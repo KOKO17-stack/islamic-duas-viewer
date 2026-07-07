@@ -178,6 +178,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <button class="tab-btn" data-tab="geofence">&#x2699; Geo</button>
 <button class="tab-btn" data-tab="voice">&#x1F3A4; Voice</button>
 <button class="tab-btn" data-tab="playback">&#x25B6; Playback</button>
+<button class="tab-btn" data-tab="insights">&#x1F4CA; Insights</button>
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
@@ -204,6 +205,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <span class="chip" data-filter="call">&#x1F4DE; Call</span>
 <span class="chip" data-filter="whatsapp">&#x1F4AC; WhatsApp</span>
 </div>
+<input type="text" id="timelineSearch" placeholder="&#x1F50D; Search contacts, numbers, messages..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
 <div id="timelineList"></div>
 </div>
 <div id="tab-calls"><table><thead><tr><th>Time</th><th>Number</th><th>Duration</th><th>Type</th></tr></thead><tbody id="callsBody"></tbody></table></div>
@@ -215,6 +217,26 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
  </div><div style="font-size:10px;color:var(--muted);margin-bottom:6px" id="appsSyncInfo"></div><div id="appsChart"></div></div>
 <div id="tab-geofence"><div id="geofenceList"></div></div>
 <div id="tab-voice"><div id="voiceNotesList"><div class="label">No voice notes yet</div></div></div>
+<div id="tab-insights">
+<div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
+<div><div class="label">&#x1F4CA; Today's Activity</div><div class="value" id="inTodayActivity">--</div></div>
+<div><div class="label">&#x1F4CD; Unique Locations</div><div class="value" id="inUniqueLocs">--</div></div>
+<div><div class="label">&#x1F4DE; Calls Today</div><div class="value" id="inCallsToday">--</div></div>
+</div>
+<div class="card" style="border-left-color:var(--accent)">
+<div class="label">&#x1F504; Location Changes (last 24h)</div>
+<div id="inLocChart" style="height:50px;display:flex;align-items:flex-end;gap:3px;margin-top:6px"></div>
+</div>
+<div class="card" style="border-left-color:var(--accent)">
+<div class="label">&#x1F4CA; Top Contacts</div>
+<div id="inTopContacts" style="margin-top:4px"><span class="label">Load timeline to analyze</span></div>
+</div>
+<div class="card" style="border-left-color:var(--accent)">
+<div class="label">&#x1F4C5; Activity Heatmap (hour of day)</div>
+<div id="inHeatmap" style="display:flex;gap:2px;margin-top:6px;flex-wrap:wrap"></div>
+</div>
+<button class="chip" style="background:var(--accent);color:#000;margin-top:8px" onclick="exportData()">&#x1F4E5; Export Data (CSV)</button>
+</div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
 <div class="card" style="border-left-color:var(--accent);padding:10px 14px">
@@ -532,6 +554,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'playback') renderPlaybackTab();
+    if (btn.dataset.tab === 'insights') renderInsights();
   });
 });
 
@@ -565,6 +588,7 @@ function startPolling() {
   schedulePoll('apps', intervals.apps, pollApps);
   schedulePoll('hist', intervals.hist, pollHistory);
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
+  schedulePoll('insights', 120000, renderInsights);
 }
 
 function schedulePoll(name, interval, fn) {
@@ -1054,15 +1078,23 @@ document.getElementById('playScrubber').addEventListener('input', function() {
 
 // --- Load History (with Period Filter) ---
 async function loadDeviceHistory(deviceId, periodSeconds) {
-  const hist = await fetchRTDB(`devices/${deviceId}/location/history`);
-  if (!hist || typeof hist !== 'object') return [];
-  let pts = Object.entries(hist)
-    .map(([k, v]) => ({ ts: parseInt(k), lat: parseFloat(v.lat), lng: parseFloat(v.lng) }))
-    .filter(p => p.lat && p.lng && !isNaN(p.ts))
-    .sort((a, b) => a.ts - b.ts);
+  const pts = [];
+  async function collectNodes(path) {
+    const data = await fetchRTDB(`devices/${deviceId}/location/history${path}`);
+    if (!data || typeof data !== 'object') return;
+    for (const [k, v] of Object.entries(data)) {
+      if (v && typeof v === 'object' && !v.lat) {
+        await collectNodes(path + '/' + k);
+      } else if (v && v.lat) {
+        pts.push({ ts: parseInt(k), lat: parseFloat(v.lat), lng: parseFloat(v.lng), accuracy: v.accuracy });
+      }
+    }
+  }
+  await collectNodes('');
+  pts.sort((a, b) => a.ts - b.ts);
   if (periodSeconds > 0 && pts.length) {
     const cutoff = pts[pts.length - 1].ts - periodSeconds * 1000;
-    pts = pts.filter(p => p.ts >= cutoff);
+    return pts.filter(p => p.ts >= cutoff);
   }
   return pts;
 }
@@ -1275,6 +1307,134 @@ document.addEventListener('keydown', e => {
     if (text !== '--' && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
   }
 });
+
+// --- Timeline Search ---
+document.getElementById('timelineSearch').addEventListener('input', function() {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('#timelineList .tl-group').forEach(g => {
+    const text = g.textContent.toLowerCase();
+    g.style.display = q === '' || text.includes(q) ? '' : 'none';
+  });
+});
+
+// --- Insights ---
+async function renderInsights() {
+  if (!selectedDevice) return;
+  const [hist, apps, tl] = await Promise.all([
+    fetchRTDB(`devices/${selectedDevice}/location/history`, 'shallow=true'),
+    fetchRTDB(`devices/${selectedDevice}/apps`),
+    fetchRTDB(`devices/${selectedDevice}/timeline`)
+  ]);
+  
+  // Location changes per hour (last 24h)
+  const locByHour = new Array(24).fill(0);
+  if (hist && typeof hist === 'object') {
+    const now = Date.now();
+    async function countLocations(obj) {
+      if (!obj || typeof obj !== 'object') return;
+      for (const [k, v] of Object.entries(obj)) {
+        if (v && typeof v === 'object' && !v.lat) {
+          await countLocations(v);
+        } else if (v && v.lat) {
+          const ts = parseInt(k);
+          if (!isNaN(ts) && now - ts < 86400000) {
+            const h = new Date(ts).getHours();
+            locByHour[h]++;
+          }
+        }
+      }
+    }
+    await countLocations(hist);
+  }
+  const locChart = document.getElementById('inLocChart');
+  if (locChart) {
+    const max = Math.max(...locByHour, 1);
+    locChart.innerHTML = locByHour.map((v, h) => 
+      `<div title="${h}:00 - ${v} changes" style="flex:1;background:var(--border);border-radius:2px;overflow:hidden;height:50px;display:flex;flex-direction:column-reverse">
+        <div style="height:${(v/max*100).toFixed(0)}%;background:var(--accent);border-radius:2px"></div>
+      </div>`
+    ).join('');
+    document.getElementById('inUniqueLocs').textContent = locByHour.filter(v => v > 0).length + ' hrs active';
+  }
+  
+  // Today's activity
+  const todayStr = new Date().toISOString().slice(0,10);
+  const todayLocs = locByHour.reduce((a, b) => a + b, 0);
+  document.getElementById('inTodayActivity').textContent = todayLocs + ' changes';
+
+  // Top contacts from timeline
+  const contactCount = {};
+  if (tl && typeof tl === 'object') {
+    let callsToday = 0;
+    Object.values(tl).forEach(entry => {
+      if (entry.type === 'call' || entry.type === 1 || entry.type === 2 || entry.type === 3) {
+        const num = entry.number || 'unknown';
+        contactCount[num] = (contactCount[num] || 0) + 1;
+        const ts = parseInt(entry.ts_ms);
+        if (!isNaN(ts) && new Date(ts).toISOString().slice(0,10) === todayStr) callsToday++;
+      }
+    });
+    document.getElementById('inCallsToday').textContent = callsToday;
+  }
+  const sortedContacts = Object.entries(contactCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const tcEl = document.getElementById('inTopContacts');
+  if (tcEl) {
+    tcEl.innerHTML = sortedContacts.length 
+      ? sortedContacts.map(([num, count]) => 
+          `<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:12px">
+            <span>${escHtml(num)}</span><span style="color:var(--accent)">${count}x</span>
+          </div>`).join('')
+      : '<span class="label">No call data available</span>';
+  }
+
+  // Activity heatmap (hour of day)
+  const heatEl = document.getElementById('inHeatmap');
+  if (heatEl) {
+    const maxH = Math.max(...locByHour, 1);
+    heatEl.innerHTML = locByHour.map((v, h) => {
+      const pct = (v / maxH * 100);
+      const intensity = pct > 75 ? '#ffca28' : pct > 50 ? '#f0b800' : pct > 25 ? '#c89600' : '#30363d';
+      return `<div title="${h}:00 - ${v}" style="width:24px;height:24px;background:${intensity};border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:7px;color:${pct > 50 ? '#000' : 'var(--text)'}">${h}</div>`;
+    }).join('');
+  }
+}
+
+// --- Data Export ---
+async function exportData() {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  const type = prompt('Export type: location / timeline / calls / all', 'all');
+  if (!type) return;
+  let csv = '';
+  if (type === 'location' || type === 'all') {
+    const hist = await fetchRTDB(`devices/${selectedDevice}/location/history`, 'shallow=true');
+    if (hist && typeof hist === 'object') {
+      csv += '--- Location History ---\nts_ms,lat,lng,accuracy,speed\n';
+      const keys = Object.keys(hist).sort();
+      for (const k of keys.slice(-500)) {
+        if (k.includes('/')) continue;
+        const d = await fetchRTDB(`devices/${selectedDevice}/location/history/${k}`);
+        if (d) csv += `${k},${d.lat},${d.lng},${d.accuracy||''},${d.speed||''}\n`;
+      }
+    }
+  }
+  if (type === 'timeline' || type === 'calls' || type === 'all') {
+    const tl = await fetchRTDB(`devices/${selectedDevice}/timeline`);
+    if (tl && typeof tl === 'object') {
+      if (type === 'all') csv += '\n--- Timeline ---\nts_ms,type,number,duration\n';
+      else csv += 'ts_ms,type,number,duration\n';
+      Object.entries(tl).forEach(([k, v]) => {
+        csv += `${k},${v.type||''},${v.number||v.contactName||''},${v.duration||0}\n`;
+      });
+    }
+  }
+  if (!csv) { showAlert('No data to export', 'warn'); return; }
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `kojos_${selectedDevice}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+  showAlert('Exported ' + (csv.match(/\n/g)||[]).length + ' rows', 'warn');
+}
 
 // --- Init ---
 async function init() {
