@@ -370,9 +370,14 @@ let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
 const map = L.map('map').setView([33.6844, 73.0479], 13);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-  maxZoom: 20
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '&copy; Esri', maxZoom: 20
+}).addTo(map);
+
+L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+  maxZoom: 19,
+  opacity: 0.35
 }).addTo(map);
 
 // --- Read Budget ---
