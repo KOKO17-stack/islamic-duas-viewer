@@ -218,6 +218,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <span class="chip" data-filter="location">&#x1F4CD; Location</span>
 <span class="chip" data-filter="call">&#x1F4DE; Call</span>
 <span class="chip" data-filter="whatsapp">&#x1F4AC; WhatsApp</span>
+<span class="chip" data-filter="snapchat">&#x1F4F8; Snapchat</span>
 </div>
 <input type="text" id="timelineSearch" placeholder="&#x1F50D; Search contacts, numbers, messages..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
 <div id="timelineList"></div>
@@ -1560,6 +1561,7 @@ function renderTimeline(docs) {
     if (timelineFilter === 'location') return type === 'location';
     if (timelineFilter === 'call') return type.includes('call');
     if (timelineFilter === 'whatsapp') return type.includes('whatsapp') || type.includes('message');
+    if (timelineFilter === 'snapchat') return type.includes('snapchat');
     return true;
   }).slice(0, 100);
   if (!filtered.length) { list.innerHTML = '<div class="label">No entries</div>'; return; }
@@ -1584,12 +1586,13 @@ function renderTimeline(docs) {
     const locs = entries.filter(e => (e.type || '').toLowerCase() === 'location').length;
     const calls = entries.filter(e => (e.type || '').includes('call')).length;
     const msgs = entries.filter(e => (e.type || '').includes('whatsapp') || (e.type || '').includes('message')).length;
-    const summary = [locs ? `${locs}📍` : '', calls ? `${calls}📞` : '', msgs ? `${msgs}💬` : ''].filter(Boolean).join(' ');
+    const snaps = entries.filter(e => (e.type || '').includes('snapchat')).length;
+    const summary = [locs ? `${locs}📍` : '', calls ? `${calls}📞` : '', msgs ? `${msgs}💬` : '', snaps ? `${snaps}📸` : ''].filter(Boolean).join(' ');
     html += `<div class="tl-group"><div class="tl-day">${day}</div><div class="tl-summary">${summary}</div>`;
     for (const d of entries) {
       const type = d.type || '';
       const ts = parseInt(d.ts_ms || '0');
-      const icon = type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : '\u{1F4CD}';
+      const icon = type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : '\u{1F4CD}';
       const contact = d.contactName || d.contact || '';
       const msg = d.messagePreview || '';
       const dur = d.duration || '';
