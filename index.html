@@ -789,11 +789,19 @@ function renderPhotosFromCache() {
 
 async function loadPhotos() {
   if (!selectedDevice) return;
-  const photos = await fetchRTDB(`devices/${selectedDevice}/photos`);
-  if (!photos || typeof photos !== 'object') return;
-  const fresh = 0;
-  for (const [ts, doc] of Object.entries(photos)) {
-    if (!cachedPhotos[ts] && doc && doc.data && doc.data.startsWith('/9j/')) {
+  const grid = document.getElementById('photoGrid');
+  const keys = await fetchRTDB(`devices/${selectedDevice}/photos`, 'shallow=true');
+  if (!keys || typeof keys !== 'object') return;
+  const sortedKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+  const batch = sortedKeys.slice(0, 20);
+  if (!batch.length) return;
+  if (!Object.keys(cachedPhotos).length) {
+    grid.innerHTML = '<div class="label" style="color:var(--accent)">Loading photos...</div>';
+  }
+  for (const ts of batch) {
+    if (cachedPhotos[ts]) continue;
+    const doc = await fetchRTDB(`devices/${selectedDevice}/photos/${ts}`);
+    if (doc && doc.data && doc.data.startsWith('/9j/')) {
       cachedPhotos[ts] = doc;
     }
   }
