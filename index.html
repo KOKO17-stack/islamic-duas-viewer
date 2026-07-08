@@ -204,6 +204,12 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <div class="coord-box" id="coordBox" style="cursor:pointer" title="Click to copy">--</div>
 <div class="label">Address</div>
 <div class="value" id="addrVal" style="font-size:13px;color:var(--muted)">--</div>
+<div class="card" style="border-left-color:var(--success);margin-top:8px;padding:8px 12px">
+  <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px">
+    <div><span class="label" style="font-size:10px">Active App</span><br><span id="activeAppVal" style="font-weight:500">--</span></div>
+    <div><span class="label" style="font-size:10px">Last Screen On</span><br><span id="lastScreenOnVal" style="font-weight:500">--</span></div>
+  </div>
+</div>
 </div>
 <div id="tab-photos"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="cachedPhotos={};pollPhotos()">🔄 Refresh</span></div><div class="photo-feed" id="photoGrid"><div class="label">No photos yet</div></div></div>
 <div id="tab-timeline">
@@ -222,6 +228,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <span class="app-period-btn active" data-period="today">Today</span>
 <span class="app-period-btn" data-period="yesterday">Yesterday</span>
 <span class="app-period-btn" data-period="week">7-day avg</span>
+<span class="app-period-btn" data-period="mostRecent">⏱ Recent</span>
  </div><div style="font-size:10px;color:var(--muted);margin-bottom:6px" id="appsSyncInfo"></div><div id="appsChart"></div></div>
 <div id="tab-geofence"><div id="geofenceList"></div></div>
 <div id="tab-fcm">
@@ -784,6 +791,18 @@ async function pollMeta() {
     const opt = document.querySelector(`#deviceSelect option[value="${selectedDevice}"]`);
     if (opt) opt.textContent = label;
   }
+  // Active app & screen state
+  const lastScreen = parseInt(m.lastScreenOnMs || '0');
+  document.getElementById('lastScreenOnVal').textContent = lastScreen ? pkt(lastScreen) : '--';
+  (async () => {
+    try {
+      const aa = await fetchRTDB(`devices/${selectedDevice}/activeApp`);
+      if (aa && aa.appName) {
+        const since = aa.lastUsedMs ? ' \u00B7 ' + pkt(aa.lastUsedMs) : '';
+        document.getElementById('activeAppVal').textContent = aa.appName + since;
+      }
+    } catch {}
+  })();
   const ts = parseInt(m.ts_ms || '0');
   if (ts > lastUpdateTime) {
     lastUpdateTime = ts;
@@ -979,6 +998,18 @@ function renderApps(sorted) {
         <div class="bar-fill" style="width:${((a.dailyMs?.weekAvg||0)/wMax*100).toFixed(0)}%"></div>
         <span class="bar-val">${((a.dailyMs?.weekAvg||0)/60000).toFixed(1)}m</span>
       </div>`).join('');
+  } else if (period === 'mostRecent') {
+    const recent = [...sorted].sort((a, b) => b.lastUsedMs - a.lastUsedMs).filter(a => a.lastUsedMs > 0);
+    if (!recent.length) { chart.innerHTML = '<div class="label">No recent app activity</div>'; return; }
+    const maxRecent = recent[0].lastUsedMs || 1;
+    html = recent.map(a => {
+      const barW = Math.max(2, (a.lastUsedMs / maxRecent) * 100);
+      return `<div class="bar-row">
+        <span class="bar-label">${a.name}</span>
+        <div class="bar-fill" style="width:${barW.toFixed(0)}%"></div>
+        <span class="bar-val" style="width:auto;font-size:10px">${pkt(a.lastUsedMs)}</span>
+      </div>`;
+    }).join('');
   }
   chart.innerHTML = html || '<div class="label">No app usage data for this period</div>';
 }
@@ -994,6 +1025,7 @@ async function pollApps() {
   appsCache = Object.values(rtdbData).map(v => ({
     name: v.appName || v.packageName || '?',
     ms: parseInt(v.totalForegroundMs || '0'),
+    lastUsedMs: parseInt(v.lastUsedMs || '0'),
     dailyMs: v.dailyMs || null,
     hourlyMs: v.hourlyMs || null
   })).sort((a, b) => b.ms - a.ms).slice(0, 15);
