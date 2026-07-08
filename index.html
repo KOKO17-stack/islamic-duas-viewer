@@ -1356,6 +1356,16 @@ function formatDistance(m) {
 
 function renderPlaybackTab() {
   const pts = playbackPoints.length ? playbackPoints : locationHistory;
+  // Deduplicate in-place by lat|lng|rounded_second
+  const seen = new Set();
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i];
+    if (!p || !p.lat) { pts.splice(i, 1); continue; }
+    const sec = Math.floor((p.ts || 0) / 1000);
+    const k = `${p.lat.toFixed(4)}|${p.lng.toFixed(4)}|${sec}`;
+    if (seen.has(k)) { pts.splice(i, 1); }
+    else seen.add(k);
+  }
   const statsEl = document.getElementById('pbStats');
   const listEl = document.getElementById('pbPointList');
   if (!pts.length) {
