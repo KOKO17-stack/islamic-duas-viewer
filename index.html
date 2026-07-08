@@ -374,9 +374,9 @@ L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/
   attribution: '&copy; Esri', maxZoom: 20
 }).addTo(map);
 
-L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-  attribution: '&copy; Esri',
-  maxZoom: 20,
+L.tileLayer('https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+  maxZoom: 19,
   opacity: 0.45
 }).addTo(map);
 
