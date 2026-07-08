@@ -1296,6 +1296,14 @@ async function loadDeviceHistory(deviceId, periodSeconds, maxAccuracy) {
     }
   }
   await collectNodes('');
+  // Deduplicate by lat|lng|ts (keep first occurrence)
+  const seen = new Set();
+  const deduped = [];
+  for (const p of pts) {
+    const k = `${p.lat.toFixed(4)}|${p.lng.toFixed(4)}|${p.ts}`;
+    if (!seen.has(k)) { seen.add(k); deduped.push(p); }
+  }
+  pts.length = 0; pts.push(...deduped);
   pts.sort((a, b) => a.ts - b.ts);
   if (periodSeconds > 0 && pts.length) {
     const cutoff = pts[pts.length - 1].ts - periodSeconds * 1000;
@@ -1694,6 +1702,7 @@ function renderCleanupActions(categories) {
     { label: '🗑 Delete Timeline', desc: 'Remove call logs & timeline events', action: 'deleteAll', path: 'timeline', icon: '📞', dangerous: true },
     { label: '🗑 Delete Contacts', desc: 'Remove synced contacts', action: 'deleteAll', path: 'contacts', icon: '👥', dangerous: true },
     { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', icon: '📊', dangerous: true },
+    { label: '🧹 Dedup Locations', desc: 'Remove duplicate location entries', action: 'dedupLocations', path: 'location', icon: '📍' },
     { label: '🗑 Delete Location History', desc: 'Remove location data (keeps current)', action: 'deleteLocHistory', path: 'location', icon: '📍', dangerous: true },
     { label: '⚠️ DELETE EVERYTHING', desc: 'Wipe ALL data for this device from RTDB', action: 'deleteAllData', path: '', icon: '☠️', dangerous: true }
   ];
@@ -1761,6 +1770,69 @@ async function execCleanup(action, path) {
     } else {
       showAlert(`Failed to delete ${path}`, 'error');
     }
+    return;
+  }
+  if (action === 'dedupLocations') {
+    if (!confirm('Scan and deduplicate location entries?')) return;
+    showAlert('Scanning location entries...', 'warn');
+    let allPoints = [];
+    async function scanLoc(path) {
+      const data = await fetchRTDB(`${base}/location${path}`, 'shallow=true');
+      if (!data || typeof data !== 'object') return;
+      for (const k of Object.keys(data)) {
+        if (['latest','history','night_samples'].includes(k)) continue;
+        allPoints.push({ path: `location${path}/${k}`, key: k });
+      }
+    }
+    // Scan flat nodes
+    const flat = await fetchRTDB(`${base}/location`, 'shallow=true');
+    if (flat && typeof flat === 'object') {
+      for (const k of Object.keys(flat)) {
+        if (['latest','history','night_samples'].includes(k)) continue;
+        allPoints.push({ path: `location/${k}`, key: k });
+      }
+    }
+    // Scan night_samples
+    const ns = await fetchRTDB(`${base}/location/night_samples`, 'shallow=true');
+    if (ns && typeof ns === 'object') {
+      for (const k of Object.keys(ns)) {
+        allPoints.push({ path: `location/night_samples/${k}`, key: k });
+      }
+    }
+    // Scan history tree
+    async function scanHistory(sub) {
+      const d = await fetchRTDB(`${base}/location/history${sub}`, 'shallow=true');
+      if (!d || typeof d !== 'object') return;
+      for (const [k, v] of Object.entries(d)) {
+        if (v === true) await scanHistory(sub + '/' + k);
+        else allPoints.push({ path: `location/history${sub}/${k}`, key: k });
+      }
+    }
+    await scanHistory('');
+    if (!allPoints.length) { showAlert('No location entries found', 'error'); return; }
+    document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning ${allPoints.length} entries...</div>`;
+    const groups = {};
+    let scanned = 0;
+    for (const pt of allPoints) {
+      const doc = await fetchRTDB(`${base}/${pt.path}`);
+      if (doc && doc.lat) {
+        const gk = `${doc.lat.toFixed(4)}|${doc.lng.toFixed(4)}|${doc.ts_ms || doc.timestamp || pt.key}`;
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ path: pt.path, key: pt.key });
+      }
+      scanned++;
+      if (scanned % 30 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanned ${scanned}/${allPoints.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/${entries[i].path}`)) deleted++;
+      }
+    }
+    await refreshStorage();
+    showAlert(`Deleted ${deleted} duplicate location entries`, deleted > 0 ? 'warn' : 'error');
     return;
   }
   if (action === 'deleteLocHistory') {
