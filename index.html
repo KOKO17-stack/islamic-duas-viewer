@@ -158,10 +158,6 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 .pb-point-row .ppt-coord{min-width:70px;font-size:7px}
 .pb-point-row .ppt-meta{font-size:7px}
 }
-.leaflet-control-layers{background:#161b22!important;color:#c9d1d9!important;border:1px solid #30363d!important;border-radius:8px!important}
-.leaflet-control-layers label{color:#c9d1d9!important;font-size:12px!important}
-.leaflet-control-layers input{margin-right:6px!important}
-.leaflet-control-layers a{color:#ffca28!important}
 </style>
 </head>
 <body>
@@ -375,22 +371,14 @@ let intervals = { ...BASE_INTERVALS };
 // --- Init Map ---
 const map = L.map('map').setView([33.6844, 73.0479], 13);
 
-const osmMap = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
-  maxZoom: 19
-});
-
-const satelliteMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
   attribution: '&copy; Esri', maxZoom: 20
-});
+}).addTo(map);
 
-// Default to OSM (labels guaranteed to work)
-osmMap.addTo(map);
-
-// Layer control to toggle
-const layerControl = L.control.layers({
-  '🗺️ Street': osmMap,
-  '🛰️ Satellite': satelliteMap
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>',
+  maxZoom: 19,
+  opacity: 0.6
 }).addTo(map);
 
 // --- Read Budget ---
