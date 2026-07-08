@@ -1139,11 +1139,13 @@ function updateTrail() {
   renderPlaybackTab();
 }
 
-// --- Playback (Time-Aware) ---
+// --- Smooth Real-Time Playback Engine ---
+let segFrom = 0, segTo = 0, segStartTime = 0, segRealGap = 0, animFrameId = null;
+
 function setupPlayback(pts) {
   playbackPoints = pts;
   const scrubber = document.getElementById('playScrubber');
-  scrubber.max = Math.max(0, pts.length - 1);
+  scrubber.max = 1000;
   const stEl = document.getElementById('playTsStart');
   const enEl = document.getElementById('playTsEnd');
   if (pts.length) {
@@ -1157,92 +1159,127 @@ function setupPlayback(pts) {
 
 function stopPlayback() {
   playbackRunning = false;
-  if (playbackTimer) { clearInterval(playbackTimer); playbackTimer = null; }
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
   document.getElementById('playBtn').textContent = '\u25B6';
   document.getElementById('statusDot').textContent = playbackDirection === 1 ? '\u25CF Live' : '\u25CF Live';
   document.getElementById('statusDot').className = 'status';
   if (marker) marker.closePopup();
 }
 
-function playbackStep() {
-  const pts = playbackPoints;
-  if (!pts.length) { stopPlayback(); return; }
-  if (playbackIdx < 0 || playbackIdx >= pts.length) {
-    if (playbackLoop) {
-      playbackIdx = playbackDirection === 1 ? 0 : pts.length - 1;
-    } else {
-      stopPlayback();
-      return;
-    }
-  }
-  const p = pts[playbackIdx];
-  if (marker) { marker.setLatLng([p.lat, p.lng]); marker.setPopupContent(pkt(p.ts)).openPopup(); }
-  map.panTo([p.lat, p.lng], { animate: true, duration: 0.3 });
-  document.getElementById('playScrubber').value = playbackIdx;
-  document.getElementById('playCount').textContent = `${playbackIdx + 1}/${pts.length}`;
-  updatePlaybackUI(p);
-  const metaParts = [];
-  if (p.speed) metaParts.push((p.speed).toFixed(1) + 'm/s');
-  if (p.accuracy) metaParts.push('\u00B1' + p.accuracy + 'm');
-  document.getElementById('playMeta').textContent = metaParts.length ? metaParts.join(' ') : '--';
-  highlightPointInList(playbackIdx);
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function setMarkerPos(lat, lng, ts) {
+  if (marker) marker.setLatLng([lat, lng]);
 }
 
-function scheduleNextPlayback() {
-  const pts = playbackPoints;
-  if (!pts.length || playbackIdx < 0 || playbackIdx >= pts.length) {
-    if (playbackLoop) {
-      playbackIdx = playbackDirection === 1 ? 0 : pts.length - 1;
-    } else {
-      stopPlayback();
-      return;
-    }
+function panIfNeeded(lat, lng) {
+  const bounds = map.getBounds();
+  const sw = bounds.getSouthWest(), ne = bounds.getNorthEast();
+  const margin = 0.25;
+  const latRange = ne.lat - sw.lat;
+  const lngRange = ne.lng - sw.lng;
+  if (lat < sw.lat + latRange * margin || lat > ne.lat - latRange * margin ||
+      lng < sw.lng + lngRange * margin || lng > ne.lng - lngRange * margin) {
+    map.panTo([lat, lng], { animate: true, duration: 0.15 });
   }
-  const speed = parseInt(document.getElementById('speedSelect').value);
-  let gap = 1000;
-  if (playbackDirection === 1) {
-    if (playbackIdx + 1 < pts.length) {
-      gap = pts[playbackIdx + 1].ts - pts[playbackIdx].ts;
+}
+
+function updatePlaybackDisplay(lat, lng, ts, fromIdx, toIdx, frac) {
+  const pts = playbackPoints;
+  const totalSegs = Math.max(1, pts.length - 1);
+  const scrubVal = totalSegs > 0 ? Math.floor(((fromIdx + frac) / totalSegs) * 1000) : 0;
+  document.getElementById('playScrubber').value = scrubVal;
+  document.getElementById('playCount').textContent = `${fromIdx + 1}/${pts.length}`;
+  const displayTs = Math.round(ts);
+  setMarkerPos(lat, lng, displayTs);
+  if (marker) marker.setPopupContent(pkt(displayTs));
+  panIfNeeded(lat, lng);
+  const cur = { lat, lng, ts: displayTs, accuracy: pts[fromIdx] ? pts[fromIdx].accuracy : 0 };
+  updatePlaybackUI(cur);
+  const speed = pts[fromIdx] && pts[fromIdx].speed ? pts[fromIdx].speed.toFixed(1) + 'm/s' : '--';
+  document.getElementById('playMeta').textContent = '\u26A1 ' + speed;
+  highlightPointInList(fromIdx);
+}
+
+function advanceSegment() {
+  const pts = playbackPoints;
+  const dir = playbackDirection;
+  if (dir === 1) {
+    if (segTo + 1 < pts.length) {
+      segFrom = segTo;
+      segTo = segTo + 1;
+    } else {
+      if (playbackLoop) { segFrom = 0; segTo = 1; }
+      else { stopPlayback(); return false; }
     }
   } else {
-    if (playbackIdx - 1 >= 0) {
-      gap = pts[playbackIdx].ts - pts[playbackIdx - 1].ts;
+    if (segFrom - 1 >= 0) {
+      segTo = segFrom;
+      segFrom = segFrom - 1;
+    } else {
+      if (playbackLoop) { segFrom = pts.length - 2; segTo = pts.length - 1; }
+      else { stopPlayback(); return false; }
     }
   }
-  if (gap <= 0) gap = 1000;
-  if (gap > 3600000) gap = 3600000;
-  const interval = Math.max(30, Math.min(5000, gap / speed));
-  playbackTimer = setTimeout(() => {
-    if (!playbackRunning) return;
-    playbackIdx += playbackDirection;
-    playbackStep();
-    if (playbackRunning) scheduleNextPlayback();
-  }, interval);
+  segRealGap = Math.abs(pts[segTo].ts - pts[segFrom].ts);
+  if (segRealGap <= 0) segRealGap = 1000;
+  if (segRealGap > 3600000) segRealGap = 3600000;
+  segStartTime = performance.now();
+  return true;
+}
+
+function animatePlayback() {
+  if (!playbackRunning) return;
+  const pts = playbackPoints;
+  const speed = parseInt(document.getElementById('speedSelect').value);
+  const elapsed = (performance.now() - segStartTime) * speed;
+  let t = elapsed / segRealGap;
+  if (t >= 1) {
+    const fromP = pts[segFrom], toP = pts[segTo];
+    updatePlaybackDisplay(toP.lat, toP.lng, toP.ts, segFrom, segTo, 1);
+    if (!advanceSegment()) return;
+    t = 0;
+    segStartTime = performance.now();
+  }
+  const fromP = pts[segFrom], toP = pts[segTo];
+  const lat = lerp(fromP.lat, toP.lat, t);
+  const lng = lerp(fromP.lng, toP.lng, t);
+  const ts = lerp(fromP.ts, toP.ts, t);
+  updatePlaybackDisplay(lat, lng, ts, segFrom, segTo, t);
+  animFrameId = requestAnimationFrame(animatePlayback);
 }
 
 document.getElementById('playBtn').addEventListener('click', function() {
   if (playbackRunning) { stopPlayback(); return; }
-  if (!playbackPoints.length) return;
-  if (playbackIdx < 0 || playbackIdx >= playbackPoints.length) {
-    playbackIdx = playbackDirection === 1 ? 0 : playbackPoints.length - 1;
+  const pts = playbackPoints;
+  if (!pts.length) return;
+  if (playbackIdx < 0 || playbackIdx >= pts.length) {
+    playbackIdx = playbackDirection === 1 ? 0 : pts.length - 1;
   }
+  segFrom = Math.max(0, Math.min(playbackIdx, pts.length - 2));
+  segTo = segFrom + 1;
+  if (playbackDirection === -1) { segFrom = segTo; segTo = segFrom - 1; }
+  segRealGap = Math.abs(pts[segTo].ts - pts[segFrom].ts);
+  if (segRealGap <= 0) segRealGap = 1000;
+  if (segRealGap > 3600000) segRealGap = 3600000;
+  segStartTime = performance.now();
   playbackRunning = true;
   this.textContent = '\u23F8';
   document.getElementById('statusDot').textContent = '\u25B6 Playing';
   document.getElementById('statusDot').className = 'status';
-  playbackStep();
-  scheduleNextPlayback();
+  animatePlayback();
 });
 
 document.getElementById('rewindBtn').addEventListener('click', () => {
   stopPlayback();
   playbackIdx = playbackDirection === 1 ? 0 : playbackPoints.length - 1;
   document.getElementById('playBtn').textContent = '\u25B6';
-  document.getElementById('playScrubber').value = playbackIdx;
-  document.getElementById('playCount').textContent = playbackPoints.length ? `${playbackIdx + 1}/${playbackPoints.length}` : '0/0';
+  document.getElementById('playScrubber').value = 0;
+  document.getElementById('playCount').textContent = playbackPoints.length ? '1/' + playbackPoints.length : '0/0';
   if (playbackPoints.length && playbackPoints[playbackIdx]) {
     const p = playbackPoints[playbackIdx];
-    if (marker) { marker.setLatLng([p.lat, p.lng]); marker.setPopupContent(pkt(p.ts)).openPopup(); }
+    setMarkerPos(p.lat, p.lng, p.ts);
+    if (marker) marker.setPopupContent(pkt(p.ts)).openPopup();
     map.panTo([p.lat, p.lng], { animate: true, duration: 0.3 });
     updatePlaybackUI(p);
   }
@@ -1268,13 +1305,18 @@ document.getElementById('loopBtn').addEventListener('click', function() {
 // --- Scrubber ---
 document.getElementById('playScrubber').addEventListener('input', function() {
   if (playbackRunning) stopPlayback();
-  playbackIdx = parseInt(this.value);
-  if (playbackPoints[playbackIdx]) {
-    const p = playbackPoints[playbackIdx];
-    if (marker) { marker.setLatLng([p.lat, p.lng]); marker.setPopupContent(pkt(p.ts)).openPopup(); }
-    document.getElementById('playCount').textContent = `${playbackIdx + 1}/${playbackPoints.length}`;
+  const pts = playbackPoints;
+  if (!pts.length) return;
+  const totalSegs = Math.max(1, pts.length - 1);
+  const segIdx = Math.min(totalSegs - 1, Math.floor((parseInt(this.value) / 1000) * totalSegs));
+  playbackIdx = segIdx;
+  const p = pts[segIdx];
+  if (p) {
+    setMarkerPos(p.lat, p.lng, p.ts);
+    if (marker) marker.setPopupContent(pkt(p.ts)).openPopup();
+    document.getElementById('playCount').textContent = `${segIdx + 1}/${pts.length}`;
     updatePlaybackUI(p);
-    highlightPointInList(playbackIdx);
+    highlightPointInList(segIdx);
   }
 });
 
@@ -1429,9 +1471,11 @@ function jumpToPoint(idx) {
   if (idx < 0 || idx >= pts.length) return;
   playbackIdx = idx;
   const p = pts[idx];
-  if (marker) { marker.setLatLng([p.lat, p.lng]); marker.setPopupContent(pkt(p.ts)).openPopup(); }
+  setMarkerPos(p.lat, p.lng, p.ts);
+  if (marker) marker.setPopupContent(pkt(p.ts)).openPopup();
   map.panTo([p.lat, p.lng], { animate: true, duration: 0.3 });
-  document.getElementById('playScrubber').value = idx;
+  const totalSegs = Math.max(1, pts.length - 1);
+  document.getElementById('playScrubber').value = Math.floor((idx / totalSegs) * 1000);
   document.getElementById('playCount').textContent = `${idx + 1}/${pts.length}`;
   updatePlaybackUI(p);
   document.getElementById('playTsStart').textContent = pts[0].ts ? pktTime(pts[0].ts) : '--';
