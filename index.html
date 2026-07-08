@@ -203,7 +203,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <div class="label">Address</div>
 <div class="value" id="addrVal" style="font-size:13px;color:var(--muted)">--</div>
 </div>
-<div id="tab-photos"><div class="photo-feed" id="photoGrid"><div class="label">No photos yet</div></div></div>
+<div id="tab-photos"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="cachedPhotos={};pollPhotos()">🔄 Refresh</span></div><div class="photo-feed" id="photoGrid"><div class="label">No photos yet</div></div></div>
 <div id="tab-timeline">
 <div class="filter-chips" id="timelineChips">
 <span class="chip active" data-filter="all">All</span>
@@ -267,6 +267,17 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <div style="font-size:10px;color:var(--muted);margin-top:4px">
 <span id="stRange">--</span>
 </div>
+</div>
+</div>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0 8px">
+<div class="pg" style="gap:4px">
+<select id="accuracyFilter" style="font-size:10px;padding:4px 16px 4px 6px;min-height:28px">
+<option value="0">Accuracy: All</option>
+<option value="50">≤ 50 m</option>
+<option value="100">≤ 100 m</option>
+<option value="200">≤ 200 m</option>
+<option value="500" selected>≤ 500 m</option>
+</select>
 </div>
 </div>
 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0 8px">
@@ -778,18 +789,13 @@ function renderPhotosFromCache() {
 
 async function loadPhotos() {
   if (!selectedDevice) return;
-  const keys = await fetchRTDB(`devices/${selectedDevice}/photos`, 'shallow=true');
-  if (!keys || typeof keys !== 'object') return;
-  const allTs = Object.keys(keys).sort((a, b) => (parseInt(b)||0) - (parseInt(a)||0));
-  const uncached = allTs.filter(k => !cachedPhotos[k]);
-  for (let i = 0; i < uncached.length; i += 8) {
-    await Promise.all(uncached.slice(i, i + 8).map(async ts => {
-      if (cachedPhotos[ts]) return;
-      try {
-        const doc = await fetchRTDB(`devices/${selectedDevice}/photos/${ts}`);
-        if (doc && doc.data && doc.data.startsWith('/9j/')) cachedPhotos[ts] = doc;
-      } catch {}
-    }));
+  const photos = await fetchRTDB(`devices/${selectedDevice}/photos`);
+  if (!photos || typeof photos !== 'object') return;
+  const fresh = 0;
+  for (const [ts, doc] of Object.entries(photos)) {
+    if (!cachedPhotos[ts] && doc && doc.data && doc.data.startsWith('/9j/')) {
+      cachedPhotos[ts] = doc;
+    }
   }
 }
 
@@ -1240,7 +1246,7 @@ document.getElementById('playScrubber').addEventListener('input', function() {
 });
 
 // --- Load History (with Period Filter) ---
-async function loadDeviceHistory(deviceId, periodSeconds) {
+async function loadDeviceHistory(deviceId, periodSeconds, maxAccuracy) {
   const pts = [];
   async function collectNodes(path) {
     const data = await fetchRTDB(`devices/${deviceId}/location/history${path}`);
@@ -1249,7 +1255,10 @@ async function loadDeviceHistory(deviceId, periodSeconds) {
       if (v && typeof v === 'object' && !v.lat) {
         await collectNodes(path + '/' + k);
       } else if (v && v.lat) {
-        pts.push({ ts: parseInt(k), lat: parseFloat(v.lat), lng: parseFloat(v.lng), accuracy: v.accuracy });
+        const acc = parseFloat(v.accuracy) || 999;
+        if (!maxAccuracy || acc <= maxAccuracy) {
+          pts.push({ ts: parseInt(k), lat: parseFloat(v.lat), lng: parseFloat(v.lng), accuracy: acc });
+        }
       }
     }
   }
@@ -1268,7 +1277,9 @@ document.getElementById('loadHistoryBtn').addEventListener('click', async functi
   this.textContent = '...';
   try {
     const periodSeconds = parseInt(document.getElementById('periodUnit').value);
-    const pts = await loadDeviceHistory(selectedDevice, periodSeconds);
+    const accVal = parseInt(document.getElementById('accuracyFilter').value);
+    const maxAcc = accVal > 0 ? accVal : 0;
+    const pts = await loadDeviceHistory(selectedDevice, periodSeconds, maxAcc);
     if (!pts.length) { showAlert('No history points in range', 'warn'); this.textContent = '\u{1F4C5}'; return; }
     locationHistory = pts;
     updateTrail();
