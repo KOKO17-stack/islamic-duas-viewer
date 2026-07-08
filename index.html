@@ -1296,11 +1296,12 @@ async function loadDeviceHistory(deviceId, periodSeconds, maxAccuracy) {
     }
   }
   await collectNodes('');
-  // Deduplicate by lat|lng|ts (keep first occurrence)
+  // Deduplicate by lat|lng|rounded_second (keep first occurrence)
   const seen = new Set();
   const deduped = [];
   for (const p of pts) {
-    const k = `${p.lat.toFixed(4)}|${p.lng.toFixed(4)}|${p.ts}`;
+    const sec = Math.floor(p.ts / 1000);
+    const k = `${p.lat.toFixed(4)}|${p.lng.toFixed(4)}|${sec}`;
     if (!seen.has(k)) { seen.add(k); deduped.push(p); }
   }
   pts.length = 0; pts.push(...deduped);
@@ -1816,7 +1817,9 @@ async function execCleanup(action, path) {
     for (const pt of allPoints) {
       const doc = await fetchRTDB(`${base}/${pt.path}`);
       if (doc && doc.lat) {
-        const gk = `${doc.lat.toFixed(4)}|${doc.lng.toFixed(4)}|${doc.ts_ms || doc.timestamp || pt.key}`;
+        const rawTs = parseInt(doc.ts_ms || doc.timestamp || pt.key) || 0;
+        const sec = Math.floor(rawTs / 1000);
+        const gk = `${doc.lat.toFixed(4)}|${doc.lng.toFixed(4)}|${sec}`;
         if (!groups[gk]) groups[gk] = [];
         groups[gk].push({ path: pt.path, key: pt.key });
       }
