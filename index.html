@@ -231,7 +231,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <span class="app-period-btn" data-period="yesterday">Yesterday</span>
 <span class="app-period-btn" data-period="week">7-day avg</span>
 <span class="app-period-btn" data-period="mostRecent">⏱ Recent</span>
- </div><div style="font-size:10px;color:var(--muted);margin-bottom:6px" id="appsSyncInfo"></div><div id="appsChart"></div></div>
+  </div><input type="text" id="appsSearch" placeholder="&#x1F50D; Search apps..." style="width:100%;padding:6px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:6px;display:none"><div style="font-size:10px;color:var(--muted);margin-bottom:6px" id="appsSyncInfo"></div><div id="appsChart"></div></div>
 <div id="tab-geofence"><div id="geofenceList"></div></div>
 <div id="tab-fcm">
 <div class="card" style="border-left-color:var(--accent);padding:12px">
@@ -547,6 +547,16 @@ function pktTime(ts) {
   return d.toLocaleString('en-PK', { timeZone: PKT, hour12: true, month: 'short', day: '2-digit', hour: 'numeric', minute: '2-digit' });
 }
 
+function relativeTime(ts) {
+  const diff = Date.now() - ts;
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  if (diff < 172800000) return 'yesterday';
+  if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
+  return pktTime(ts);
+}
+
 // --- Geofences ---
 function saveGeofences() {
   if (!selectedDevice) return;
@@ -758,32 +768,34 @@ async function fetchDevices() {
     if (ts) active.push({ id, ts: Date.parse(ts) || 0 });
   }
   active.sort((a, b) => b.ts - a.ts);
-  const activeIds = active.map(a => a.id);
-  if (!activeIds.length) {
+  if (!active.length) {
     document.getElementById('statusDot').textContent = '\u2716 No active devices';
     document.getElementById('statusDot').className = 'status warn';
     return;
   }
+
+  // Fetch manufacturer+model for each device, then deduplicate
+  const modelMap = {};
+  for (const entry of active) {
+    const info = await fetchRTDB(`devices/${entry.id}/info`);
+    const metrics = info ? null : await fetchRTDB(`devices/${entry.id}/metrics/latest`);
+    const devInfo = info || metrics || {};
+    const manuf = (devInfo.manufacturer || '').trim();
+    const model = (devInfo.deviceModel || '').trim();
+    const modelKey = manuf && model ? manuf + '|' + model : entry.id;
+    if (!modelMap[modelKey] || entry.ts > modelMap[modelKey].ts) {
+      modelMap[modelKey] = { id: entry.id, ts: entry.ts, manuf, model, label: [manuf, model].filter(Boolean).join(' ') || entry.id.slice(0, 8) };
+    }
+  }
+  const dedupedIds = Object.values(modelMap).sort((a, b) => b.ts - a.ts);
+  const activeIds = dedupedIds.map(a => a.id);
+
   selectedDevice = activeIds[0];
   loadGeofences(selectedDevice);
   localStorage.setItem('selectedDevice', selectedDevice);
-  activeIds.forEach(id => { devices[id] = { id, label: id.slice(0, 8) + '...', model: '', manuf: '' }; });
-  sel.innerHTML = activeIds.map(k => `<option value="${k}">${devices[k].label}</option>`).join('');
+  dedupedIds.forEach(d => { devices[d.id] = { id: d.id, label: d.label, model: d.model, manuf: d.manuf }; });
+  sel.innerHTML = dedupedIds.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
   sel.value = selectedDevice;
-
-  (async () => {
-    try {
-      for (const id of activeIds) {
-        const info = await fetchRTDB(`devices/${id}/info`);
-        if (info && info.deviceModel) {
-          const label = [info.manufacturer, info.deviceModel].filter(Boolean).join(' ') || id.slice(0, 8);
-          if (devices[id]) devices[id].label = label;
-        }
-      }
-      const opt = document.querySelector(`#deviceSelect option[value="${selectedDevice}"]`);
-      if (opt && devices[selectedDevice]) opt.textContent = devices[selectedDevice].label;
-    } catch {}
-  })();
 }
 
 async function pollLocation() {
@@ -979,8 +991,8 @@ function renderApps(sorted) {
   if (period === 'lastHour') {
     const currentHour = parseInt(new Intl.DateTimeFormat('en', { timeZone: PKT, hour: 'numeric', hour12: false }).format(new Date()));
     const hourData = sorted.map(a => {
-      const ms = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : 0;
-      return { name: a.name, ms };
+      const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : 0;
+      return { name: a.name, ms: Math.min(raw, 3600000) };
     }).sort((a, b) => b.ms - a.ms);
     const maxH = Math.max(...hourData.map(a => a.ms), 1);
     html = hourData.map(a => `
@@ -1021,15 +1033,46 @@ function renderApps(sorted) {
   } else if (period === 'mostRecent') {
     const recent = [...sorted].sort((a, b) => b.lastUsedMs - a.lastUsedMs).filter(a => a.lastUsedMs > 0);
     if (!recent.length) { chart.innerHTML = '<div class="label">No recent app activity</div>'; return; }
-    const maxRecent = recent[0].lastUsedMs || 1;
-    html = recent.map(a => {
-      const barW = Math.max(2, (a.lastUsedMs / maxRecent) * 100);
-      return `<div class="bar-row">
-        <span class="bar-label">${a.name}</span>
-        <div class="bar-fill" style="width:${barW.toFixed(0)}%"></div>
-        <span class="bar-val" style="width:auto;font-size:10px">${pkt(a.lastUsedMs)}</span>
-      </div>`;
-    }).join('');
+    const q = (document.getElementById('appsSearch').value || '').toLowerCase();
+    const filtered = q ? recent.filter(a => a.name.toLowerCase().includes(q)) : recent;
+    if (!filtered.length) { chart.innerHTML = '<div class="label">No apps matching "' + q + '"</div>'; return; }
+    const groups = { 'justNow': [], 'today': [], 'yesterday': [], 'thisWeek': [], 'older': [] };
+    const now = Date.now(), todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7);
+    for (const a of filtered) {
+      const d = a.lastUsedMs;
+      if (now - d < 3600000) groups.justNow.push(a);
+      else if (d >= todayStart.getTime()) groups.today.push(a);
+      else if (d >= yesterdayStart.getTime()) groups.yesterday.push(a);
+      else if (d >= weekStart.getTime()) groups.thisWeek.push(a);
+      else groups.older.push(a);
+    }
+    const groupLabels = {
+      justNow: { label: '\u26A1 Just now', color: '#3fb950' },
+      today: { label: '\uD83D\uDD25 Today', color: '#ffca28' },
+      yesterday: { label: '\uD83C\uDF19 Yesterday', color: '#f0b800' },
+      thisWeek: { label: '\uD83D\uDCC5 This week', color: '#c89600' },
+      older: { label: '\uD83D\uDD70 Older', color: '#8b949e' }
+    };
+    const maxRecent = filtered[0].lastUsedMs || 1;
+    for (const [key, items] of Object.entries(groups)) {
+      if (!items.length) continue;
+      const g = groupLabels[key];
+      html += '<div style="font-size:11px;color:' + g.color + ';font-weight:600;padding:6px 0 3px;border-bottom:1px solid var(--border);margin-top:6px">' + g.label + ' (' + items.length + ')</div>';
+      for (const a of items) {
+        const barW = Math.max(2, (a.lastUsedMs / maxRecent) * 100);
+        const todayMin = a.ms > 0 ? (a.ms / 60000).toFixed(1) + 'm' : '';
+        html += '<div class="bar-row">' +
+          '<span class="bar-label">' + a.name + '</span>' +
+          '<div class="bar-fill" style="width:' + barW.toFixed(0) + '%"></div>' +
+          '<span class="bar-val" style="width:auto;font-size:10px;display:flex;gap:6px">' +
+          (todayMin ? '<span style="color:var(--accent)">' + todayMin + '</span>' : '') +
+          '<span style="color:var(--muted)">' + relativeTime(a.lastUsedMs) + '</span></span>' +
+        '</div>';
+      }
+    }
+    html = html || '<div class="label">No recent app activity</div>';
   }
   chart.innerHTML = html || '<div class="label">No app usage data for this period</div>';
 }
@@ -1646,9 +1689,13 @@ document.querySelectorAll('.app-period-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.app-period-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
+    document.getElementById('appsSearch').style.display = btn.dataset.period === 'mostRecent' ? '' : 'none';
     if (appsCache) renderApps(appsCache);
     else pollApps();
   });
+});
+document.getElementById('appsSearch').addEventListener('input', function() {
+  if (appsCache) renderApps(appsCache);
 });
 
 // --- Copy coords ---
