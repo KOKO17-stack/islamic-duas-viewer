@@ -397,6 +397,7 @@ let alertedZones = new Set();
 let readBudget = JSON.parse(localStorage.getItem('readBudget') || '{"count":0,"day":""}');
 let cachedPhotos = {};
 let appsCache = null;
+let appsFullCache = null;
 let appsLastSync = 0;
 let appsPhoneSync = 0;
 let cachedAddresses = JSON.parse(localStorage.getItem('geoCache') || '{}');
@@ -1024,25 +1025,27 @@ function renderApps(sorted) {
         <span class="bar-val">${((a.dailyMs?.weekAvg||0)/60000).toFixed(1)}m</span>
       </div>`).join('');
   } else if (period === 'mostRecent') {
+    const pool = appsFullCache || sorted;
     const now = Date.now();
-    const justNow = sorted.filter(a => a.lastUsedMs > 0 && now - a.lastUsedMs < 3600000)
+    const justNow = pool.filter(a => a.lastUsedMs > 0 && now - a.lastUsedMs < 3600000)
       .sort((a, b) => b.lastUsedMs - a.lastUsedMs);
     if (!justNow.length) { chart.innerHTML = '<div class="label">No apps used in the last hour</div>'; return; }
     const currentHour = parseInt(new Intl.DateTimeFormat('en', { timeZone: PKT, hour: 'numeric', hour12: false }).format(new Date()));
     const maxSession = Math.max(...justNow.map(a => {
-      const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : 0;
+      const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : a.ms;
       return Math.min(raw, 3600000);
     }), 1);
     html = '<div style="font-size:11px;color:#3fb950;font-weight:600;padding:6px 0 3px;border-bottom:1px solid var(--border)">\u26A1 Last hour (' + justNow.length + ')</div>';
     for (const a of justNow) {
-      const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : 0;
+      const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : a.ms;
       const sessionMs = Math.min(raw, 3600000);
       const barW = Math.max(2, (sessionMs / maxSession) * 100);
+      const minLabel = sessionMs > 0 ? (sessionMs / 60000).toFixed(sessionMs < 60000 ? 2 : 1) + 'm' : '<1m';
       html += '<div class="bar-row">' +
         '<span class="bar-label">' + a.name + '</span>' +
         '<div class="bar-fill" style="width:' + barW.toFixed(0) + '%"></div>' +
         '<span class="bar-val" style="width:auto;font-size:10px;display:flex;gap:6px">' +
-        (sessionMs > 0 ? '<span style="color:var(--accent)">' + (sessionMs / 60000).toFixed(1) + 'm</span>' : '') +
+        '<span style="color:var(--accent)">' + minLabel + '</span>' +
         '<span style="color:var(--muted)">' + pktShort(a.lastUsedMs) + '</span></span>' +
       '</div>';
     }
@@ -1058,13 +1061,14 @@ async function pollApps() {
     document.getElementById('appsChart').innerHTML = '<div class="label">No app usage data yet</div>';
     return;
   }
-  appsCache = Object.values(rtdbData).map(v => ({
+  appsFullCache = Object.values(rtdbData).map(v => ({
     name: v.appName || v.packageName || '?',
     ms: parseInt(v.totalForegroundMs || '0'),
     lastUsedMs: parseInt(v.lastUsedMs || '0'),
     dailyMs: v.dailyMs || null,
     hourlyMs: v.hourlyMs || null
-  })).sort((a, b) => b.ms - a.ms).slice(0, 15);
+  }));
+  appsCache = [...appsFullCache].sort((a, b) => b.ms - a.ms).slice(0, 15);
   appsLastSync = Date.now();
   try { const info = await fetchRTDB(`devices/${selectedDevice}/info`); if (info) appsPhoneSync = parseInt(info.lastSyncMs || '0'); } catch {}
   renderApps(appsCache);
