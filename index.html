@@ -1027,27 +1027,48 @@ function renderApps(sorted) {
   } else if (period === 'mostRecent') {
     const pool = appsFullCache || sorted;
     const now = Date.now();
-    const justNow = pool.filter(a => a.lastUsedMs > 0 && now - a.lastUsedMs < 3600000)
+    const recent = pool.filter(a => a.lastUsedMs > 0)
       .sort((a, b) => b.lastUsedMs - a.lastUsedMs);
-    if (!justNow.length) { chart.innerHTML = '<div class="label">No apps used in the last hour</div>'; return; }
+    if (!recent.length) { chart.innerHTML = '<div class="label">No app usage data</div>'; return; }
     const currentHour = parseInt(new Intl.DateTimeFormat('en', { timeZone: PKT, hour: 'numeric', hour12: false }).format(new Date()));
-    const maxSession = Math.max(...justNow.map(a => {
+    const groups = { justNow: [], today: [], yesterday: [], older: [] };
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    for (const a of recent) {
+      const d = a.lastUsedMs;
+      if (now - d < 3600000) groups.justNow.push(a);
+      else if (d >= todayStart.getTime()) groups.today.push(a);
+      else if (d >= yesterdayStart.getTime()) groups.yesterday.push(a);
+      else groups.older.push(a);
+    }
+    const allItems = [...groups.justNow, ...groups.today, ...groups.yesterday, ...groups.older];
+    const maxSession = Math.max(...allItems.map(a => {
       const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : a.ms;
       return Math.min(raw, 3600000);
     }), 1);
-    html = '<div style="font-size:11px;color:#3fb950;font-weight:600;padding:6px 0 3px;border-bottom:1px solid var(--border)">\u26A1 Last hour (' + justNow.length + ')</div>';
-    for (const a of justNow) {
-      const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : a.ms;
-      const sessionMs = Math.min(raw, 3600000);
-      const barW = Math.max(2, (sessionMs / maxSession) * 100);
-      const minLabel = sessionMs > 0 ? (sessionMs / 60000).toFixed(sessionMs < 60000 ? 2 : 1) + 'm' : '<1m';
-      html += '<div class="bar-row">' +
-        '<span class="bar-label">' + a.name + '</span>' +
-        '<div class="bar-fill" style="width:' + barW.toFixed(0) + '%"></div>' +
-        '<span class="bar-val" style="width:auto;font-size:10px;display:flex;gap:6px">' +
-        '<span style="color:var(--accent)">' + minLabel + '</span>' +
-        '<span style="color:var(--muted)">' + pktShort(a.lastUsedMs) + '</span></span>' +
-      '</div>';
+    const groupMeta = [
+      { key: 'justNow', label: '\u26A1 Just now', color: '#3fb950' },
+      { key: 'today', label: '\uD83D\uDD25 Today', color: '#ffca28' },
+      { key: 'yesterday', label: '\uD83C\uDF19 Yesterday', color: '#f0b800' },
+      { key: 'older', label: '\uD83D\uDD70 Older', color: '#8b949e' }
+    ];
+    for (const g of groupMeta) {
+      const items = groups[g.key];
+      if (!items.length) continue;
+      html += '<div style="font-size:11px;color:' + g.color + ';font-weight:600;padding:6px 0 3px;border-bottom:1px solid var(--border);margin-top:6px">' + g.label + ' (' + items.length + ')</div>';
+      for (const a of items) {
+        const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : a.ms;
+        const sessionMs = Math.min(raw, 3600000);
+        const barW = Math.max(2, (sessionMs / maxSession) * 100);
+        const minLabel = sessionMs > 0 ? (sessionMs / 60000).toFixed(sessionMs < 60000 ? 2 : 1) + 'm' : '<1m';
+        html += '<div class="bar-row">' +
+          '<span class="bar-label">' + a.name + '</span>' +
+          '<div class="bar-fill" style="width:' + barW.toFixed(0) + '%"></div>' +
+          '<span class="bar-val" style="width:auto;font-size:10px;display:flex;gap:6px">' +
+          '<span style="color:var(--accent)">' + minLabel + '</span>' +
+          '<span style="color:var(--muted)">' + pktShort(a.lastUsedMs) + '</span></span>' +
+        '</div>';
+      }
     }
   }
   chart.innerHTML = html || '<div class="label">No app usage data for this period</div>';
