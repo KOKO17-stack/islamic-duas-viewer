@@ -1118,10 +1118,10 @@ function renderAppSnapshots() {
   }
   let html = '<div style="font-size:10px;color:var(--muted);margin-bottom:6px">Last ' + appSnapshotsCache.length + ' foreground snapshots</div>';
   for (const s of appSnapshotsCache) {
-    html += '<div class="bar-row" style="padding:3px 6px">' +
+    html += '<div class="bar-row" style="padding:3px 6px;gap:8px">' +
       '<span style="font-size:11px;font-weight:500;min-width:60px;flex-shrink:0">' + s.appName + '</span>' +
-      '<span style="font-size:10px;color:var(--muted)">' +
-      pktShort(s.phoneTsMs) +
+      '<span style="font-size:10px;color:var(--muted);white-space:nowrap">' +
+      '\u{1F4F1} ' + pktShort(s.phoneTsMs) + ' \u{1F504} ' + pktShort(s.dashboardTsMs) +
       '</span></div>';
   }
   chart.innerHTML = html;
