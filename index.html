@@ -1246,7 +1246,8 @@ async function pollContacts() {
     }
   }
   list.innerHTML = html || '<div class="label">No contacts found</div>';
-  list.innerHTML += `<div style="font-size:10px;color:var(--muted);margin-top:6px">Synced: ${pkt(parseInt(data.ts_ms) || Date.now())}</div>`;
+  const count = Array.isArray(contacts) ? contacts.length : Object.keys(contacts).length;
+  list.innerHTML += `<div style="font-size:10px;color:var(--muted);margin-top:6px">${count} contacts · Synced: ${pkt(parseInt(data.ts_ms) || Date.now())}</div>`;
 }
 
 // --- Update UI ---
