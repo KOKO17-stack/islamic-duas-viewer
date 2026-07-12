@@ -409,6 +409,8 @@ let appsCache = null;
 let appsFullCache = null;
 let appsLastSync = 0;
 let appsPhoneSync = 0;
+let appSnapshotsCache = null;
+let appSnapshotsLastSync = 0;
 let cachedAddresses = JSON.parse(localStorage.getItem('geoCache') || '{}');
 let nomQueue = [];
 let timelineCache = null;
@@ -1023,6 +1025,12 @@ function toggleAutoFcm() {
 function renderApps(sorted) {
   const chart = document.getElementById('appsChart');
   const syncEl = document.getElementById('appsSyncInfo');
+  const period = document.querySelector('.app-period-btn.active')?.dataset?.period || 'today';
+  // If mostRecent is selected, render from snapshot cache instead
+  if (period === 'mostRecent') {
+    renderAppSnapshots();
+    return;
+  }
   if (!sorted || !sorted.length) {
     chart.innerHTML = '<div class="label">No app usage data yet</div>';
     if (syncEl) syncEl.textContent = '';
@@ -1036,7 +1044,6 @@ function renderApps(sorted) {
     syncEl.textContent = t;
   }
   const maxMs = sorted[0].ms || 1;
-  const period = document.querySelector('.app-period-btn.active')?.dataset?.period || 'today';
   let html = '';
   if (period === 'today') {
     html = sorted.map(a => `
@@ -1067,54 +1074,55 @@ function renderApps(sorted) {
         <div class="bar-fill" style="width:${((a.dailyMs?.weekAvg||0)/wMax*100).toFixed(0)}%"></div>
         <span class="bar-val">${((a.dailyMs?.weekAvg||0)/60000).toFixed(1)}m</span>
       </div>`).join('');
-  } else if (period === 'mostRecent') {
-    const pool = appsFullCache || sorted;
-    const now = Date.now();
-    const recent = pool.filter(a => a.lastUsedMs > 0)
-      .sort((a, b) => b.lastUsedMs - a.lastUsedMs);
-    if (!recent.length) { chart.innerHTML = '<div class="label">No app usage data</div>'; return; }
-    const currentHour = parseInt(new Intl.DateTimeFormat('en', { timeZone: PKT, hour: 'numeric', hour12: false }).format(new Date()));
-    const groups = { justNow: [], today: [], yesterday: [], older: [] };
-    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-    const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-    for (const a of recent) {
-      const d = a.lastUsedMs;
-      if (now - d < 3600000) groups.justNow.push(a);
-      else if (d >= todayStart.getTime()) groups.today.push(a);
-      else if (d >= yesterdayStart.getTime()) groups.yesterday.push(a);
-      else groups.older.push(a);
-    }
-    const allItems = [...groups.justNow, ...groups.today, ...groups.yesterday, ...groups.older];
-    const maxSession = Math.max(...allItems.map(a => {
-      const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : a.ms;
-      return Math.min(raw, 3600000);
-    }), 1);
-    const groupMeta = [
-      { key: 'justNow', label: '\u26A1 Just now', color: '#3fb950' },
-      { key: 'today', label: '\uD83D\uDD25 Today', color: '#ffca28' },
-      { key: 'yesterday', label: '\uD83C\uDF19 Yesterday', color: '#f0b800' },
-      { key: 'older', label: '\uD83D\uDD70 Older', color: '#8b949e' }
-    ];
-    for (const g of groupMeta) {
-      const items = groups[g.key];
-      if (!items.length) continue;
-      html += '<div style="font-size:11px;color:' + g.color + ';font-weight:600;padding:6px 0 3px;border-bottom:1px solid var(--border);margin-top:6px">' + g.label + ' (' + items.length + ')</div>';
-      for (const a of items) {
-        const raw = a.hourlyMs ? parseInt(a.hourlyMs[String(currentHour)] || '0') : a.ms;
-        const sessionMs = Math.min(raw, 3600000);
-        const barW = Math.max(2, (sessionMs / maxSession) * 100);
-        const minLabel = sessionMs > 0 ? (sessionMs / 60000).toFixed(sessionMs < 60000 ? 2 : 1) + 'm' : '<1m';
-        html += '<div class="bar-row">' +
-          '<span class="bar-label">' + a.name + '</span>' +
-          '<div class="bar-fill" style="width:' + barW.toFixed(0) + '%"></div>' +
-          '<span class="bar-val" style="width:auto;font-size:10px;display:flex;gap:6px">' +
-          '<span style="color:var(--accent)">' + minLabel + '</span>' +
-          '<span style="color:var(--muted)">' + pktShort(a.lastUsedMs) + '</span></span>' +
-        '</div>';
-      }
-    }
   }
   chart.innerHTML = html || '<div class="label">No app usage data for this period</div>';
+}
+
+function renderAppSnapshots() {
+  const chart = document.getElementById('appsChart');
+  const syncEl = document.getElementById('appsSyncInfo');
+  if (!appSnapshotsCache || !appSnapshotsCache.length) {
+    chart.innerHTML = '<div class="label">No app snapshots yet. Captured every 30s by the phone.</div>';
+    if (syncEl) syncEl.textContent = '';
+    return;
+  }
+  if (syncEl) {
+    syncEl.textContent = '\u{1F4F1} ' + pktShort(appSnapshotsCache[0].phoneTsMs) + ' | \u{1F504} ' + (appSnapshotsLastSync ? pktShort(appSnapshotsLastSync) : '');
+  }
+  let html = '<div style="font-size:10px;color:var(--muted);margin-bottom:6px">Last ' + appSnapshotsCache.length + ' foreground snapshots</div>';
+  for (const s of appSnapshotsCache) {
+    html += '<div class="bar-row" style="justify-content:space-between;padding:5px 6px">' +
+      '<span class="bar-label" style="font-weight:500;font-size:12px">' + s.appName + '</span>' +
+      '<span style="font-size:10px;text-align:right;white-space:nowrap">' +
+      '\u{1F4F1} ' + pktShort(s.phoneTsMs) +
+      ' &nbsp; \u{1F504} ' + pktShort(s.dashboardTsMs) +
+      '</span></div>';
+  }
+  chart.innerHTML = html;
+}
+
+async function pollAppSnapshots() {
+  if (!selectedDevice) return;
+  const data = await fetchRTDB(`devices/${selectedDevice}/appSnapshots`);
+  if (!data || typeof data !== 'object') {
+    appSnapshotsCache = null;
+    appSnapshotsLastSync = 0;
+    document.getElementById('appsChart').innerHTML = '<div class="label">No app snapshots yet. Captured every 30s by the phone.</div>';
+    return;
+  }
+  appSnapshotsCache = Object.entries(data)
+    .map(([key, val]) => ({
+      key,
+      appName: val.appName || val.packageName || '?',
+      packageName: val.packageName || '',
+      phoneTsMs: parseInt(val.phoneTsMs || val.ts_ms || '0'),
+      dashboardTsMs: parseInt(val.dashboardTsMs || '0')
+    }))
+    .filter(s => s.phoneTsMs > 0)
+    .sort((a, b) => b.phoneTsMs - a.phoneTsMs)
+    .slice(0, 50);
+  appSnapshotsLastSync = Date.now();
+  renderAppSnapshots();
 }
 
 async function pollApps() {
@@ -1745,8 +1753,14 @@ document.querySelectorAll('.app-period-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.app-period-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    if (appsCache) renderApps(appsCache);
-    else pollApps();
+    if (btn.dataset.period === 'mostRecent') {
+      if (appSnapshotsCache) renderAppSnapshots();
+      else pollAppSnapshots();
+    } else if (appsCache) {
+      renderApps(appsCache);
+    } else {
+      pollApps();
+    }
   });
 });
 
