@@ -1552,39 +1552,37 @@ async function loadDeviceHistory(deviceId, periodSeconds, maxAccuracy) {
   return pts;
 }
 
-document.getElementById('loadHistoryBtn').addEventListener('click', async function() {
+async function reloadHistory(showAlertMsg) {
   if (!selectedDevice) return;
   if (playbackRunning) stopPlayback();
-  this.textContent = '...';
-  try {
-    const periodSeconds = parseInt(document.getElementById('periodUnit').value);
-    const accVal = parseInt(document.getElementById('accuracyFilter').value);
-    const maxAcc = accVal > 0 ? accVal : 0;
-    const pts = await loadDeviceHistory(selectedDevice, periodSeconds, maxAcc);
-    if (!pts.length) { showAlert('No history points in range', 'warn'); this.textContent = '\u{1F4C5}'; return; }
-    locationHistory = pts;
-    updateTrail();
-    renderPlaybackTab();
-    if (pts.length) map.fitBounds(pts.map(p => [p.lat, p.lng]));
-    const label = document.getElementById('periodUnit').options[document.getElementById('periodUnit').selectedIndex].text;
-    showAlert(`Loaded ${pts.length} points (${label})`, 'warn');
-  } catch { showAlert('Failed to load history', 'error'); }
-  this.textContent = '\u{1F4C5}';
-});
-
-async function loadDefaultHistory() {
-  if (!selectedDevice) return;
-  const periodSeconds = parseInt(document.getElementById('periodUnit').value) || 86400;
-  const accVal = parseInt(document.getElementById('accuracyFilter').value) || 500;
+  const periodSeconds = parseInt(document.getElementById('periodUnit').value);
+  const accVal = parseInt(document.getElementById('accuracyFilter').value);
   const maxAcc = accVal > 0 ? accVal : 0;
   const pts = await loadDeviceHistory(selectedDevice, periodSeconds, maxAcc);
-  if (pts.length) {
-    locationHistory = pts;
-    updateTrail();
-    renderPlaybackTab();
-    if (pts.length) map.fitBounds(pts.map(p => [p.lat, p.lng]));
+  if (!pts.length) {
+    if (showAlertMsg) showAlert('No history points in range', 'warn');
+    return;
+  }
+  locationHistory = pts;
+  updateTrail();
+  renderPlaybackTab();
+  if (pts.length) map.fitBounds(pts.map(p => [p.lat, p.lng]));
+  if (showAlertMsg) {
+    const label = document.getElementById('periodUnit').options[document.getElementById('periodUnit').selectedIndex].text;
+    showAlert(`Loaded ${pts.length} points (${label})`, 'warn');
   }
 }
+
+document.getElementById('loadHistoryBtn').addEventListener('click', () => reloadHistory(true));
+
+async function loadDefaultHistory() { reloadHistory(false); }
+
+document.getElementById('accuracyFilter').addEventListener('change', () => {
+  if (historyAutoLoaded) reloadHistory(true);
+});
+document.getElementById('periodUnit').addEventListener('change', () => {
+  if (historyAutoLoaded) reloadHistory(true);
+});
 
 // --- Playback Tab ---
 function calcTrailDistance(pts) {
