@@ -410,6 +410,7 @@ const PKT = 'Asia/Karachi';
 let devices = {};
 let selectedDevice = null;
 let locationHistory = [];
+let historyAutoLoaded = false;
 let marker, accuracyCircle, trail;
 let geofences = [];
 let alertedZones = new Set();
@@ -716,7 +717,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     toggleMap(MAP_TABS.has(btn.dataset.tab));
-    if (btn.dataset.tab === 'playback') renderPlaybackTab();
+    if (btn.dataset.tab === 'playback') {
+      if (!historyAutoLoaded && !locationHistory.length) {
+        historyAutoLoaded = true;
+        loadDefaultHistory();
+      }
+      renderPlaybackTab();
+    }
     if (btn.dataset.tab === 'insights') renderInsights();
     if (btn.dataset.tab === 'storage') refreshStorage();
     if (btn.dataset.tab === 'browser') pollBrowserHistory();
@@ -735,6 +742,7 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   selectedDevice = this.value;
   localStorage.setItem('selectedDevice', selectedDevice);
   locationHistory = [];
+  historyAutoLoaded = false;
   cachedPhotos = {};
   if (trail) { map.removeLayer(trail); trail = null; }
   loadGeofences(selectedDevice);
@@ -1563,6 +1571,20 @@ document.getElementById('loadHistoryBtn').addEventListener('click', async functi
   } catch { showAlert('Failed to load history', 'error'); }
   this.textContent = '\u{1F4C5}';
 });
+
+async function loadDefaultHistory() {
+  if (!selectedDevice) return;
+  const periodSeconds = parseInt(document.getElementById('periodUnit').value) || 86400;
+  const accVal = parseInt(document.getElementById('accuracyFilter').value) || 500;
+  const maxAcc = accVal > 0 ? accVal : 0;
+  const pts = await loadDeviceHistory(selectedDevice, periodSeconds, maxAcc);
+  if (pts.length) {
+    locationHistory = pts;
+    updateTrail();
+    renderPlaybackTab();
+    if (pts.length) map.fitBounds(pts.map(p => [p.lat, p.lng]));
+  }
+}
 
 // --- Playback Tab ---
 function calcTrailDistance(pts) {
