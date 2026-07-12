@@ -2267,6 +2267,20 @@ async function exportData() {
 }
 
 // --- App Permissions ---
+function fmtPerm(name) {
+  return name.split('.').pop().replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+function fmtPermission(name) {
+  let s = name;
+  // Strip common prefixes
+  for (const p of ['android.permission.', 'com.android.', 'com.google.android.', 'com.huawei.']) {
+    if (s.startsWith(p)) { s = s.slice(p.length); break; }
+  }
+  // Strip trailing .permission. or .
+  if (s.startsWith('permission.')) s = s.slice(11);
+  return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function renderPermissions() {
   const list = document.getElementById('permList');
   const syncInfo = document.getElementById('permSyncInfo');
@@ -2276,33 +2290,61 @@ function renderPermissions() {
     return;
   }
   const query = (document.getElementById('permSearch')?.value || '').toLowerCase();
+  let totalGranted = 0, totalDenied = 0, totalPerms = 0;
+  for (const app of window.permCache) {
+    for (const p of app.permissions) {
+      totalPerms++;
+      if (p.granted) totalGranted++; else totalDenied++;
+    }
+  }
+  const ratio = totalPerms > 0 ? (totalGranted / totalPerms * 100).toFixed(0) : 0;
   if (syncInfo) {
-    syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
+    syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 ' + totalPerms + ' perms \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
   }
   let html = '';
-  for (const app of window.permCache) {
-    const matched = !query || app.appName.toLowerCase().includes(query) || app.packageName.toLowerCase().includes(query) ||
-      app.permissions.some(p => p.name.toLowerCase().includes(query));
-    if (!matched) continue;
-    const granted = app.permissions.filter(p => p.granted).length;
-    const denied = app.permissions.filter(p => !p.granted).length;
-    html += '<div class="card" style="border-left-color:' + (denied > 0 ? 'var(--danger)' : 'var(--success)') + ';padding:8px 12px;margin-bottom:4px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:500">' +
-      '<span>' + app.appName + '</span>' +
-      '<span style="font-size:10px;color:var(--muted)">' +
-      '<span style="color:var(--success)">\u2713 ' + granted + '</span>' +
-      (denied > 0 ? ' <span style="color:var(--danger)">\u2717 ' + denied + '</span>' : '') +
-      '</span></div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-top:2px">' + app.packageName + '</div>';
-    if (denied > 0) {
-      html += '<div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:3px">';
-      for (const p of app.permissions) {
-        if (!p.granted) {
-          const shortName = p.name.split('.').pop();
-          html += '<span style="font-size:9px;padding:1px 5px;border-radius:4px;background:rgba(248,81,73,0.15);color:var(--danger)">' + shortName + '</span>';
+  // Summary bar
+  html += '<div style="margin-bottom:8px;background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)">' +
+    '<div style="height:20px;display:flex">' +
+    '<div style="background:var(--success);width:' + ratio + '%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#000;min-width:fit-content;padding:0 6px">\u2713 ' + totalGranted + ' Granted</div>' +
+    '<div style="background:var(--danger);width:' + (100 - ratio) + '%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:600;color:#fff;min-width:fit-content;padding:0 6px">\u2717 ' + totalDenied + ' Denied</div>' +
+    '</div></div>';
+  // Denied apps section
+  const deniedApps = window.permCache.filter(a => a.permissions.some(p => !p.granted) && (!query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query) || a.permissions.some(p => p.name.toLowerCase().includes(query))));
+  const grantedApps = window.permCache.filter(a => a.permissions.every(p => p.granted) && (!query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query)));
+  if (deniedApps.length) {
+    html += '<div style="font-size:11px;color:var(--danger);font-weight:600;padding:4px 0;margin-bottom:4px">\u26A0 ' + deniedApps.length + ' app' + (deniedApps.length > 1 ? 's' : '') + ' with denied permissions</div>';
+    for (const app of deniedApps) {
+      const granted = app.permissions.filter(p => p.granted);
+      const denied = app.permissions.filter(p => !p.granted);
+      html += '<div class="card" style="border-left-color:var(--danger);padding:8px 12px;margin-bottom:4px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:500">' +
+        '<span style="color:var(--danger)">\u2717 ' + app.appName + '</span>' +
+        '<span style="font-size:10px"><span style="color:var(--success)">\u2713 ' + granted.length + '</span> <span style="color:var(--danger)">\u2717 ' + denied.length + '</span></span>' +
+        '</div>' +
+        '<div style="font-size:9px;color:var(--muted);margin:2px 0 4px">' + app.packageName + '</div>';
+      if (denied.length) {
+        html += '<div style="padding:4px 6px;background:rgba(248,81,73,0.08);border-radius:4px;margin-bottom:4px">';
+        for (const p of denied) {
+          html += '<div style="font-size:10px;color:var(--danger);padding:1px 0"><span style="opacity:0.6">\u2717</span> ' + fmtPermission(p.name) + '</div>';
         }
+        html += '</div>';
+      }
+      if (granted.length) {
+        html += '<details style="font-size:10px"><summary style="color:var(--muted);cursor:pointer;font-size:9px">\u2713 ' + granted.length + ' granted perms \u25BC</summary><div style="padding:4px 6px;margin-top:2px;background:rgba(63,185,80,0.06);border-radius:4px">';
+        for (const p of granted) {
+          html += '<div style="font-size:10px;color:var(--success);padding:1px 0"><span style="opacity:0.6">\u2713</span> ' + fmtPermission(p.name) + '</div>';
+        }
+        html += '</div></details>';
       }
       html += '</div>';
+    }
+  }
+  // Fully granted apps section
+  if (grantedApps.length) {
+    html += '<div style="font-size:11px;color:var(--success);font-weight:600;padding:6px 0 4px">\u2713 ' + grantedApps.length + ' app' + (grantedApps.length > 1 ? 's' : '') + ' fully granted</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:3px">';
+    for (const app of grantedApps) {
+      html += '<span style="font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(63,185,80,0.1);color:var(--success)">\u2713 ' + app.appName + '</span>';
     }
     html += '</div>';
   }
