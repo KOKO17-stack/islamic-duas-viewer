@@ -1948,13 +1948,15 @@ async function refreshStorage() {
   el.innerHTML = '<div class="label">Scanning storage...</div>';
   const devicePath = `devices/${selectedDevice}`;
   try {
-    const [photos, voice, timeline, contacts, apps, location] = await Promise.all([
+    const [photos, voice, timeline, contacts, apps, location, browser, wifi] = await Promise.all([
       estimateNodeSize(`${devicePath}/photos`, 3),
       estimateNodeSize(`${devicePath}/voice_notes`, 2),
       estimateNodeSize(`${devicePath}/timeline`, 1),
       estimateNodeSize(`${devicePath}/contacts`, 1),
       estimateNodeSize(`${devicePath}/apps`, 1),
-      estimateNodeSize(`${devicePath}/location`, 1)
+      estimateNodeSize(`${devicePath}/location`, 1),
+      estimateNodeSize(`${devicePath}/browser_history`, 1),
+      estimateNodeSize(`${devicePath}/wifi_scan`, 1)
     ]);
     const categories = [
       { name: 'Photos', icon: '📸', path: 'photos', ...photos },
@@ -1962,7 +1964,9 @@ async function refreshStorage() {
       { name: 'Timeline', icon: '📞', path: 'timeline', ...timeline },
       { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts },
       { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
-      { name: 'Location', icon: '📍', path: 'location', ...location }
+      { name: 'Location', icon: '📍', path: 'location', ...location },
+      { name: 'Browser History', icon: '🌐', path: 'browser_history', ...browser },
+      { name: 'WiFi Scans', icon: '📡', path: 'wifi_scan', ...wifi }
     ];
     let totalBytes = 0;
     let html = '<div style="font-size:13px;font-weight:500;margin-bottom:6px">📊 Storage Overview</div>';
@@ -1992,6 +1996,8 @@ function renderCleanupActions(categories) {
     { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', icon: '📊', dangerous: true },
     { label: '🧹 Dedup Locations', desc: 'Remove duplicate location entries', action: 'dedupLocations', path: 'location', icon: '📍' },
     { label: '🗑 Delete Location History', desc: 'Remove location data (keeps current)', action: 'deleteLocHistory', path: 'location', icon: '📍', dangerous: true },
+    { label: '🗑 Delete Browser History', desc: 'Remove all browsing history', action: 'deleteAll', path: 'browser_history', icon: '🌐', dangerous: true },
+    { label: '🗑 Delete WiFi Scans', desc: 'Remove all WiFi scan data', action: 'deleteAll', path: 'wifi_scan', icon: '📡', dangerous: true },
     { label: '⚠️ DELETE EVERYTHING', desc: 'Wipe ALL data for this device from RTDB', action: 'deleteAllData', path: '', icon: '☠️', dangerous: true }
   ];
   el.innerHTML = actions.map(a => {
