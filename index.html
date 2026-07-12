@@ -1233,8 +1233,8 @@ async function pollContacts() {
 function updateLocationUI(loc) {
   document.getElementById('latVal').textContent = loc.lat.toFixed(6) + '\u00B0';
   document.getElementById('lngVal').textContent = loc.lng.toFixed(6) + '\u00B0';
-  document.getElementById('accVal').textContent = loc.accuracy ? loc.accuracy + 'm' : '--';
-  document.getElementById('spdVal').textContent = (loc.speed || 0).toFixed(1) + ' m/s';
+  document.getElementById('accVal').textContent = loc.accuracy != null ? loc.accuracy + 'm' : '--';
+  document.getElementById('spdVal').textContent = loc.speed != null ? loc.speed.toFixed(1) + ' m/s' : '--';
   document.getElementById('seenVal').textContent = pkt(loc.ts_ms || Date.now());
   document.getElementById('coordBox').textContent = `${loc.lat.toFixed(6)}, ${loc.lng.toFixed(6)}`;
   document.getElementById('coordBox').onclick = () => {
@@ -1252,16 +1252,16 @@ function updatePlaybackUI(p) {
   if (!p) return;
   document.getElementById('latVal').textContent = p.lat.toFixed(6) + '\u00B0';
   document.getElementById('lngVal').textContent = p.lng.toFixed(6) + '\u00B0';
-  document.getElementById('accVal').textContent = p.accuracy ? p.accuracy + 'm' : '--';
-  document.getElementById('spdVal').textContent = (p.speed || 0).toFixed(1) + ' m/s';
+  document.getElementById('accVal').textContent = p.accuracy != null ? p.accuracy + 'm' : '--';
+  document.getElementById('spdVal').textContent = p.speed != null ? p.speed.toFixed(1) + ' m/s' : '--';
   document.getElementById('seenVal').textContent = p.ts ? pkt(p.ts) : '--';
   document.getElementById('coordBox').textContent = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
   geocode(p.lat, p.lng).then(d => {
     if (d) document.getElementById('addrVal').textContent = d.display_name || '--';
   });
   const metaParts = [];
-  if (p.speed) metaParts.push((p.speed).toFixed(1) + 'm/s');
-  if (p.accuracy) metaParts.push('±' + p.accuracy + 'm');
+  if (p.speed != null) metaParts.push(p.speed.toFixed(1) + 'm/s');
+  if (p.accuracy != null) metaParts.push('±' + p.accuracy + 'm');
   document.getElementById('playMeta').textContent = metaParts.length ? metaParts.join(' ') : '--';
 }
 
@@ -1270,7 +1270,7 @@ function updateMap(loc) {
   if (marker) { marker.setLatLng(latlng); }
   else { marker = L.marker(latlng).addTo(map).bindPopup('Current'); }
   if (accuracyCircle) map.removeLayer(accuracyCircle);
-  accuracyCircle = L.circle(latlng, { radius: loc.accuracy || 50, color: '#3fb950', fillOpacity: 0.1 }).addTo(map);
+  accuracyCircle = L.circle(latlng, { radius: loc.accuracy != null ? loc.accuracy : 50, color: '#3fb950', fillOpacity: 0.1 }).addTo(map);
   locationHistory.push({ lat: loc.lat, lng: loc.lng, ts: loc.ts_ms || Date.now(), speed: loc.speed, accuracy: loc.accuracy });
   if (locationHistory.length > 500) locationHistory.shift();
   updateTrail();
@@ -1495,21 +1495,27 @@ document.getElementById('playScrubber').addEventListener('input', function() {
 // --- Load History (with Period Filter) ---
 async function loadDeviceHistory(deviceId, periodSeconds, maxAccuracy) {
   const pts = [];
-  async function collectNodes(path) {
-    const data = await fetchRTDB(`devices/${deviceId}/location/history${path}`);
-    if (!data || typeof data !== 'object') return;
-    for (const [k, v] of Object.entries(data)) {
-      if (v && typeof v === 'object' && !v.lat) {
-        await collectNodes(path + '/' + k);
-      } else if (v && v.lat) {
-        const acc = parseFloat(v.accuracy) || 999;
-        if (!maxAccuracy || acc <= maxAccuracy) {
-          pts.push({ ts: parseInt(k), lat: parseFloat(v.lat), lng: parseFloat(v.lng), accuracy: acc });
+  // Single fetch — walk the entire tree in-memory (no recursive HTTP calls)
+  const data = await fetchRTDB(`devices/${deviceId}/location/history`);
+  if (!data || typeof data !== 'object') return pts;
+  function walk(obj) {
+    if (!obj || typeof obj !== 'object') return;
+    for (const [k, v] of Object.entries(obj)) {
+      if (v && typeof v === 'object') {
+        if (v.lat !== undefined) {
+          const ts = parseInt(k);
+          if (!ts) continue;
+          const acc = v.accuracy !== undefined && v.accuracy !== null ? parseFloat(v.accuracy) : 999;
+          if (!maxAccuracy || acc <= maxAccuracy) {
+            pts.push({ ts, lat: parseFloat(v.lat), lng: parseFloat(v.lng), accuracy: acc, speed: v.speed != null ? parseFloat(v.speed) : 0 });
+          }
+        } else {
+          walk(v);
         }
       }
     }
   }
-  await collectNodes('');
+  walk(data);
   // Deduplicate by lat|lng|rounded_second (keep first occurrence)
   const seen = new Set();
   const deduped = [];
@@ -1608,9 +1614,9 @@ function renderPlaybackTab() {
     html += `<div class="pb-day">${day} <span style="font-weight:400;color:var(--muted)">(${entries.length})</span></div>`;
     for (const { idx, p } of entries) {
       const active = idx === activeIdx ? ' pb-point-active' : '';
-      const speed = p.speed ? (p.speed).toFixed(1) + 'm/s' : '';
-      const acc = p.accuracy ? '\u00B1' + p.accuracy + 'm' : '';
-      const meta = [speed, acc].filter(Boolean).join(' ');
+      const speed = p.speed != null ? (p.speed).toFixed(1) + 'm/s' : '';
+      const acc = p.accuracy != null ? '\u00B1' + p.accuracy + 'm' : '';
+      const meta = [speed, acc].filter(s => s).join(' ');
       html += `<div class="pb-point-row${active}" data-pb-idx="${idx}">
         <span class="ppt-ts">${p.ts ? pktShort(p.ts) : '--'}</span>
         <span class="ppt-coord">${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</span>
