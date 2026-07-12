@@ -1147,7 +1147,7 @@ async function pollAppSnapshots() {
     }))
     .filter(s => s.phoneTsMs > 0)
     .sort((a, b) => b.phoneTsMs - a.phoneTsMs)
-    .slice(0, 50);
+    .slice(0, 100);
   appSnapshotsLastSync = Date.now();
   renderAppSnapshots();
 }
