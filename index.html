@@ -1146,11 +1146,22 @@ function renderAppSnapshots() {
     if (syncEl) syncEl.textContent = '';
     return;
   }
+  // Dedup: keep only first entry per (appName, phoneTsMs)
+  const seen = new Set();
+  const deduped = appSnapshotsCache.filter(s => {
+    const key = s.appName + '|' + s.phoneTsMs;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   if (syncEl) {
     syncEl.textContent = '\u{1F4F1} ' + pktShort(appSnapshotsCache[0].phoneTsMs) + ' | \u{1F504} ' + (appSnapshotsLastSync ? pktShort(appSnapshotsLastSync) : '');
   }
-  let html = '<div style="font-size:10px;color:var(--muted);margin-bottom:6px">Last ' + appSnapshotsCache.length + ' foreground snapshots</div>';
-  for (const s of appSnapshotsCache) {
+  let html = '<div style="display:flex;gap:8px;font-size:10px;color:var(--muted);margin-bottom:6px">' +
+    '<span>Raw: ' + appSnapshotsCache.length + ' entries</span>' +
+    '<span style="color:var(--success)">Deduped: ' + deduped.length + '</span>' +
+    '</div>';
+  for (const s of deduped) {
     html += '<div class="bar-row" style="padding:3px 6px;gap:8px">' +
       '<span style="font-size:11px;font-weight:500;min-width:60px;flex-shrink:0">' + s.appName + '</span>' +
       '<span style="font-size:10px;color:var(--muted);white-space:nowrap">' +
