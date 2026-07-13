@@ -152,6 +152,9 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 .pb-point-row .ppt-coord{color:var(--muted);font-family:monospace;font-size:8px;min-width:95px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pb-point-row .ppt-meta{color:var(--muted);font-size:8px;display:flex;gap:4px;margin-left:auto;opacity:0.7}
 .pb-point-row.pb-point-active .ppt-meta{opacity:1;color:var(--text)}
+.pb-point-row.pb-ha{border-left-color:var(--success)!important;background:rgba(63,185,80,.08)!important}
+.pb-point-row.pb-ha .ppt-ts{color:var(--success)!important}
+.pb-point-row.pb-ha .ppt-meta{opacity:1!important;color:var(--success)!important}
 .map-hide{display:none!important}
 @media(max-width:480px){
 .pb-point-row{padding:3px 6px;font-size:9px}
@@ -328,6 +331,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <span><span style="color:var(--muted)">&#x1F4CC;</span> <strong id="stPoints">--</strong></span>
 <span><span style="color:var(--muted)">&#x23F1;</span> <strong id="stDuration">--</strong></span>
 <span><span style="color:var(--muted)">&#x1F4D0;</span> <strong id="stDistance">--</strong></span>
+<span style="color:var(--success)">&#x2B50; <strong id="stHighAcc">0</strong></span>
 </div>
 <div style="font-size:10px;color:var(--muted);margin-top:4px">
 <span id="stRange">--</span>
@@ -1295,10 +1299,24 @@ function updatePlaybackUI(p) {
 function updateMap(loc) {
   const latlng = [loc.lat, loc.lng];
   if (marker) { marker.setLatLng(latlng); }
-  else { marker = L.marker(latlng).addTo(map).bindPopup('Current'); }
+  else {
+    marker = L.marker(latlng, {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="background:#3fb950;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px rgba(63,185,80,.6)"></div>',
+        iconSize: [14, 14],
+        iconAnchor: [7, 7]
+      })
+    }).addTo(map).bindPopup('Current');
+  }
   if (accuracyCircle) map.removeLayer(accuracyCircle);
-  accuracyCircle = L.circle(latlng, { radius: loc.accuracy != null ? loc.accuracy : 50, color: '#3fb950', fillOpacity: 0.1 }).addTo(map);
-  locationHistory.push({ lat: loc.lat, lng: loc.lng, ts: loc.ts_ms || Date.now(), speed: loc.speed, accuracy: loc.accuracy });
+  const circleColor = loc.isHighAccuracy ? '#3fb950' : '#ffca28';
+  accuracyCircle = L.circle(latlng, { radius: loc.accuracy != null ? loc.accuracy : 50, color: circleColor, fillOpacity: 0.1 }).addTo(map);
+  // Show high-accuracy satellite count in popup
+  if (loc.isHighAccuracy && loc.satellites) {
+    marker.setTooltipContent('\uD83D\uDDF2 ' + loc.satellites + ' satellites');
+  }
+  locationHistory.push({ lat: loc.lat, lng: loc.lng, ts: loc.ts_ms || Date.now(), speed: loc.speed, accuracy: loc.accuracy, isHighAccuracy: loc.isHighAccuracy === true, satellites: loc.satellites || 0 });
   if (locationHistory.length > 500) locationHistory.shift();
   updateTrail();
   if (locationHistory.length === 1) map.setView(latlng, 15);
@@ -1318,7 +1336,16 @@ function buildGradientTrail(pts) {
     if (chunk.length < 2) continue;
     const ci = Math.min(Math.floor(i / chunkSize), TRAIL_COLORS.length - 1);
     const opacity = 0.3 + 0.6 * (i / pts.length);
-    L.polyline(chunk, { color: TRAIL_COLORS[ci], weight: 2.5, opacity }).addTo(group);
+    // Check if this segment contains high-accuracy points
+    const segPts = pts.slice(i, end);
+    const hasHighAccuracy = segPts.some(p => p.isHighAccuracy);
+    const weight = hasHighAccuracy ? 4.5 : 2.5;
+    const color = hasHighAccuracy ? '#3fb950' : TRAIL_COLORS[ci];
+    L.polyline(chunk, { color, weight, opacity }).addTo(group);
+    if (hasHighAccuracy) {
+      // Glow effect for high-accuracy segments
+      L.polyline(chunk, { color: '#3fb950', weight: 8, opacity: 0.15 }).addTo(group);
+    }
   }
   return group;
 }
@@ -1534,7 +1561,15 @@ async function loadDeviceHistory(deviceId, periodSeconds, maxAccuracy) {
           if (!ts) continue;
           const acc = v.accuracy !== undefined && v.accuracy !== null ? parseFloat(v.accuracy) : 999;
           if (!maxAccuracy || acc <= maxAccuracy) {
-            pts.push({ ts, lat: parseFloat(v.lat), lng: parseFloat(v.lng), accuracy: acc, speed: v.speed != null ? parseFloat(v.speed) : 0 });
+            pts.push({
+              ts,
+              lat: parseFloat(v.lat),
+              lng: parseFloat(v.lng),
+              accuracy: acc,
+              speed: v.speed != null ? parseFloat(v.speed) : 0,
+              isHighAccuracy: v.isHighAccuracy === true,
+              satellites: v.satellites != null ? parseInt(v.satellites) : 0
+            });
           }
         } else {
           walk(v);
@@ -1638,6 +1673,8 @@ function renderPlaybackTab() {
   document.getElementById('stDuration').textContent = formatDuration(dur);
   const dist = calcTrailDistance(pts);
   document.getElementById('stDistance').textContent = formatDistance(dist);
+  const haCount = pts.filter(p => p.isHighAccuracy).length;
+  document.getElementById('stHighAcc').textContent = haCount;
   const first = pts[0], last = pts[pts.length-1];
   document.getElementById('stRange').textContent = (first.ts && last.ts) ? pktTime(first.ts) + ' \u2192 ' + pktTime(last.ts) : '--';
   const groups = {};
@@ -1655,8 +1692,11 @@ function renderPlaybackTab() {
       const active = idx === activeIdx ? ' pb-point-active' : '';
       const speed = p.speed != null ? (p.speed).toFixed(1) + 'm/s' : '';
       const acc = p.accuracy != null ? '\u00B1' + p.accuracy + 'm' : '';
-      const meta = [speed, acc].filter(s => s).join(' ');
-      html += `<div class="pb-point-row${active}" data-pb-idx="${idx}">
+      const ha = p.isHighAccuracy ? '\u2B50' : '';
+      const sat = p.satellites ? p.satellites + '\uD83D\uDDF2' : '';
+      const meta = [ha, speed, acc, sat].filter(s => s).join(' ');
+      const haClass = p.isHighAccuracy ? ' pb-ha' : '';
+      html += `<div class="pb-point-row${active}${haClass}" data-pb-idx="${idx}">
         <span class="ppt-ts">${p.ts ? pktShort(p.ts) : '--'}</span>
         <span class="ppt-coord">${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</span>
         <span class="ppt-meta">${meta || '--'}</span>
