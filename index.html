@@ -155,6 +155,9 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 .pb-point-row.pb-ha{border-left-color:var(--success)!important;background:rgba(63,185,80,.08)!important}
 .pb-point-row.pb-ha .ppt-ts{color:var(--success)!important}
 .pb-point-row.pb-ha .ppt-meta{opacity:1!important;color:var(--success)!important}
+.pb-point-row .ppt-addr{color:var(--muted);font-size:7px;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:0.5;padding-left:2px;margin-top:-1px}
+.pb-point-row .ppt-addr.loading{opacity:0.3;font-style:italic}
+.pb-point-row .ppt-addr.done{opacity:0.7}
 .map-hide{display:none!important}
 @media(max-width:480px){
 .pb-point-row{padding:3px 6px;font-size:9px}
@@ -1736,10 +1739,17 @@ function renderPlaybackTab() {
       const sat = p.satellites ? p.satellites + '\uD83D\uDDF2' : '';
       const meta = [ha, speed, acc, sat].filter(s => s).join(' ');
       const haClass = p.isHighAccuracy ? ' pb-ha' : '';
+      const addrKey = p.lat.toFixed(3) + ',' + p.lng.toFixed(3);
+      const cached = cachedAddresses[addrKey];
+      const addrText = cached ? (cached.display_name || cached.name || '') : '';
+      const addrHtml = addrText
+        ? `<span class="ppt-addr done" title="${escHtml(addrText)}">${escHtml(addrText)}</span>`
+        : `<span class="ppt-addr loading" data-addr-key="${addrKey}" data-addr-lat="${p.lat}" data-addr-lng="${p.lng}">${cached === undefined ? '\u{1F4CD} resolving...' : '--'}</span>`;
       html += `<div class="pb-point-row${active}${haClass}" data-pb-idx="${idx}">
         <span class="ppt-ts">${p.ts ? pktShort(p.ts) : '--'}</span>
         <span class="ppt-coord">${p.lat.toFixed(4)}, ${p.lng.toFixed(4)}</span>
         <span class="ppt-meta">${meta || '--'}</span>
+        ${addrHtml}
       </div>`;
     }
   }
@@ -1751,6 +1761,38 @@ function renderPlaybackTab() {
       jumpToPoint(idx);
     });
   });
+  // Resolve uncached addresses in background
+  resolvePlaybackAddresses();
+}
+
+function resolvePlaybackAddresses() {
+  const loading = document.querySelectorAll('.ppt-addr.loading[data-addr-key]');
+  if (!loading.length) return;
+  loading.forEach(el => {
+    const key = el.dataset.addrKey;
+    if (cachedAddresses[key]) {
+      const addr = cachedAddresses[key];
+      el.textContent = addr.display_name || addr.name || '';
+      el.className = 'ppt-addr done';
+      el.title = el.textContent;
+      return;
+    }
+    const lat = parseFloat(el.dataset.addrLat);
+    const lng = parseFloat(el.dataset.addrLng);
+    geocode(lat, lng).then(d => {
+      if (d) {
+        el.textContent = d.display_name || d.name || '';
+        el.className = 'ppt-addr done';
+        el.title = el.textContent;
+      } else {
+        el.textContent = '??';
+        el.className = 'ppt-addr';
+      }
+    });
+  });
+}    });
+  }
+  next();
 }
 
 function highlightPointInList(idx) {
