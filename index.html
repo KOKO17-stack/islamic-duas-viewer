@@ -2559,7 +2559,8 @@ async function pollWifiScans() {
   // Show visible AP count on live tab
   if (wifiCache.length) {
     const latestAps = wifiCache[0].networks.length;
-    document.getElementById('wifiApCount').textContent = '📡 ' + latestAps;
+    const apCountEl = document.getElementById('wifiApCount');
+    if (apCountEl) apCountEl.textContent = '📡 ' + latestAps;
   }
   renderWifiScans();
 }
