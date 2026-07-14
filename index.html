@@ -449,7 +449,7 @@ let historyAutoLoaded = false;
 let marker, accuracyCircle, trail;
 let geofences = [];
 let alertedZones = new Set();
-let readBudget = JSON.parse(localStorage.getItem('readBudget') || '{"count":0,"day":""}');
+let readBudget = (() => { try { return JSON.parse(localStorage.getItem('readBudget') || '{"count":0,"day":""}'); } catch { return { count: 0, day: '' }; } })();
 let cachedPhotos = {};
 let appsCache = null;
 let appsFullCache = null;
@@ -457,14 +457,14 @@ let appsLastSync = 0;
 let appsPhoneSync = 0;
 let appSnapshotsCache = null;
 let appSnapshotsLastSync = 0;
-let cachedAddresses = JSON.parse(localStorage.getItem('geoCache') || '{}');
+let cachedAddresses = (() => { try { return JSON.parse(localStorage.getItem('geoCache') || '{}'); } catch { return {}; } })();
 let nomQueue = [];
 let timelineCache = null;
 let nomProcessing = false;
 
 function loadGeofences(deviceId) {
   if (!deviceId) { geofences = []; renderGeofences(); renderGeofenceList(); return; }
-  geofences = JSON.parse(localStorage.getItem('geofences_' + deviceId) || '[]');
+  try { geofences = JSON.parse(localStorage.getItem('geofences_' + deviceId) || '[]'); } catch { geofences = []; }
   if (!geofences.length) {
     geofences.push({ id: 'home', name: 'Home', lat: 32.04551, lng: 73.43149, radius: 1000, active: true });
     localStorage.setItem('geofences_' + deviceId, JSON.stringify(geofences));
@@ -2644,7 +2644,11 @@ async function init() {
   if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
     try { await Notification.requestPermission(); } catch {}
   }
-  try { await fetchDevices(); } catch {}
+  // Retry fetchDevices up to 3 times with delay
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { await fetchDevices(); if (selectedDevice) break; } catch {}
+    if (!selectedDevice) await new Promise(r => setTimeout(r, 2000));
+  }
   if (selectedDevice) try { await pollAll(); } catch {}
   startPolling();
   if (geofences.length === 0) {
