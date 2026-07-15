@@ -2321,6 +2321,7 @@ function renderCleanupActions(categories) {
   const actions = [
     { label: '🧹 Dedup Photos', desc: 'Remove duplicate photos (keep highest quality)', action: 'dedupPhotos', path: 'photos', icon: '📸' },
     { label: '🗑 Delete All Photos', desc: 'Remove all uploaded photos', action: 'deleteAll', path: 'photos', icon: '📸', dangerous: true },
+    { label: '👥 Dedup Contacts', desc: 'Merge duplicate contacts by phone number', action: 'dedupContacts', path: 'contacts', icon: '👥' },
     { label: '🗑 Delete Voice Notes', desc: 'Remove all voice recordings', action: 'deleteAll', path: 'voice_notes', icon: '🎤', dangerous: true },
     { label: '🗑 Delete Timeline', desc: 'Remove call logs & timeline events', action: 'deleteAll', path: 'timeline', icon: '📞', dangerous: true },
     { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', icon: '📊', dangerous: true },
@@ -2381,6 +2382,58 @@ async function execCleanup(action, path) {
     renderPhotosFromCache();
     await refreshStorage();
     showAlert(`Deleted ${deleted} duplicate photos (freed ${formatBytes(freed)})`, deleted > 0 ? 'warn' : 'error');
+    return;
+  }
+  if (action === 'dedupContacts') {
+    if (!confirm('Scan and remove duplicate contacts? Only one entry per unique phone number will be kept (preferring entries with names).')) return;
+    showAlert('Scanning contacts...', 'warn');
+    const data = await fetchRTDB(`${base}/contacts/all`);
+    if (!data || !data.contacts) { showAlert('No contacts found', 'error'); return; }
+    const raw = data.contacts;
+    const seen = new Map();
+    const entries = [];
+    const extract = c => ({
+      name: c.displayName || c.name || c.number || 'Unknown',
+      num: (c.number || '').replace(/[\s\-\(\)]/g, ''),
+      email: c.email || ''
+    });
+    if (Array.isArray(raw)) {
+      raw.forEach((c, i) => entries.push({ idx: i, ...extract(c) }));
+    } else {
+      Object.entries(raw).forEach(([k, c]) => {
+        if (c && typeof c === 'object') entries.push({ idx: k, ...extract(c) });
+      });
+    }
+    const toDelete = [];
+    for (const e of entries) {
+      const key = e.num || e.email || e.name;
+      if (!key) continue;
+      if (seen.has(key)) {
+        const prev = seen.get(key);
+        if ((e.name !== 'Unknown' && prev.name === 'Unknown') ||
+            (e.name !== 'Unknown' && prev.name === e.name && e.email && !prev.email)) {
+          seen.set(key, e);
+          toDelete.push(prev.idx);
+        } else {
+          toDelete.push(e.idx);
+        }
+      } else {
+        seen.set(key, e);
+      }
+    }
+    if (!toDelete.length) { showAlert('No duplicate contacts found', 'error'); return; }
+    let deleted = 0;
+    for (const idx of toDelete) {
+      if (Array.isArray(raw)) {
+        const fullPath = `${base}/contacts/all/${idx}`;
+        if (await deleteRTDB(`${base}/contacts/all/${idx}`)) deleted++;
+      } else {
+        if (await deleteRTDB(`${base}/contacts/all/${idx}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate contacts`, deleted > 0 ? 'warn' : 'error');
+    pollContacts();
+    await refreshStorage();
     return;
   }
   if (action === 'deleteAll') {
