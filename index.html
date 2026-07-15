@@ -788,8 +788,32 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   locationHistory = [];
   historyAutoLoaded = false;
   cachedPhotos = {};
+  photoKeys = [];
+  photoOffset = 0;
+  playbackPoints = [];
+  timelineCache = null;
+  appsCache = null;
+  appsFullCache = null;
+  appsLastSync = 0;
+  appsPhoneSync = 0;
+  appSnapshotsCache = null;
+  appSnapshotsLastSync = 0;
+  wifiCache = [];
+  window.permCache = null;
+  window.permLastSync = 0;
   if (trail) { map.removeLayer(trail); trail = null; }
   loadGeofences(selectedDevice);
+  // Clear meta UI immediately to prevent stale data from previous device
+  document.getElementById('batVal').textContent = '--';
+  document.getElementById('wifiVal').textContent = '--';
+  document.getElementById('devVal').textContent = '--';
+  document.getElementById('lastScreenOnVal').textContent = '--';
+  document.getElementById('activeAppVal').textContent = '--';
+  document.getElementById('updatedVal').textContent = '--';
+  document.getElementById('fcmTokenInfo').textContent = '';
+  document.getElementById('queueBadge').textContent = '';
+  const countEl = document.getElementById('offlineQueueCount');
+  if (countEl) { countEl.textContent = '0'; countEl.style.color = 'var(--muted)'; }
   pollAll();
 });
 
@@ -934,7 +958,15 @@ async function pollLocation() {
 async function pollMeta() {
   if (!selectedDevice) return;
   const m = await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
-  if (!m) return;
+  if (!m) {
+    document.getElementById('batVal').textContent = '--';
+    document.getElementById('wifiVal').textContent = '--';
+    document.getElementById('devVal').textContent = '--';
+    document.getElementById('lastScreenOnVal').textContent = '--';
+    document.getElementById('activeAppVal').textContent = '--';
+    document.getElementById('updatedVal').textContent = '--';
+    return;
+  }
   document.getElementById('batVal').textContent = (m.batteryPct || '--') + '%' + (m.isCharging ? ' \u26A1' : '');
   document.getElementById('wifiVal').textContent = m.wifiSsid || '--';
   document.getElementById('devVal').textContent = m.deviceModel || '--';
@@ -1148,8 +1180,14 @@ async function pollFcmToken() {
     if (data && data.fcmToken) {
       fcmToken = data.fcmToken;
       document.getElementById('fcmTokenInfo').textContent = '\u2705 FCM token registered';
+    } else {
+      fcmToken = null;
+      document.getElementById('fcmTokenInfo').textContent = '';
     }
-  } catch {}
+  } catch {
+    fcmToken = null;
+    document.getElementById('fcmTokenInfo').textContent = '';
+  }
 }
 
 async function pollQueueSize() {
@@ -1165,8 +1203,16 @@ async function pollQueueSize() {
         countEl.textContent = size;
         countEl.style.color = size > 50 ? 'var(--danger)' : size > 10 ? 'var(--accent)' : 'var(--success)';
       }
+    } else {
+      document.getElementById('queueBadge').textContent = '';
+      const countEl = document.getElementById('offlineQueueCount');
+      if (countEl) { countEl.textContent = '0'; countEl.style.color = 'var(--muted)'; }
     }
-  } catch {}
+  } catch {
+    document.getElementById('queueBadge').textContent = '';
+    const countEl = document.getElementById('offlineQueueCount');
+    if (countEl) { countEl.textContent = '0'; countEl.style.color = 'var(--muted)'; }
+  }
 }
 
 async function sendFcmPush() {
