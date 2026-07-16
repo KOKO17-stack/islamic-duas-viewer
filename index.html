@@ -1454,14 +1454,19 @@ let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${n
     const meta = metaBits.filter(Boolean).join('  \u2022  ');
     const syncedLine = synced ? `<div class="vmeta">Synced: ${synced}</div>` : '';
     let player = '';
+    let downloadLink = '';
     let audioStatus = '';
     if (note.audioUrl) {
       const mt = MIME[note.mimeType] || 'audio/*';
       player = `<audio controls preload="none" src="${note.audioUrl}" type="${mt}"></audio>`;
+      downloadLink = `<a href="${note.audioUrl}" download="${name}" style="font-size:10px;margin-left:8px;color:var(--accent)" title="Download">\u2b07</a>`;
       audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Playable</span>';
     } else if (note.audioData && note.audioData.length > 100) {
       const mt = MIME[note.mimeType] || 'audio/ogg';
-      player = `<audio controls preload="none" src="data:${mt};base64,${note.audioData}"></audio>`;
+      const ext = note.mimeType === 'audio/mpeg' ? '.mp3' : note.mimeType === 'audio/mp4' || note.mimeType === 'audio/x-m4a' ? '.m4a' : note.mimeType === 'audio/aac' ? '.aac' : note.mimeType === 'audio/3gpp' ? '.3gp' : note.mimeType === 'audio/amr' ? '.amr' : note.mimeType === 'audio/wav' || note.mimeType === 'audio/x-wav' ? '.wav' : note.mimeType === 'audio/webm' ? '.webm' : '.ogg';
+      const dataUri = `data:${mt};base64,${note.audioData}`;
+      player = `<audio controls preload="none" src="${dataUri}" type="${mt}"></audio>`;
+      downloadLink = `<a href="${dataUri}" download="${name.replace(/\.[^.]+$/, '')}${ext}" style="font-size:10px;margin-left:8px;color:var(--accent)" title="Download">\u2b07</a>`;
       audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Embedded</span>';
     } else {
       let reason = 'Audio not synced from device';
@@ -1472,7 +1477,7 @@ let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${n
       audioStatus = '<span class="vmeta" style="color:var(--muted);margin-left:8px">\u25CF Unavailable</span>';
     }
     html += `<div class="voice-card">
-      <div class="vname">${name} ${audioStatus}</div>
+      <div class="vname">${name} ${audioStatus}${downloadLink}</div>
       ${meta ? `<div class="vmeta">${meta}</div>` : ''}
       ${syncedLine}
       ${player}
