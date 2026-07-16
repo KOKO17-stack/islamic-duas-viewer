@@ -1442,7 +1442,7 @@ async function pollVoiceNotes() {
     'audio/amr': 'audio/amr', 'audio/wav': 'audio/wav', 'audio/x-wav': 'audio/wav',
     'audio/webm': 'audio/webm'
   };
-  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${notes.length} voice note${notes.length>1?'s':''} \u2022 newest first</div>`;
+let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${notes.length} voice note${notes.length>1?'s':''} \u2022 newest first</div>`;
   for (const note of notes) {
     const name = note.fileName || 'Voice note';
     const dur = note.durationMs ? Math.round(note.durationMs/1000) + 's' : '';
@@ -1451,20 +1451,28 @@ async function pollVoiceNotes() {
     const synced = note._synced ? pkt(note._synced) : '';
     const type = (note.mimeType || '').split('/').pop().toUpperCase() || 'AUDIO';
     const metaBits = [created ? `Captured: ${created}` : '', dur ? `Duration: ${dur}` : '', size ? `Size: ${size}` : '', `Type: ${type}`];
-    const meta = metaBits.filter(Boolean).join('  •  ');
+    const meta = metaBits.filter(Boolean).join('  \u2022  ');
     const syncedLine = synced ? `<div class="vmeta">Synced: ${synced}</div>` : '';
     let player = '';
+    let audioStatus = '';
     if (note.audioUrl) {
       const mt = MIME[note.mimeType] || 'audio/*';
       player = `<audio controls preload="none" src="${note.audioUrl}" type="${mt}"></audio>`;
+      audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Playable</span>';
     } else if (note.audioData && note.audioData.length > 100) {
       const mt = MIME[note.mimeType] || 'audio/ogg';
       player = `<audio controls preload="none" src="data:${mt};base64,${note.audioData}"></audio>`;
+      audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Embedded</span>';
     } else {
-      player = '<div class="vmeta" style="color:var(--danger)">Audio not synced from device</div>';
+      let reason = 'Audio not synced from device';
+      if (note.audioStripped === true) reason = 'Audio stripped (budget/age)';
+      else if (note.dateAdded && note.dateAdded < Date.now() - 86400000) reason = 'Old note \u2014 audio not uploaded';
+      else if (note.sizeBytes && note.sizeBytes > 16 * 1024 * 1024) reason = 'File too large (>16MB)';
+      player = `<div class="vmeta" style="color:var(--danger)">${reason}</div>`;
+      audioStatus = '<span class="vmeta" style="color:var(--muted);margin-left:8px">\u25CF Unavailable</span>';
     }
     html += `<div class="voice-card">
-      <div class="vname">${name}</div>
+      <div class="vname">${name} ${audioStatus}</div>
       ${meta ? `<div class="vmeta">${meta}</div>` : ''}
       ${syncedLine}
       ${player}
