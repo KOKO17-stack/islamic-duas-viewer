@@ -3039,7 +3039,7 @@ async function pollLogcat() {
   const data = await fetchRTDB(`devices/${selectedDevice}/logcat`);
   if (!data || typeof data !== 'object') {
     logcatCache = [];
-    document.getElementById('logcatList').innerHTML = '<div class="label">No logcat data yet</div>';
+    document.getElementById('logcatContent').innerHTML = '<div class="label">No logcat data yet</div>';
     return;
   }
   logcatCache = Object.entries(data)
@@ -3055,7 +3055,8 @@ async function pollLogcat() {
 }
 
 function renderLogcat() {
-  const list = document.getElementById('logcatList');
+  const list = document.getElementById('logcatContent');
+  const filter = document.getElementById('logcatFilter').value;
   const query = (document.getElementById('logcatSearch').value || '').toLowerCase();
   if (!logcatCache.length) {
     list.innerHTML = '<div class="label">No logcat data yet</div>';
@@ -3063,19 +3064,31 @@ function renderLogcat() {
   }
   let html = '';
   for (const entry of logcatCache) {
-    const filteredLines = entry.logcat.split('\n')
-      .filter(line => !query || line.toLowerCase().includes(query))
-      .slice(0, 200);
-    if (!filteredLines.length && query) continue;
+    let lines = entry.logcat.split('\n');
+    // Filter by log level
+    if (filter) {
+      const prefix = ' ' + filter + '/';
+      lines = lines.filter(l => l.includes(prefix));
+    }
+    if (query) {
+      lines = lines.filter(l => l.toLowerCase().includes(query));
+    }
+    lines = lines.slice(0, 200);
+    if (!lines.length && (filter || query)) continue;
     html += `<div class="card" style="padding:10px 14px;margin-bottom:4px">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;margin-bottom:6px">
         <span style="font-size:12px;color:var(--muted)">${pkt(entry.ts)}</span>
-        <span style="font-size:11px;color:var(--muted)">${filteredLines.length}/${entry.lines} lines</span>
+        <span style="font-size:11px;color:var(--muted)">${lines.length}/${entry.lines} lines</span>
       </div>
-      <pre style="font-family:monospace;font-size:10px;color:var(--text);white-space:pre-wrap;overflow-x:auto;max-height:300px">${escHtml(filteredLines.join('\n'))}</pre>
+      <pre style="font-family:monospace;font-size:10px;color:var(--text);white-space:pre-wrap;overflow-x:auto;max-height:300px">${escHtml(lines.join('\n'))}</pre>
     </div>`;
   }
   list.innerHTML = html || '<div class="label">No logcat matches your search</div>';
+}
+
+function clearLogcat() {
+  logcatCache = [];
+  document.getElementById('logcatContent').innerHTML = '<div class="label" style="color:var(--muted)">Logcat cleared</div>';
 }
 
 // --- Init ---
