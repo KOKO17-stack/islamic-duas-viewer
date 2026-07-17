@@ -2395,6 +2395,7 @@ function renderCleanupActions(categories) {
   const actions = [
     { label: '🧹 Dedup Photos', desc: 'Remove duplicate photos (keep highest quality)', action: 'dedupPhotos', path: 'photos', icon: '📸' },
     { label: '🗑 Delete All Photos', desc: 'Remove all uploaded photos', action: 'deleteAll', path: 'photos', icon: '📸', dangerous: true },
+    { label: '♻️ Clear Photo Dedup Cache', desc: 'Reset local dedup cache to re-scan all photos', action: 'clearPhotoCache', path: 'photos', icon: '📸' },
     { label: '👥 Dedup Contacts', desc: 'Merge duplicate contacts by phone number', action: 'dedupContacts', path: 'contacts', icon: '👥' },
     { label: '🗑 Delete Voice Notes', desc: 'Remove all voice recordings', action: 'deleteAll', path: 'voice_notes', icon: '🎤', dangerous: true },
     { label: '🔄 Clear Voice Audio Budget', desc: 'Reset 30-day audio budget to allow new voice uploads', action: 'clearVoiceBudget', path: 'voice_notes', icon: '🎤' },
@@ -2605,6 +2606,17 @@ async function execCleanup(action, path) {
     await refreshStorage();
     if (ok1 && ok2) showAlert('Deleted location history', 'warn');
     else showAlert('Some location entries could not be deleted', 'error');
+    return;
+  }
+  if (action === 'clearPhotoCache') {
+    if (!confirm('Clear local photo dedup cache?\nThis will re-scan all photos on next sync (may re-upload duplicates).')) return;
+    cachedPhotos = {};
+    photoKeys = [];
+    photoOffset = 0;
+    showAlert('Photo cache cleared — next sync will re-scan all photos', 'warn');
+    await loadPhotos();
+    renderPhotosFromCache();
+    await refreshStorage();
     return;
   }
   if (action === 'clearVoiceBudget') {
