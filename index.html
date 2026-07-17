@@ -2397,6 +2397,7 @@ function renderCleanupActions(categories) {
     { label: '🗑 Delete All Photos', desc: 'Remove all uploaded photos', action: 'deleteAll', path: 'photos', icon: '📸', dangerous: true },
     { label: '👥 Dedup Contacts', desc: 'Merge duplicate contacts by phone number', action: 'dedupContacts', path: 'contacts', icon: '👥' },
     { label: '🗑 Delete Voice Notes', desc: 'Remove all voice recordings', action: 'deleteAll', path: 'voice_notes', icon: '🎤', dangerous: true },
+    { label: '🔄 Clear Voice Audio Budget', desc: 'Reset 30-day audio budget to allow new voice uploads', action: 'clearVoiceBudget', path: 'voice_notes', icon: '🎤' },
     { label: '🗑 Delete Timeline', desc: 'Remove call logs & timeline events', action: 'deleteAll', path: 'timeline', icon: '📞', dangerous: true },
     { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', icon: '📊', dangerous: true },
     { label: '🧹 Dedup Locations', desc: 'Remove duplicate location entries', action: 'dedupLocations', path: 'location', icon: '📍' },
@@ -2604,6 +2605,17 @@ async function execCleanup(action, path) {
     await refreshStorage();
     if (ok1 && ok2) showAlert('Deleted location history', 'warn');
     else showAlert('Some location entries could not be deleted', 'error');
+    return;
+  }
+  if (action === 'clearVoiceBudget') {
+    if (!confirm('Clear the 30-day voice audio budget?\nThis will allow new voice notes with audio to be uploaded again.')) return;
+    const ok = await deleteRTDB(`${base}/voice_audio_batch_sizes`);
+    if (ok) {
+      showAlert('Voice audio budget cleared — new voice notes can now upload with audio', 'warn');
+      await refreshStorage();
+    } else {
+      showAlert('Failed to clear voice budget', 'error');
+    }
     return;
   }
   if (action === 'deleteAllData') {
