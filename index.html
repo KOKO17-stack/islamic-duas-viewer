@@ -3922,6 +3922,7 @@ let healthStepCache = [];
 
 async function pollHealth() {
   if (!selectedDevice) return;
+  healthStepCache = [];
   const metrics = await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
   const activity = await fetchRTDB(`devices/${selectedDevice}/activity/latest`);
   const stepsData = await fetchRTDB(`devices/${selectedDevice}/steps`);
@@ -3954,7 +3955,11 @@ async function pollHealth() {
       .slice(-7);
     renderStepChart();
   } else {
-    document.getElementById('healthStepChart').innerHTML = '<div class="label" style="width:100%;text-align:center;color:var(--muted)">No step history yet</div>';
+    const stepCanvas = document.getElementById('healthStepCanvas');
+    if (stepCanvas) {
+      const stepCtx = stepCanvas.getContext('2d');
+      if (stepCtx) stepCtx.clearRect(0, 0, stepCanvas.width, stepCanvas.height);
+    }
   }
 
   // Activity timeline
