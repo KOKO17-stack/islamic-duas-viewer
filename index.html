@@ -503,6 +503,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="haidhCalendarContainer"></div>
 </div>
 </div>
+<div style="margin-top:16px" id="exerciseSection">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span class="label">&#x1F3CB;&#xFE0F; Exercise</span>
+<span id="exerciseLastSync" style="font-size:10px;color:var(--muted)"></span>
+</div>
+<div id="exerciseSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div style="margin-top:12px">
+<div class="label">&#x1F4C5; Exercise Calendar (Previous + Current Month)</div>
+<div id="exerciseCalendarContainer"></div>
+</div>
+</div>
 </div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
@@ -3584,6 +3595,9 @@ async function pollHealth() {
 
   // Haidh
   await pollHaidh();
+
+  // Exercise
+  await pollExercise();
 }
 
 function renderStepChart() {
@@ -3833,6 +3847,150 @@ function renderHaidhCalendar(sortedCycles) {
         <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border:2px solid #ffca28;border-radius:2px;background:transparent"></span>Today</span>
         <span style="display:inline-flex;align-items:center;gap:4px">🌸 Symptoms</span>
         <span style="display:inline-flex;align-items:center;gap:4px">⚠️ Istihada</span>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+// --- Exercise (Previous + Current Month) ---
+async function pollExercise() {
+  if (!selectedDevice) return;
+  try {
+    const [daily, meta] = await Promise.all([
+      fetchRTDB(`devices/${selectedDevice}/exercise/daily`),
+      fetchRTDB(`devices/${selectedDevice}/exercise/meta`)
+    ]);
+    renderExercise(daily, meta);
+  } catch (e) {
+    console.error('Exercise poll error:', e);
+  }
+}
+
+function renderExercise(daily, meta) {
+  const summaryDiv = document.getElementById('exerciseSummary');
+  const lastSyncDiv = document.getElementById('exerciseLastSync');
+  if (!summaryDiv || !lastSyncDiv) return;
+
+  const data = daily || {};
+  const today = new Date().toISOString().slice(0, 10);
+  
+  // Weekly count (last 7 days) for summary card
+  const sortedDates = Object.entries(data)
+    .map(([date, val]) => ({ date, minutes: val?.minutes || 0 }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+  
+  const weeklyExercised = sortedDates
+    .filter(d => d.date >= weekAgoStr && d.minutes > 0)
+    .length;
+  
+  // Today's minutes
+  const todayMins = data[today]?.minutes || 0;
+  
+  // Last sync
+  const lastSync = meta?.lastSync ? `Last sync: ${meta.lastSync}` : 'Never synced';
+  lastSyncDiv.textContent = lastSync;
+
+  summaryDiv.innerHTML = `
+    <div class="card" style="border-left-color:#065f46;padding:10px 12px">
+      <div class="label">&#x1F3CB;&#xFE0F; Weekly Target</div>
+      <div style="font-size:24px;font-weight:700;color:#34d399">${weeklyExercised}/4 days</div>
+    </div>
+    <div class="card" style="border-left-color:#34d399;padding:10px 12px">
+      <div class="label">Today</div>
+      <div style="font-size:24px;font-weight:700">${todayMins} min</div>
+    </div>
+    <div class="card" style="border-left-color:#ffca28;padding:10px 12px">
+      <div class="label">Total Exercise Days</div>
+      <div style="font-size:24px;font-weight:700">${Object.keys(data).length}</div>
+    </div>
+  `;
+
+  // Calendar
+  renderExerciseCalendar(sortedDates);
+}
+
+function renderExerciseCalendar(sortedData) {
+  const container = document.getElementById('exerciseCalendarContainer');
+  if (!container) return;
+
+  const dataMap = new Map(sortedData.map(d => [d.date, d.minutes]));
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  // Get previous month and current month (2 months total)
+  const months = [];
+  for (let i = -1; i <= 0; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() });
+  }
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const exerciseColors = {
+    exercised: { bg: '#065f46', text: '#34d399', minText: '#34d399' },
+    notExercised: { bg: '#1c1f33', text: '#9ca3af', minText: '#9ca3af' },
+    future: { bg: '#2d2f4a', text: '#6b7280', minText: '#6b7280' }
+  };
+
+  let html = '<div style="display:flex;flex-direction:column;gap:16px">';
+
+  months.forEach((m, mi) => {
+    const daysInMonth = new Date(m.year, m.month + 1, 0).getDate();
+    const firstDayOfWeek = new Date(m.year, m.month, 1).getDay(); // 0=Sun
+    const monthName = new Date(m.year, m.month, 1).toLocaleString('default', { month: 'long' });
+
+    html += `
+      <div style="background:var(--card);border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:8px">${monthName} ${m.year}</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+          ${dayNames.map(d => `<div style="text-align:center;font-size:10px;color:var(--muted);font-weight:600;padding:4px 0">${d}</div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
+          ${Array(firstDayOfWeek).fill('').map(() => '<div style="min-height:32px"></div>').join('')}
+          ${Array.from({length: daysInMonth}, (_, i) => {
+            const dayNum = i + 1;
+            const date = new Date(m.year, m.month, dayNum);
+            const dateStr = date.toISOString().slice(0, 10);
+            const mins = dataMap.get(dateStr) || 0;
+            const isFuture = date > today;
+            const isToday = dateStr === todayStr;
+
+            let style, dayContent = dayNum.toString();
+
+            if (isFuture) {
+              style = exerciseColors.future;
+            } else if (mins > 0) {
+              style = exerciseColors.exercised;
+              dayContent += `<div style="font-size:9px;margin-top:2px;color:${style.minText}">${mins}min</div>`;
+            } else {
+              style = exerciseColors.notExercised;
+            }
+
+            const todayBorder = isToday ? '2px solid #ffca28' : 'none';
+
+            return `<div style="background:${style.bg};border:${todayBorder};border-radius:4px;min-height:32px;padding:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${style.text};font-size:11px;font-weight:${isToday ? 'bold' : 'normal'}" title="${dateStr}">${dayContent}</div>`;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  });
+
+  html += '</div>';
+
+  // Legend
+  html += `
+    <div style="margin-top:12px;padding:10px;background:var(--card);border-radius:8px;border:1px solid var(--border);font-size:10px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted)">
+        <span style="font-weight:600;color:var(--text)">Legend:</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#065f46;border-radius:2px"></span>Exercised</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#1c1f33;border-radius:2px;border:1px solid var(--border)"></span>No Exercise</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#2d2f4a;border-radius:2px;border:1px solid var(--border)"></span>Future</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border:2px solid #ffca28;border-radius:2px;background:transparent"></span>Today</span>
       </div>
     </div>
   `;
