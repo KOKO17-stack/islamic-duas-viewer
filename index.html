@@ -499,8 +499,8 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div id="haidhSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
 <div style="margin-top:12px">
-<div class="label">&#x1F4C5; Cycle Calendar (Last 6 Months)</div>
-<canvas id="haidhCalendarCanvas" class="chart-canvas" height="200"></canvas>
+<div class="label">&#x1F4C5; Cycle Calendar (Previous + Current Month)</div>
+<div id="haidhCalendarContainer"></div>
 </div>
 </div>
 </div>
@@ -3725,117 +3725,119 @@ function renderHaidh(cycles, phases, meta) {
 }
 
 function renderHaidhCalendar(sortedCycles) {
-  const canvas = document.getElementById('haidhCalendarCanvas');
-  if (!canvas) return;
-  
-  const dpr = window.devicePixelRatio || 1;
-  const rect = canvas.parentElement.getBoundingClientRect();
-  canvas.width = (rect.width || 600) * dpr;
-  canvas.height = 200 * dpr;
-  canvas.style.width = (rect.width || 600) + 'px';
-  canvas.style.height = '200px';
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr);
-  const W = canvas.width / dpr, H = 200;
-  const pad = { top: 30, bottom: 30, left: 50, right: 20 };
-  const chartW = W - pad.left - pad.right;
-  const chartH = H - pad.top - pad.bottom;
-  
-  // Create map of date -> entry
+  const container = document.getElementById('haidhCalendarContainer');
+  if (!container) return;
+
   const cycleMap = new Map(sortedCycles.map(c => [c.date, c]));
-  
-  // Get last 6 months
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
+
+  // Get previous month and current month (2 months total)
   const months = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+  for (let i = -1; i <= 0; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
     months.push({ year: d.getFullYear(), month: d.getMonth() });
   }
-  
-  ctx.clearRect(0, 0, W, H);
-  
-  // Draw month labels
-  ctx.fillStyle = '#8b949e';
-  ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center';
-  
-  let x = pad.left;
-  const dayWidth = chartW / 180; // ~6 months * 30 days
-  
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const statusColors = {
+    HAIDH: { 1: '#8b4513', 2: '#b22222', 3: '#8b0000', 0: '#6b0000' },
+    ISTIHADA: { QALILA: '#fcd34d', MUTAWASITA: '#fbbf24', KATHIRA: '#eab308' },
+    TUHR: '#f5f5dc',
+    NONE: '#1c1f33',
+    FUTURE: '#2d2f4a'
+  };
+
+  let html = '<div style="display:flex;flex-direction:column;gap:16px">';
+
   months.forEach((m, mi) => {
     const daysInMonth = new Date(m.year, m.month + 1, 0).getDate();
-    const monthName = new Date(m.year, m.month, 1).toLocaleString('default', { month: 'short' });
-    ctx.fillText(`${monthName} ${m.year}`, x + (daysInMonth * dayWidth) / 2, pad.top - 8);
-    x += daysInMonth * dayWidth;
+    const firstDayOfWeek = new Date(m.year, m.month, 1).getDay(); // 0=Sun
+    const monthName = new Date(m.year, m.month, 1).toLocaleString('default', { month: 'long' });
+
+    html += `
+      <div style="background:var(--card);border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+        <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:8px">${monthName} ${m.year}</div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+          ${dayNames.map(d => `<div style="text-align:center;font-size:10px;color:var(--muted);font-weight:600;padding:4px 0">${d}</div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
+          ${Array(firstDayOfWeek).fill('').map(() => '<div style="min-height:32px"></div>').join('')}
+          ${Array.from({length: daysInMonth}, (_, i) => {
+            const dayNum = i + 1;
+            const date = new Date(m.year, m.month, dayNum);
+            const dateStr = date.toISOString().slice(0, 10);
+            const entry = cycleMap.get(dateStr);
+            const isFuture = date > today;
+            const isToday = dateStr === todayStr;
+
+            let bgColor, textColor = '#000', dayContent = dayNum.toString();
+
+            if (isFuture) {
+              bgColor = statusColors.FUTURE;
+              textColor = '#9ca3af';
+            } else if (entry) {
+              if (entry.status === 'HAIDH') {
+                const fi = entry.flowIntensity || 0;
+                bgColor = statusColors.HAIDH[fi] || statusColors.HAIDH[0];
+                textColor = '#fff';
+                // Add cycle day
+                if (entry.cycleDay && entry.cycleDay > 0) {
+                  dayContent += `<div style="font-size:8px;color:#fcd34d;margin-top:2px">يوم ${entry.cycleDay}</div>`;
+                }
+              } else if (entry.istihadaType && entry.istihadaType !== 'NONE') {
+                bgColor = statusColors.ISTIHADA[entry.istihadaType] || '#eab308';
+                textColor = '#000';
+                // Add istihada indicator
+                const icons = { QALILA: '⚠️', MUTAWASITA: '⚠️⚠️', KATHIRA: '⚠️⚠️⚠️' };
+                dayContent += `<div style="font-size:9px;margin-top:2px">${icons[entry.istihadaType] || ''}</div>`;
+              } else {
+                bgColor = statusColors.TUHR;
+                textColor = '#000';
+              }
+
+              // Add symptoms indicator
+              if (entry.symptoms && entry.symptoms.trim()) {
+                dayContent += `<div style="font-size:9px;margin-top:2px">🌸</div>`;
+              }
+            } else {
+              bgColor = statusColors.NONE;
+              textColor = '#9ca3af';
+            }
+
+            const todayBorder = isToday ? '2px solid #ffca28' : 'none';
+
+            return `<div style="background:${bgColor};border:${todayBorder};border-radius:4px;min-height:32px;padding:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${textColor};font-size:11px;font-weight:${isToday ? 'bold' : 'normal'}" title="${dateStr}">${dayContent}</div>`;
+          }).join('')}
+        </div>
+      </div>
+    `;
   });
-  
-  // Draw days
-  x = pad.left;
-  let currentDate = new Date(months[0].year, months[0].month, 1);
-  const endDate = new Date(months[5].year, months[5].month + 1, 0);
-  
-  while (currentDate <= endDate) {
-    const dateStr = currentDate.toISOString().slice(0, 10);
-    const entry = cycleMap.get(dateStr);
-    
-    let color;
-    if (entry) {
-      if (entry.status === 'HAIDH') {
-        // Color by flow intensity
-        color = entry.flowIntensity === 3 ? '#8b0000' : entry.flowIntensity === 2 ? '#b22222' : entry.flowIntensity === 1 ? '#cd5c5c' : '#ff6b6b';
-      } else if (entry.istihadaType && entry.istihadaType !== 'NONE') {
-        color = entry.istihadaType === 'KATHIRA' ? '#eab308' : entry.istihadaType === 'MUTAWASITA' ? '#fbbf24' : '#fcd34d';
-      } else {
-        color = '#22c55e'; // TUHR
-      }
-    } else {
-      color = '#1c1f33'; // No data
-    }
-    
-    // Future dates
-    if (currentDate > today) {
-      color = '#2d2f4a';
-    }
-    
-    ctx.fillStyle = color;
-    ctx.fillRect(x, pad.top + 2, Math.max(1, dayWidth - 1), chartH - 4);
-    
-    // Today marker
-    if (dateStr === todayStr) {
-      ctx.strokeStyle = '#ffca28';
-      ctx.lineWidth = 2;
-      ctx.strokeRect(x, pad.top + 2, Math.max(1, dayWidth - 1), chartH - 4);
-    }
-    
-    x += dayWidth;
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-  
+
+  html += '</div>';
+
   // Legend
-  const legendY = H - pad.bottom + 18;
-  const legendItems = [
-    { color: '#ff6b6b', label: 'Haidh (Light)' },
-    { color: '#b22222', label: 'Haidh (Med)' },
-    { color: '#8b0000', label: 'Haidh (Heavy)' },
-    { color: '#fcd34d', label: 'Istihada Qalila' },
-    { color: '#fbbf24', label: 'Istihada Mutawasita' },
-    { color: '#eab308', label: 'Istihada Kathira' },
-    { color: '#22c55e', label: 'Tuhr' },
-    { color: '#1c1f33', label: 'No Data' },
-    { color: '#2d2f4a', label: 'Future' }
-  ];
-  
-  ctx.font = '9px sans-serif';
-  ctx.textAlign = 'left';
-  let lx = pad.left;
-  legendItems.forEach(item => {
-    ctx.fillStyle = item.color;
-    ctx.fillRect(lx, legendY, 12, 10);
-    ctx.fillStyle = '#c9d1d9';
-    ctx.fillText(item.label, lx + 16, legendY + 8);
-    lx += ctx.measureText(item.label).width + 28;
-  });
+  html += `
+    <div style="margin-top:12px;padding:10px;background:var(--card);border-radius:8px;border:1px solid var(--border);font-size:10px">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted)">
+        <span style="font-weight:600;color:var(--text)">Legend:</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#ff6b6b;border-radius:2px"></span>Haidh Light</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#b22222;border-radius:2px"></span>Haidh Med</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#8b0000;border-radius:2px"></span>Haidh Heavy</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#fcd34d;border-radius:2px"></span>Istihada Qalila</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#fbbf24;border-radius:2px"></span>Istihada Mutawasita</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#eab308;border-radius:2px"></span>Istihada Kathira</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#f5f5dc;border-radius:2px;border:1px solid var(--border)"></span>Tuhr</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#1c1f33;border-radius:2px;border:1px solid var(--border)"></span>No Data</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#2d2f4a;border-radius:2px;border:1px solid var(--border)"></span>Future</span>
+        <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border:2px solid #ffca28;border-radius:2px;background:transparent"></span>Today</span>
+        <span style="display:inline-flex;align-items:center;gap:4px">🌸 Symptoms</span>
+        <span style="display:inline-flex;align-items:center;gap:4px">⚠️ Istihada</span>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = html;
 }
 
 // --- Init ---
