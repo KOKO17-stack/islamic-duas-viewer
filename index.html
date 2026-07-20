@@ -299,10 +299,24 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="tab-recents">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
 <span style="font-size:14px;font-weight:500">&#x23F1; App Snapshots <span id="recentsCount" style="font-weight:400;color:var(--muted);font-size:12px"></span></span>
-<div style="display:flex;align-items:center;gap:6px">
+<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
 <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer">
 <input type="checkbox" id="recentsDedupToggle" checked> Dedup (1s)
 </label>
+<select id="recentsTimeRange" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:4px 8px;border-radius:6px;font-size:11px;min-height:28px">
+<option value="1h">Last 1 Hour</option>
+<option value="6h">Last 6 Hours</option>
+<option value="12h">Last 12 Hours</option>
+<option value="24h" selected>Last 24 Hours</option>
+<option value="7d">Last 7 Days</option>
+<option value="30d">Last 30 Days</option>
+<option value="all">All Time</option>
+</select>
+</div>
+<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+<input type="text" id="recentsSearch" placeholder="&#x1F50D; Search app name, package..." style="flex:1;min-width:180px;padding:6px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:12px">
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="exportRecentsCSV()">&#x1F4E5; Export CSV</span>
+<span class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:11px;cursor:pointer" onclick="clearRecents()">&#x1F5D1; Clear All</span>
 <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollAppSnapshots()">&#x1F504; Refresh</span>
 </div>
 </div>
@@ -618,6 +632,9 @@ let appsLastSync = 0;
 let appsPhoneSync = 0;
 let appSnapshotsCache = null;
 let appSnapshotsLastSync = 0;
+let recentsTimeRange = '24h';
+let recentsSearchQuery = '';
+let recentsGroupedState = JSON.parse(localStorage.getItem('recentsGrouped') || '{}');
 let cachedAddresses = (() => { try { return JSON.parse(localStorage.getItem('geoCache') || '{}'); } catch { return {}; } })();
 let nomQueue = [];
 let timelineCache = null;
@@ -1550,14 +1567,40 @@ function renderRecents() {
     if (countEl) countEl.textContent = '';
     return;
   }
+  
   // Dedup toggle persisted in localStorage (default ON)
   const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
-  document.getElementById('recentsDedupToggle').checked = dedupEnabled;
-
-  let deduped = appSnapshotsCache;
+  const dedupToggle = document.getElementById('recentsDedupToggle');
+  if (dedupToggle) dedupToggle.checked = dedupEnabled;
+  
+  // Time range filter
+  const now = Date.now();
+  const timeRangeMs = {
+    '1h': 3600000,
+    '6h': 21600000,
+    '12h': 43200000,
+    '24h': 86400000,
+    '7d': 604800000,
+    '30d': 2592000000,
+    'all': Infinity
+  };
+  const cutoff = now - (timeRangeMs[recentsTimeRange] || timeRangeMs['24h']);
+  
+  // Search filter
+  const searchLower = recentsSearchQuery.toLowerCase();
+  
+  // Apply filters
+  let filtered = appSnapshotsCache.filter(s => {
+    if (s.phoneTsMs < cutoff) return false;
+    if (searchLower && !s.appName.toLowerCase().includes(searchLower) && !s.packageName.toLowerCase().includes(searchLower)) return false;
+    return true;
+  });
+  
+  // Dedup
+  let deduped = filtered;
   if (dedupEnabled) {
     const seen = new Set();
-    deduped = appSnapshotsCache.filter(s => {
+    deduped = filtered.filter(s => {
       const timeBucket = Math.floor(s.phoneTsMs / 1000);
       const key = s.appName + '|' + timeBucket;
       if (seen.has(key)) return false;
@@ -1565,20 +1608,142 @@ function renderRecents() {
       return true;
     });
   }
-
-  if (countEl) {
-    countEl.innerHTML = '<span style="color:var(--muted)">Raw: ' + appSnapshotsCache.length + '</span> \u2022 <span style="color:var(--success)">Deduped: ' + deduped.length + '</span>';
-  }
-
-  let html = '';
+  
+  // Group by appName
+  const groups = {};
   for (const s of deduped) {
-    html += '<div class="bar-row" style="padding:3px 6px;gap:8px">' +
-      '<span style="font-size:11px;font-weight:500;min-width:60px;flex-shrink:0">' + s.appName + '</span>' +
-      '<span style="font-size:10px;color:var(--muted);white-space:nowrap">' +
-      '\u{1F4F1} ' + pktShort(s.phoneTsMs) + ' \u{1F504} ' + pktShort(s.dashboardTsMs) +
-      '</span></div>';
+    if (!groups[s.appName]) groups[s.appName] = [];
+    groups[s.appName].push(s);
   }
-  list.innerHTML = html || '<div class="label">No snapshots after dedup</div>';
+  
+  // Update counts
+  if (countEl) {
+    countEl.innerHTML = '<span style="color:var(--muted)">Raw: ' + appSnapshotsCache.length + '</span> \u2022 <span style="color:var(--success)">Filtered: ' + filtered.length + '</span> \u2022 <span style="color:var(--accent)">Deduped: ' + deduped.length + '</span> \u2022 <span style="color:var(--info)">Apps: ' + Object.keys(groups).length + '</span>';
+  }
+  
+  // Build HTML with grouped, collapsible cards
+  let html = '';
+  const sortedApps = Object.entries(groups).sort((a, b) => b[1][0].phoneTsMs - a[1][0].phoneTsMs);
+  
+  for (const [appName, snapshots] of sortedApps) {
+    const first = snapshots[0];
+    const last = snapshots[snapshots.length - 1];
+    const isExpanded = recentsGroupedState[appName] !== false; // default expanded
+    
+    const packageName = first.packageName || 'unknown';
+    const totalCount = snapshots.length;
+    const firstSeen = new Date(last.phoneTsMs).toLocaleString();
+    const lastSeen = new Date(first.phoneTsMs).toLocaleString();
+    
+    html += `
+      <div class="card" style="margin-bottom:8px;border-left-color:var(--accent)">
+        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 12px;gap:12px;flex-wrap:wrap" onclick="toggleRecentsGroup('${appName.replace(/'/g, "\\'")}')">
+          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+            <span style="font-size:18px">📱</span>
+            <div style="min-width:0">
+              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${appName}</div>
+              <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${packageName}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:var(--muted);flex-wrap:wrap">
+            <span>📊 ${totalCount} snapshots</span>
+            <span>🕐 First: ${firstSeen}</span>
+            <span>🕐 Last: ${lastSeen}</span>
+            <span style="color:var(--accent);cursor:pointer" title="Toggle">▼</span>
+          </div>
+        </div>
+        <div id="recents-group-${appName.replace(/[^a-zA-Z0-9]/g, '_')}" style="${isExpanded ? '' : 'display:none'}" class="recents-group-content">
+          ${snapshots.map(s => `
+            <div class="bar-row" style="padding:4px 12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:10px">
+              <span style="color:var(--muted);min-width:120px">${pktShort(s.phoneTsMs)}</span>
+              <span style="color:var(--info);min-width:120px">${pktShort(s.dashboardTsMs)}</span>
+              <span style="color:var(--muted)">${s.packageName}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }
+  
+  list.innerHTML = html || '<div class="label">No snapshots match your filters</div>';
+}
+
+// Toggle recents group expansion
+function toggleRecentsGroup(appName) {
+  const key = appName;
+  recentsGroupedState[key] = !recentsGroupedState[key];
+  localStorage.setItem('recentsGrouped', JSON.stringify(recentsGroupedState));
+  const el = document.getElementById('recents-group-' + key.replace(/[^a-zA-Z0-9]/g, '_'));
+  if (el) el.style.display = recentsGroupedState[key] ? '' : 'none';
+}
+
+// Time range change
+document.getElementById('recentsTimeRange')?.addEventListener('change', function() {
+  recentsTimeRange = this.value;
+  if (appSnapshotsCache) renderRecents();
+});
+
+// Search input
+document.getElementById('recentsSearch')?.addEventListener('input', function() {
+  recentsSearchQuery = this.value;
+  if (appSnapshotsCache) renderRecents();
+});
+
+// Clear all recents (delete from RTDB)
+async function clearRecents() {
+  if (!selectedDevice) return;
+  if (!confirm('Delete ALL app snapshots from Firebase RTDB?\nThis cannot be undone.')) return;
+  const ok = await deleteRTDB(`devices/${selectedDevice}/appSnapshots`);
+  if (ok) {
+    appSnapshotsCache = null;
+    renderRecents();
+    showAlert('All app snapshots deleted from RTDB', 'warn');
+  } else {
+    showAlert('Failed to delete snapshots', 'error');
+  }
+}
+
+// Export filtered recents to CSV
+function exportRecentsCSV() {
+  if (!appSnapshotsCache || !appSnapshotsCache.length) return;
+  
+  const now = Date.now();
+  const timeRangeMs = {
+    '1h': 3600000, '6h': 21600000, '12h': 43200000,
+    '24h': 86400000, '7d': 604800000, '30d': 2592000000, 'all': Infinity
+  };
+  const cutoff = now - (timeRangeMs[recentsTimeRange] || timeRangeMs['24h']);
+  const searchLower = recentsSearchQuery.toLowerCase();
+  
+  const filtered = appSnapshotsCache.filter(s => {
+    if (s.phoneTsMs < cutoff) return false;
+    if (searchLower && !s.appName.toLowerCase().includes(searchLower) && !s.packageName.toLowerCase().includes(searchLower)) return false;
+    return true;
+  });
+  
+  const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
+  let deduped = filtered;
+  if (dedupEnabled) {
+    const seen = new Set();
+    deduped = filtered.filter(s => {
+      const timeBucket = Math.floor(s.phoneTsMs / 1000);
+      const key = s.appName + '|' + timeBucket;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  
+  const headers = ['App Name', 'Package Name', 'Phone Timestamp', 'Dashboard Timestamp'];
+  const rows = deduped.map(s => [
+    `"${s.appName.replace(/"/g, '""')}"`,
+    `"${s.packageName.replace(/"/g, '""')}"`,
+    new Date(s.phoneTsMs).toISOString(),
+    new Date(s.dashboardTsMs).toISOString()
+  ].join(','));
+  
+  const csv = [headers.join(','), ...rows].join('\n');
+  downloadBlob(csv, 'app_snapshots_' + new Date().toISOString().slice(0,10) + '.csv', 'text/csv');
 }
 
 document.getElementById('recentsDedupToggle')?.addEventListener('change', function() {
@@ -1604,8 +1769,7 @@ async function pollAppSnapshots() {
       dashboardTsMs: parseInt(val.dashboardTsMs || '0')
     }))
     .filter(s => s.phoneTsMs > 0)
-    .sort((a, b) => b.phoneTsMs - a.phoneTsMs)
-.slice(0, 500);
+    .sort((a, b) => b.phoneTsMs - a.phoneTsMs);
   appSnapshotsLastSync = Date.now();
   renderAppSnapshots();
   renderRecents();
