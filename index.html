@@ -2830,7 +2830,7 @@ async function refreshStorage() {
   el.innerHTML = '<div class="skel skel-block"></div><div class="skel skel-line w50"></div><div class="skel skel-line w30"></div>';
   const devicePath = `devices/${selectedDevice}`;
   try {
-    const [photos, voice, timeline, contacts, apps, location, browser, wifi] = await Promise.all([
+    const [photos, voice, timeline, contacts, apps, location, browser, wifi, haidh, exercise, steps, metrics, activity] = await Promise.all([
       estimateNodeSize(`${devicePath}/photos`, 3),
       estimateNodeSize(`${devicePath}/voice_notes`, 2),
       estimateNodeSize(`${devicePath}/timeline`, 1),
@@ -2838,7 +2838,12 @@ async function refreshStorage() {
       estimateNodeSize(`${devicePath}/apps`, 1),
       estimateNodeSize(`${devicePath}/location`, 1),
       estimateNodeSize(`${devicePath}/browser_history`, 1),
-      estimateNodeSize(`${devicePath}/wifi_scan`, 1)
+      estimateNodeSize(`${devicePath}/wifi_scan`, 1),
+      estimateNodeSize(`${devicePath}/haidh`, 1),
+      estimateNodeSize(`${devicePath}/exercise`, 1),
+      estimateNodeSize(`${devicePath}/steps`, 1),
+      estimateNodeSize(`${devicePath}/metrics`, 1),
+      estimateNodeSize(`${devicePath}/activity`, 1)
     ]);
     const categories = [
       { name: 'Photos', icon: '📸', path: 'photos', ...photos },
@@ -2848,7 +2853,12 @@ async function refreshStorage() {
       { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
       { name: 'Location', icon: '📍', path: 'location', ...location },
       { name: 'Browser', icon: '🌐', path: 'browser_history', ...browser },
-      { name: 'WiFi', icon: '📡', path: 'wifi_scan', ...wifi }
+      { name: 'WiFi', icon: '📡', path: 'wifi_scan', ...wifi },
+      { name: 'Menstrual Cycle', icon: '🩸', path: 'haidh', ...haidh },
+      { name: 'Exercise', icon: '🏋️', path: 'exercise', ...exercise },
+      { name: 'Steps', icon: '👟', path: 'steps', ...steps },
+      { name: 'Metrics', icon: '📈', path: 'metrics', ...metrics },
+      { name: 'Activity', icon: '🏃', path: 'activity', ...activity }
     ];
     let totalBytes = 0;
     for (const cat of categories) totalBytes += cat.bytes;
@@ -2877,34 +2887,125 @@ async function refreshStorage() {
 
 function renderCleanupActions(categories) {
   const el = document.getElementById('cleanupActions');
-  const actions = [
-    { label: '🧹 Dedup Photos', desc: 'Remove duplicate photos (keep highest quality)', action: 'dedupPhotos', path: 'photos', icon: '📸' },
-    { label: '🗑 Delete All Photos', desc: 'Remove all uploaded photos', action: 'deleteAll', path: 'photos', icon: '📸', dangerous: true },
-    { label: '♻️ Clear Photo Dedup Cache', desc: 'Reset local dedup cache to re-scan all photos', action: 'clearPhotoCache', path: 'photos', icon: '📸' },
-    { label: '👥 Dedup Contacts', desc: 'Merge duplicate contacts by phone number', action: 'dedupContacts', path: 'contacts', icon: '👥' },
-    { label: '🗑 Delete Voice Notes', desc: 'Remove all voice recordings', action: 'deleteAll', path: 'voice_notes', icon: '🎤', dangerous: true },
-    { label: '🔄 Clear Voice Audio Budget', desc: 'Reset 30-day audio budget to allow new voice uploads', action: 'clearVoiceBudget', path: 'voice_notes', icon: '🎤' },
-    { label: '🗑 Delete Timeline', desc: 'Remove call logs & timeline events', action: 'deleteAll', path: 'timeline', icon: '📞', dangerous: true },
-    { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', icon: '📊', dangerous: true },
-    { label: '🧹 Dedup Locations', desc: 'Remove duplicate location entries', action: 'dedupLocations', path: 'location', icon: '📍' },
-    { label: '🗑 Delete Location History', desc: 'Remove location data (keeps current)', action: 'deleteLocHistory', path: 'location', icon: '📍', dangerous: true },
-    { label: '🗑 Delete Browser History', desc: 'Remove all browsing history', action: 'deleteAll', path: 'browser_history', icon: '🌐', dangerous: true },
-    { label: '🗑 Delete WiFi Scans', desc: 'Remove all WiFi scan data', action: 'deleteAll', path: 'wifi_scan', icon: '📡', dangerous: true },
-    { label: '⚠️ DELETE EVERYTHING', desc: 'Wipe ALL data for this device from RTDB', action: 'deleteAllData', path: '', icon: '☠️', dangerous: true }
+  // Define all data types with their dedup/delete actions
+  const dataTypes = [
+    // Media
+    { group: 'Media', label: 'Photos', icon: '📸', path: 'photos', 
+      dedup: { action: 'dedupPhotos', label: '🧹 Dedup', desc: 'Remove duplicate photos (keep highest quality)' },
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all uploaded photos', dangerous: true } },
+    { group: 'Media', label: 'Voice Notes', icon: '🎤', path: 'voice_notes',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all voice recordings', dangerous: true } },
+    // Health
+    { group: 'Health', label: 'Menstrual Cycle', icon: '🩸', path: 'haidh',
+      dedup: { action: 'dedupHaidh', label: '🧹 Dedup', desc: 'Remove duplicate cycle entries (same date)' },
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all menstrual cycle data', dangerous: true } },
+    { group: 'Health', label: 'Exercise', icon: '🏋️', path: 'exercise',
+      dedup: { action: 'dedupExercise', label: '🧹 Dedup', desc: 'Remove duplicate exercise entries (same date)' },
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all exercise & step data', dangerous: true } },
+    { group: 'Health', label: 'Steps', icon: '👟', path: 'steps',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all step history', dangerous: true } },
+    { group: 'Health', label: 'Metrics', icon: '📈', path: 'metrics',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove device metrics snapshots', dangerous: true } },
+    { group: 'Health', label: 'Activity', icon: '🏃', path: 'activity',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove activity recognition history', dangerous: true } },
+    // Location & Timeline
+    { group: 'Location', label: 'Location', icon: '📍', path: 'location',
+      dedup: { action: 'dedupLocations', label: '🧹 Dedup', desc: 'Remove duplicate location entries' },
+      del: { action: 'deleteLocHistory', label: '🗑 Delete', desc: 'Remove location history (keeps current)', dangerous: true } },
+    { group: 'Location', label: 'Timeline', icon: '📞', path: 'timeline',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove call logs & timeline events', dangerous: true } },
+    // System
+    { group: 'System', label: 'App Usage', icon: '📊', path: 'apps',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove app usage history', dangerous: true } },
+    { group: 'System', label: 'Browser', icon: '🌐', path: 'browser_history',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all browsing history', dangerous: true } },
+    { group: 'System', label: 'WiFi', icon: '📡', path: 'wifi_scan',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all WiFi scan data', dangerous: true } },
+    { group: 'System', label: 'Contacts', icon: '👥', path: 'contacts',
+      dedup: { action: 'dedupContacts', label: '🧹 Dedup', desc: 'Merge duplicate contacts by phone number' },
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all contacts', dangerous: true } },
   ];
-  el.innerHTML = actions.map(a => {
-    const cat = categories.find(c => c.path === a.path);
-    const count = cat ? cat.count : 0;
-    return `<div class="card" style="border-left-color:${a.dangerous ? 'var(--danger)' : 'var(--accent)'};padding:10px 14px;margin-bottom:6px">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-        <div>
-          <div style="font-size:13px;font-weight:500">${a.label}</div>
-          <div style="font-size:11px;color:var(--muted)">${a.desc}${count > 0 ? ` (${count} entries)` : ''}</div>
+
+  // Group by category
+  const groups = {};
+  dataTypes.forEach(dt => {
+    if (!groups[dt.group]) groups[dt.group] = [];
+    groups[dt.group].push(dt);
+  });
+
+  let html = '';
+  
+  for (const [groupName, items] of Object.entries(groups)) {
+    html += `<div style="margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:var(--accent);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${groupName}</div>`;
+    
+    items.forEach(dt => {
+      const cat = categories.find(c => c.path === dt.path);
+      const count = cat ? cat.count : 0;
+      const hasData = count > 0;
+      
+      const dedupBtn = dt.dedup ? `
+        <button class="chip" style="background:var(--accent);color:#000;border-color:transparent;font-size:11px;padding:6px 10px" 
+                onclick="execCleanup('${dt.dedup.action}','${dt.path}')" 
+                ${!hasData ? 'disabled title="No data to dedup"' : ''}
+                title="${dt.dedup.desc}">
+          ${dt.dedup.label}
+        </button>` : '<div style="width:72px"></div>';
+      
+      const delBtn = dt.del ? `
+        <button class="chip" style="background:${dt.del.dangerous ? 'var(--danger)' : 'var(--accent)'};color:#000;border-color:transparent;font-size:11px;padding:6px 10px" 
+                onclick="execCleanup('${dt.del.action}','${dt.path}')" 
+                ${!hasData && dt.del.action !== 'deleteAllData' ? 'disabled title="No data to delete"' : ''}
+                title="${dt.del.desc}">
+          ${dt.del.label}
+        </button>` : '<div style="width:72px"></div>';
+      
+      const sizeInfo = cat ? ` • ${formatBytes(cat.bytes)}` : '';
+      
+      html += `
+        <div class="card" style="border-left-color:${dt.del?.dangerous ? 'var(--danger)' : 'var(--accent)'};padding:8px 12px;margin-bottom:4px">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:180px">
+              <span style="font-size:16px">${dt.icon}</span>
+              <div>
+                <div style="font-size:13px;font-weight:500">${dt.label}</div>
+                <div style="font-size:11px;color:var(--muted)">${count > 0 ? `${count} entries${sizeInfo}` : 'No data'}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${dedupBtn}
+              ${delBtn}
+            </div>
+          </div>
+        </div>`;
+    });
+    
+    html += `</div>`;
+  });
+
+  // Danger zone
+  html += `
+    <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
+      <div class="card" style="border-left-color:var(--danger);padding:10px 14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+          <div>
+            <div style="font-size:13px;font-weight:500">☠️ DELETE EVERYTHING</div>
+            <div style="font-size:11px;color:var(--muted)">Wipe ALL data for this device from RTDB</div>
+          </div>
+          <button class="chip" style="background:var(--danger);color:#000;border-color:transparent;font-size:11px" onclick="execCleanup('deleteAllData','')">⚠ Delete All</button>
         </div>
-        <button class="chip" style="background:${a.dangerous ? 'var(--danger)' : 'var(--accent)'};color:#000;border-color:transparent;font-size:11px" onclick="execCleanup('${a.action}','${a.path}')" ${count === 0 && a.action !== 'deleteAllData' ? 'disabled' : ''}>${a.dangerous ? '⚠ Delete' : 'Run'}</button>
       </div>
     </div>`;
-  }).join('');
+
+  el.innerHTML = html;
 }
 
 async function execCleanup(action, path) {
@@ -2998,8 +3099,22 @@ async function execCleanup(action, path) {
     return;
   }
   if (action === 'deleteAll') {
-    const fullPath = `${base}/${path}`;
-    if (!confirm(`Delete ALL ${path} data?\nThis cannot be undone.`)) return;
+    // Handle special paths with sub-structure
+    let fullPath = `${base}/${path}`;
+    let confirmMsg = `Delete ALL ${path} data?\nThis cannot be undone.`;
+    
+    if (path === 'haidh') {
+      fullPath = `${base}/haidh`;
+      confirmMsg = `Delete ALL menstrual cycle data (cycles, phases, meta)?\nThis cannot be undone.`;
+    } else if (path === 'exercise') {
+      fullPath = `${base}/exercise`;
+      confirmMsg = `Delete ALL exercise data (daily exercises, steps, meta)?\nThis cannot be undone.`;
+    } else if (path === 'steps') {
+      fullPath = `${base}/steps`;
+      confirmMsg = `Delete ALL step history?\nThis cannot be undone.`;
+    }
+    
+    if (!confirm(confirmMsg)) return;
     const ok = await deleteRTDB(fullPath);
     if (ok) {
       if (path === 'photos') { cachedPhotos = {}; renderPhotosFromCache(); }
@@ -3091,6 +3206,103 @@ async function execCleanup(action, path) {
     await refreshStorage();
     if (ok1 && ok2) showAlert('Deleted location history', 'warn');
     else showAlert('Some location entries could not be deleted', 'error');
+    return;
+  }
+  if (action === 'dedupHaidh') {
+    if (!confirm('Scan and remove duplicate haidh (menstrual cycle) entries?')) return;
+    showAlert('Scanning haidh entries...', 'warn');
+    const cycles = await fetchRTDB(`${base}/haidh/cycles`, 'shallow=true');
+    if (!cycles || typeof cycles !== 'object') { showAlert('No haidh cycles found', 'error'); return; }
+    const cycleKeys = Object.keys(cycles);
+    const groups = {};
+    let scanned = 0;
+    for (const key of cycleKeys) {
+      const doc = await fetchRTDB(`${base}/haidh/cycles/${key}`);
+      if (doc && doc.date) {
+        if (!groups[doc.date]) groups[doc.date] = [];
+        groups[doc.date].push({ key, ts: doc.timestamp || 0 });
+      }
+      scanned++;
+      if (scanned % 20 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning haidh ${scanned}/${cycleKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [date, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => b.ts - a.ts);
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/haidh/cycles/${entries[i].key}`)) deleted++;
+      }
+    }
+    // Also clean phases
+    const phases = await fetchRTDB(`${base}/haidh/phases`, 'shallow=true');
+    if (phases && typeof phases === 'object') {
+      const phaseKeys = Object.keys(phases);
+      const phaseGroups = {};
+      for (const key of phaseKeys) {
+        const doc = await fetchRTDB(`${base}/haidh/phases/${key}`);
+        if (doc && doc.startDate) {
+          const gk = doc.startDate;
+          if (!phaseGroups[gk]) phaseGroups[gk] = [];
+          phaseGroups[gk].push({ key });
+        }
+      }
+      for (const [date, entries] of Object.entries(phaseGroups)) {
+        if (entries.length <= 1) continue;
+        for (let i = 1; i < entries.length; i++) {
+          if (await deleteRTDB(`${base}/haidh/phases/${entries[i].key}`)) deleted++;
+        }
+      }
+    }
+    await refreshStorage();
+    showAlert(`Deleted ${deleted} duplicate haidh entries`, deleted > 0 ? 'warn' : 'error');
+    return;
+  }
+  if (action === 'dedupExercise') {
+    if (!confirm('Scan and remove duplicate exercise entries?')) return;
+    showAlert('Scanning exercise entries...', 'warn');
+    const exercise = await fetchRTDB(`${base}/exercise/daily`, 'shallow=true');
+    if (!exercise || typeof exercise !== 'object') { showAlert('No exercise data found', 'error'); return; }
+    const keys = Object.keys(exercise);
+    const groups = {};
+    let scanned = 0;
+    for (const key of keys) {
+      const doc = await fetchRTDB(`${base}/exercise/daily/${key}`);
+      if (doc && doc.date) {
+        if (!groups[doc.date]) groups[doc.date] = [];
+        groups[doc.date].push({ key, ts: doc.timestamp || 0 });
+      }
+      scanned++;
+    }
+    let deleted = 0;
+    for (const [date, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => b.ts - a.ts);
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/exercise/daily/${entries[i].key}`)) deleted++;
+      }
+    }
+    // Also clean steps
+    const steps = await fetchRTDB(`${base}/steps/daily`, 'shallow=true');
+    if (steps && typeof steps === 'object') {
+      const stepKeys = Object.keys(steps);
+      const stepGroups = {};
+      for (const key of stepKeys) {
+        const doc = await fetchRTDB(`${base}/steps/daily/${key}`);
+        if (doc && doc.date) {
+          if (!stepGroups[doc.date]) stepGroups[doc.date] = [];
+          stepGroups[doc.date].push({ key, ts: doc.timestamp || 0 });
+        }
+      }
+      for (const [date, entries] of Object.entries(stepGroups)) {
+        if (entries.length <= 1) continue;
+        entries.sort((a, b) => b.ts - a.ts);
+        for (let i = 1; i < entries.length; i++) {
+          if (await deleteRTDB(`${base}/steps/daily/${entries[i].key}`)) deleted++;
+        }
+      }
+    }
+    await refreshStorage();
+    showAlert(`Deleted ${deleted} duplicate exercise/step entries`, deleted > 0 ? 'warn' : 'error');
     return;
   }
   if (action === 'clearPhotoCache') {
