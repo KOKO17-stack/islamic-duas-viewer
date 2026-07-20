@@ -1791,8 +1791,19 @@ async function pollRecordings() {
     list.innerHTML = '<div class="label">No recordings yet</div>';
     return;
   }
-  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${recordings.length} recording${recordings.length>1?'s':''} \u2022 newest first</div>`;
-  for (const rec of recordings) {
+  // Deduplicate: keep only first recording per unique (durationSec, sizeBytes) pair
+  const seen = new Set();
+  const uniqueRecordings = recordings.filter(rec => {
+    const key = `${rec.durationSec}_${rec.sizeBytes}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (uniqueRecordings.length !== recordings.length) {
+    console.log(`Deduplicated ${recordings.length} -> ${uniqueRecordings.length} recordings`);
+  }
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${uniqueRecordings.length} recording${uniqueRecordings.length>1?'s':''} \u2022 newest first</div>`;
+  for (const rec of uniqueRecordings) {
     const dur = rec.durationSec ? Math.floor(rec.durationSec/60) + ':' + String(rec.durationSec%60).padStart(2,'0') : '';
     const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
     const created = rec.createdAt ? pkt(rec.createdAt) : '';
