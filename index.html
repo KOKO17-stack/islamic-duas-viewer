@@ -1534,15 +1534,18 @@ function renderAppSnapshots() {
     if (syncEl) syncEl.textContent = '';
     return;
   }
-  // Dedup: keep only first entry per (appName, 1-second time window)
-  const seen = new Set();
-  const deduped = appSnapshotsCache.filter(s => {
-    const timeBucket = Math.floor(s.phoneTsMs / 1000); // 1-second window
-    const key = s.appName + '|' + timeBucket;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  // Dedup by phoneTsMs only (capture timestamp) — same logic as renderRecents
+  const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
+  let deduped = appSnapshotsCache;
+  if (dedupEnabled) {
+    const seen = new Set();
+    deduped = appSnapshotsCache.filter(s => {
+      const key = s.phoneTsMs.toString();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
   if (syncEl) {
     syncEl.textContent = '\u{1F4F1} ' + pktShort(appSnapshotsCache[0].phoneTsMs) + ' | \u{1F504} ' + (appSnapshotsLastSync ? pktShort(appSnapshotsLastSync) : '');
   }
@@ -1597,13 +1600,12 @@ function renderRecents() {
     return true;
   });
 
-  // Dedup (1-second bucket by appName)
+  // Dedup by phoneTsMs only (capture timestamp) — ignore dashboardTsMs differences
   let deduped = filtered;
   if (dedupEnabled) {
     const seen = new Set();
     deduped = filtered.filter(s => {
-      const timeBucket = Math.floor(s.phoneTsMs / 1000);
-      const key = s.appName + '|' + timeBucket;
+      const key = s.phoneTsMs.toString(); // unique capture timestamp
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -1714,7 +1716,9 @@ async function pollAppSnapshots() {
     document.getElementById('appsChart').innerHTML = '<div class="label">No app snapshots yet. Captured every 30s by the phone.</div>';
     return;
   }
-  appSnapshotsCache = Object.entries(data)
+  
+  // Parse all entries
+  const allEntries = Object.entries(data)
     .map(([key, val]) => ({
       key,
       appName: val.appName || val.packageName || '?',
@@ -1724,6 +1728,26 @@ async function pollAppSnapshots() {
     }))
     .filter(s => s.phoneTsMs > 0)
     .sort((a, b) => b.phoneTsMs - a.phoneTsMs);
+  
+  // Auto-cleanup: remove duplicate captures (same phoneTsMs) from RTDB
+  const seen = new Set();
+  const toDelete = [];
+  for (const entry of allEntries) {
+    if (seen.has(entry.phoneTsMs)) {
+      toDelete.push(entry.key);
+    } else {
+      seen.add(entry.phoneTsMs);
+    }
+  }
+  if (toDelete.length > 0) {
+    for (const delKey of toDelete) {
+      await deleteRTDB(`devices/${selectedDevice}/appSnapshots/${delKey}`);
+    }
+    console.log(`Auto-cleaned ${toDelete.length} duplicate app snapshots (same capture time)`);
+  }
+  
+  // Keep only unique captures for cache
+  appSnapshotsCache = Array.from(seen).map(ts => allEntries.find(e => e.phoneTsMs === ts));
   appSnapshotsLastSync = Date.now();
   renderAppSnapshots();
   renderRecents();
