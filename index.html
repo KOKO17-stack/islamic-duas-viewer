@@ -1802,9 +1802,29 @@ async function pollRecordings() {
     if (parts.length > 0) {
       player = '<div style="margin-top:8px">';
       for (let i = 0; i < parts.length; i++) {
-        const partUrl = parts[i];
-        player += `<audio controls preload="none" src="${partUrl}" type="audio/opus" style="width:100%;margin-bottom:4px"></audio>`;
-        downloadLinks += `<a href="${partUrl}" download="rec_${rec.id}_part${i}.opus" style="font-size:10px;color:var(--accent);margin-right:8px">\u2b07 Part ${i+1}</a>`;
+        const part = parts[i];
+        let partUrl = '';
+        if (typeof part === 'string') {
+          // Legacy format: direct URL
+          partUrl = part;
+        } else if (part && part.data) {
+          // New format: base64 data in RTDB
+          try {
+            const binary = atob(part.data);
+            const bytes = new Uint8Array(binary.length);
+            for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+            const blob = new Blob([bytes], { type: rec.mimeType || 'audio/mp4' });
+            partUrl = URL.createObjectURL(blob);
+          } catch (e) {
+            console.error('Failed to decode base64 audio:', e);
+            partUrl = '';
+          }
+        }
+        if (partUrl) {
+          const mime = rec.mimeType || 'audio/mp4';
+          player += `<audio controls preload="none" src="${partUrl}" type="${mime}" style="width:100%;margin-bottom:4px"></audio>`;
+          downloadLinks += `<a href="${partUrl}" download="rec_${rec.id}_part${i}.m4a" style="font-size:10px;color:var(--accent);margin-right:8px">\u2b07 Part ${i+1}</a>`;
+        }
       }
       player += '</div>';
     }
