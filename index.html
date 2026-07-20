@@ -1714,6 +1714,7 @@ async function pollAppSnapshots() {
     appSnapshotsCache = null;
     appSnapshotsLastSync = 0;
     document.getElementById('appsChart').innerHTML = '<div class="label">No app snapshots yet. Captured every 30s by the phone.</div>';
+    renderRecents();
     return;
   }
   
