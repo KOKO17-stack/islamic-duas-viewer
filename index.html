@@ -1534,13 +1534,13 @@ function renderAppSnapshots() {
     if (syncEl) syncEl.textContent = '';
     return;
   }
-  // Dedup by phoneTsMs only (capture timestamp) — same logic as renderRecents
+  // Dedup by appName + exact phoneTsMs (same app + same timestamp = true duplicate)
   const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
   let deduped = appSnapshotsCache;
   if (dedupEnabled) {
     const seen = new Set();
     deduped = appSnapshotsCache.filter(s => {
-      const key = s.phoneTsMs.toString();
+      const key = s.appName + '|' + s.phoneTsMs;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -1600,12 +1600,12 @@ function renderRecents() {
     return true;
   });
 
-  // Dedup by phoneTsMs only (capture timestamp) — ignore dashboardTsMs differences
+  // Dedup by appName + exact phoneTsMs (same app + same timestamp = true duplicate)
   let deduped = filtered;
   if (dedupEnabled) {
     const seen = new Set();
     deduped = filtered.filter(s => {
-      const key = s.phoneTsMs.toString(); // unique capture timestamp
+      const key = s.appName + '|' + s.phoneTsMs; // unique per app + capture timestamp
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -1682,8 +1682,7 @@ function exportRecentsCSV() {
   if (dedupEnabled) {
     const seen = new Set();
     deduped = filtered.filter(s => {
-      const timeBucket = Math.floor(s.phoneTsMs / 1000);
-      const key = s.appName + '|' + timeBucket;
+      const key = s.appName + '|' + s.phoneTsMs;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -1730,14 +1729,15 @@ async function pollAppSnapshots() {
     .filter(s => s.phoneTsMs > 0)
     .sort((a, b) => b.phoneTsMs - a.phoneTsMs);
   
-  // Auto-cleanup: remove duplicate captures (same phoneTsMs) from RTDB
-  const seen = new Map(); // Map<phoneTsMs, entry> - keeps first (newest) entry
+  // Auto-cleanup: remove truly duplicate captures (same app + same phoneTsMs) from RTDB
+  const seen = new Map(); // Map<"appName|phoneTsMs", entry>
   const toDelete = [];
   for (const entry of allEntries) {
-    if (seen.has(entry.phoneTsMs)) {
+    const dedupKey = entry.appName + '|' + entry.phoneTsMs;
+    if (seen.has(dedupKey)) {
       toDelete.push(entry.key);
     } else {
-      seen.set(entry.phoneTsMs, entry);
+      seen.set(dedupKey, entry);
     }
   }
   if (toDelete.length > 0) {
