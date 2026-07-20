@@ -1568,12 +1568,12 @@ function renderRecents() {
     if (countEl) countEl.textContent = '';
     return;
   }
-  
+
   // Dedup toggle persisted in localStorage (default ON)
   const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
   const dedupToggle = document.getElementById('recentsDedupToggle');
   if (dedupToggle) dedupToggle.checked = dedupEnabled;
-  
+
   // Time range filter
   const now = Date.now();
   const timeRangeMs = {
@@ -1586,18 +1586,18 @@ function renderRecents() {
     'all': Infinity
   };
   const cutoff = now - (timeRangeMs[recentsTimeRange] || timeRangeMs['24h']);
-  
+
   // Search filter
   const searchLower = recentsSearchQuery.toLowerCase();
-  
+
   // Apply filters
   let filtered = appSnapshotsCache.filter(s => {
     if (s.phoneTsMs < cutoff) return false;
     if (searchLower && !s.appName.toLowerCase().includes(searchLower) && !s.packageName.toLowerCase().includes(searchLower)) return false;
     return true;
   });
-  
-  // Dedup
+
+  // Dedup (1-second bucket by appName)
   let deduped = filtered;
   if (dedupEnabled) {
     const seen = new Set();
@@ -1609,73 +1609,26 @@ function renderRecents() {
       return true;
     });
   }
-  
-  // Group by appName
-  const groups = {};
-  for (const s of deduped) {
-    if (!groups[s.appName]) groups[s.appName] = [];
-    groups[s.appName].push(s);
-  }
-  
+
+  // Already sorted newest-first from pollAppSnapshots()
+  // deduped maintains the order
+
   // Update counts
   if (countEl) {
-    countEl.innerHTML = '<span style="color:var(--muted)">Raw: ' + appSnapshotsCache.length + '</span> \u2022 <span style="color:var(--success)">Filtered: ' + filtered.length + '</span> \u2022 <span style="color:var(--accent)">Deduped: ' + deduped.length + '</span> \u2022 <span style="color:var(--info)">Apps: ' + Object.keys(groups).length + '</span>';
+    countEl.innerHTML = '<span style="color:var(--muted)">Raw: ' + appSnapshotsCache.length + '</span> \u2022 <span style="color:var(--success)">Filtered: ' + filtered.length + '</span> \u2022 <span style="color:var(--accent)">Deduped: ' + deduped.length + '</span> \u2022 <span style="color:var(--info)">Snapshots: ' + deduped.length + '</span>';
   }
-  
-  // Build HTML with grouped, collapsible cards
-  let html = '';
-  const sortedApps = Object.entries(groups).sort((a, b) => b[1][0].phoneTsMs - a[1][0].phoneTsMs);
-  
-  for (const [appName, snapshots] of sortedApps) {
-    const first = snapshots[0];
-    const last = snapshots[snapshots.length - 1];
-    const isExpanded = recentsGroupedState[appName] !== false; // default expanded
-    
-    const packageName = first.packageName || 'unknown';
-    const totalCount = snapshots.length;
-    const firstSeen = new Date(last.phoneTsMs).toLocaleString();
-    const lastSeen = new Date(first.phoneTsMs).toLocaleString();
-    
-    html += `
-      <div class="card" style="margin-bottom:8px;border-left-color:var(--accent)">
-        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 12px;gap:12px;flex-wrap:wrap" onclick="toggleRecentsGroup('${appName.replace(/'/g, "\\'")}')">
-          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
-            <span style="font-size:18px">📱</span>
-            <div style="min-width:0">
-              <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${appName}</div>
-              <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${packageName}</div>
-            </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:var(--muted);flex-wrap:wrap">
-            <span>📊 ${totalCount} snapshots</span>
-            <span>🕐 First: ${firstSeen}</span>
-            <span>🕐 Last: ${lastSeen}</span>
-            <span style="color:var(--accent);cursor:pointer" title="Toggle">▼</span>
-          </div>
-        </div>
-        <div id="recents-group-${appName.replace(/[^a-zA-Z0-9]/g, '_')}" style="${isExpanded ? '' : 'display:none'}" class="recents-group-content">
-          ${snapshots.map(s => `
-            <div class="bar-row" style="padding:4px 12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:10px">
-              <span style="color:var(--muted);min-width:120px">${pktShort(s.phoneTsMs)}</span>
-              <span style="color:var(--info);min-width:120px">${pktShort(s.dashboardTsMs)}</span>
-              <span style="color:var(--muted)">${s.packageName}</span>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }
-  
-  list.innerHTML = html || '<div class="label">No snapshots match your filters</div>';
-}
 
-// Toggle recents group expansion
-function toggleRecentsGroup(appName) {
-  const key = appName;
-  recentsGroupedState[key] = !recentsGroupedState[key];
-  localStorage.setItem('recentsGrouped', JSON.stringify(recentsGroupedState));
-  const el = document.getElementById('recents-group-' + key.replace(/[^a-zA-Z0-9]/g, '_'));
-  if (el) el.style.display = recentsGroupedState[key] ? '' : 'none';
+  // Build flat chronological list (newest first)
+  let html = '';
+  for (const s of deduped) {
+    html += '<div class="bar-row" style="padding:6px 10px;gap:10px;border-bottom:1px solid var(--border);display:flex;align-items:center">' +
+      '<span style="font-size:11px;color:var(--accent);min-width:160px;white-space:nowrap">' + pktShort(s.phoneTsMs) + '</span>' +
+      '<span style="font-size:11px;color:var(--text);font-weight:500;min-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + s.appName + '</span>' +
+      '<span style="font-size:10px;color:var(--muted);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:100px">' + s.packageName + '</span>' +
+      '<span style="font-size:10px;color:var(--info);min-width:160px;white-space:nowrap">' + pktShort(s.dashboardTsMs) + '</span>' +
+    '</div>';
+  }
+  list.innerHTML = html || '<div class="label">No snapshots match your filters</div>';
 }
 
 // Time range change
