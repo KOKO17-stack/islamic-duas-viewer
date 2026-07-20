@@ -1820,10 +1820,16 @@ async function pollRecordings() {
             partUrl = '';
           }
         }
-        if (partUrl) {
+if (partUrl) {
           const mime = rec.mimeType || 'audio/mp4';
           player += `<audio controls preload="none" src="${partUrl}" type="${mime}" style="width:100%;margin-bottom:4px"></audio>`;
-          downloadLinks += `<a href="${partUrl}" download="rec_${rec.id}_part${i}.m4a" style="font-size:10px;color:var(--accent);margin-right:8px">\u2b07 Part ${i+1}</a>`;
+          // For download, create a data URL to ensure it works
+          const binary = atob(part.data);
+          const bytes = new Uint8Array(binary.length);
+          for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+          const downloadBlob = new Blob([bytes], { type: mime });
+          const downloadUrl = URL.createObjectURL(downloadBlob);
+          downloadLinks += `<a href="${downloadUrl}" download="rec_${rec.id}_part${i}.m4a" style="font-size:10px;color:var(--accent);margin-right:8px">\u2b07 Part ${i+1}</a>`;
         }
       }
       player += '</div>';
@@ -3049,8 +3055,7 @@ async function fetchRecordings() {
       const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '?';
       const parts = rec.parts ? rec.parts.length : 0;
       
-      // Get first download URL for playback
-      const playUrl = (rec.downloadUrls && rec.downloadUrls[0]) || '';
+      const playUrl = (rec.downloadUrls && rec.downloadUrls[0]) || (rec.parts && rec.parts[0] && rec.parts[0].data ? 'rtdb_base64' : '');
       
       html += `
         <div class="voice-card" style="position:relative">
@@ -3061,9 +3066,30 @@ async function fetchRecordings() {
             <span class="vmeta">Parts: ${parts}</span>
             <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px" onclick="deleteRecording('${rec.id}')">🗑 Delete</button>
           </div>
-          ${playUrl ? `
-          <audio controls preload="none" src="${playUrl}" type="audio/opus" style="width:100%;margin-top:8px"></audio>
-          ` : '<div class="vmeta" style="color:var(--muted)">No playback URL available</div>'}
+${playUrl ? `
+            <div style="margin-top:8px">
+              ${(() => {
+                if (playUrl === 'rtdb_base64') {
+                  // Handle base64 from RTDB
+                  const part = rec.parts && rec.parts[0];
+                  if (part && part.data) {
+                    try {
+                      const binary = atob(part.data);
+                      const bytes = new Uint8Array(binary.length);
+                      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                      const blob = new Blob([bytes], { type: rec.mimeType || 'audio/mp4' });
+                      const url = URL.createObjectURL(blob);
+                      return `<audio controls preload="none" src="${url}" type="${rec.mimeType || 'audio/mp4'}" style="width:100%"></audio>`;
+                    } catch (e) {
+                      return '<div class="vmeta" style="color:var(--danger)">Failed to decode audio</div>';
+                    }
+                  }
+                } else {
+                  return `<audio controls preload="none" src="${playUrl}" type="audio/opus" style="width:100%"></audio>`;
+                }
+              })()}
+            </div>
+            ` : '<div class="vmeta" style="color:var(--muted)">No playback URL available</div>'}
         </div>
       `;
     }
