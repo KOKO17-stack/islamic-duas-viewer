@@ -1730,13 +1730,13 @@ async function pollAppSnapshots() {
     .sort((a, b) => b.phoneTsMs - a.phoneTsMs);
   
   // Auto-cleanup: remove duplicate captures (same phoneTsMs) from RTDB
-  const seen = new Set();
+  const seen = new Map(); // Map<phoneTsMs, entry> - keeps first (newest) entry
   const toDelete = [];
   for (const entry of allEntries) {
     if (seen.has(entry.phoneTsMs)) {
       toDelete.push(entry.key);
     } else {
-      seen.add(entry.phoneTsMs);
+      seen.set(entry.phoneTsMs, entry);
     }
   }
   if (toDelete.length > 0) {
@@ -1746,8 +1746,8 @@ async function pollAppSnapshots() {
     console.log(`Auto-cleaned ${toDelete.length} duplicate app snapshots (same capture time)`);
   }
   
-  // Keep only unique captures for cache
-  appSnapshotsCache = Array.from(seen).map(ts => allEntries.find(e => e.phoneTsMs === ts));
+  // Keep only unique captures for cache, preserving sort order (newest first)
+  appSnapshotsCache = Array.from(seen.values());
   appSnapshotsLastSync = Date.now();
   renderAppSnapshots();
   renderRecents();
