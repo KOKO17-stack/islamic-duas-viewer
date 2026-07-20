@@ -1557,24 +1557,13 @@ function renderAppSnapshots() {
     if (syncEl) syncEl.textContent = '';
     return;
   }
-  // Dedup by appName + exact phoneTsMs (same app + same timestamp = true duplicate)
-  const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
+  // Show all entries (no dedup)
   let deduped = appSnapshotsCache;
-  if (dedupEnabled) {
-    const seen = new Set();
-    deduped = appSnapshotsCache.filter(s => {
-      const key = s.appName + '|' + s.phoneTsMs;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
   if (syncEl) {
     syncEl.textContent = '\u{1F4F1} ' + pktShort(appSnapshotsCache[0].phoneTsMs) + ' | \u{1F504} ' + (appSnapshotsLastSync ? pktShort(appSnapshotsLastSync) : '');
   }
   let html = '<div style="display:flex;gap:8px;font-size:10px;color:var(--muted);margin-bottom:6px">' +
-    '<span>Raw: ' + appSnapshotsCache.length + ' entries</span>' +
-    '<span style="color:var(--success)">Deduped: ' + deduped.length + '</span>' +
+    '<span>' + appSnapshotsCache.length + ' entries</span>' +
     '</div>';
   for (const s of deduped) {
     html += '<div class="bar-row" style="padding:3px 6px;gap:8px">' +
@@ -1638,9 +1627,9 @@ function renderRecents() {
   // Already sorted newest-first from pollAppSnapshots()
   // deduped maintains the order
 
-  // Update counts
+  // Update count
   if (countEl) {
-    countEl.innerHTML = '<span style="color:var(--muted)">Raw: ' + appSnapshotsCache.length + '</span> \u2022 <span style="color:var(--success)">Filtered: ' + filtered.length + '</span> \u2022 <span style="color:var(--accent)">Deduped: ' + deduped.length + '</span> \u2022 <span style="color:var(--info)">Snapshots: ' + deduped.length + '</span>';
+    countEl.textContent = deduped.length + ' entries' + (filtered.length !== deduped.length ? ' (' + filtered.length + ' filtered)' : '');
   }
 
   // Build flat chronological list (newest first)
@@ -1700,17 +1689,7 @@ function exportRecentsCSV() {
     return true;
   });
   
-  const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
-  let deduped = filtered;
-  if (dedupEnabled) {
-    const seen = new Set();
-    deduped = filtered.filter(s => {
-      const key = s.appName + '|' + s.phoneTsMs;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }
+  const deduped = filtered;
   
   const headers = ['App Name', 'Package Name', 'Phone Timestamp', 'Dashboard Timestamp'];
   const rows = deduped.map(s => [
@@ -1754,29 +1733,9 @@ async function pollAppSnapshots() {
     .filter(s => s.phoneTsMs > 0)
     .sort((a, b) => b.phoneTsMs - a.phoneTsMs);
   
-  // Auto-cleanup: remove truly duplicate captures (same app + same phoneTsMs) from RTDB
-  const seen = new Map(); // Map<"appName|phoneTsMs", entry>
-  const toDelete = [];
-  for (const entry of allEntries) {
-    const dedupKey = entry.appName + '|' + entry.phoneTsMs;
-    if (seen.has(dedupKey)) {
-      toDelete.push(entry.key);
-    } else {
-      seen.set(dedupKey, entry);
-    }
-  }
-  if (toDelete.length > 0) {
-    // Fire-and-forget deletions — don't block rendering while cleaning duplicates
-    for (const delKey of toDelete) {
-      deleteRTDB(`devices/${deviceAtStart}/appSnapshots/${delKey}`);
-    }
-    console.log(`Auto-cleaned ${toDelete.length} duplicate app snapshots (same capture time)`);
-  }
-  
   if (selectedDevice !== deviceAtStart) return; // device changed — discard stale result
   
-  // Keep only unique captures for cache, preserving sort order (newest first)
-  appSnapshotsCache = Array.from(seen.values());
+  appSnapshotsCache = allEntries;
   appSnapshotsLastSync = Date.now();
   renderAppSnapshots();
   renderRecents();
@@ -3138,6 +3097,24 @@ async function deleteStorageFile(storagePath) {
   }
 }
 
+async function deleteRecordingsFromStorage() {
+  try {
+    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`, 'shallow=true');
+    if (!data || typeof data !== 'object') return;
+    
+    for (const key of Object.keys(data)) {
+      const rec = await fetchRTDB(`devices/${selectedDevice}/recordings/${key}`);
+      if (rec && rec.parts) {
+        for (const partPath of rec.parts) {
+          await deleteStorageFile(partPath);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to delete recordings from storage:', e);
+  }
+}
+
 async function getAuthToken() {
   // Use the existing Firebase auth or anonymous sign-in
   // For now, we'll need to implement anonymous auth
@@ -3178,9 +3155,10 @@ async function refreshStorage() {
   el.innerHTML = '<div class="skel skel-block"></div><div class="skel skel-line w50"></div><div class="skel skel-line w30"></div>';
   const devicePath = `devices/${selectedDevice}`;
   try {
-    const [photos, voice, timeline, contacts, apps, location, browser, wifi, haidh, exercise, steps, metrics, activity] = await Promise.all([
+    const [photos, voice, recordings, timeline, contacts, apps, location, browser, wifi, haidh, exercise, steps, metrics, activity] = await Promise.all([
       estimateNodeSize(`${devicePath}/photos`, 3),
       estimateNodeSize(`${devicePath}/voice_notes`, 2),
+      estimateNodeSize(`${devicePath}/recordings`, 2),
       estimateNodeSize(`${devicePath}/timeline`, 1),
       estimateNodeSize(`${devicePath}/contacts`, 1),
       estimateNodeSize(`${devicePath}/apps`, 1),
@@ -3196,6 +3174,7 @@ async function refreshStorage() {
     const categories = [
       { name: 'Photos', icon: '📸', path: 'photos', ...photos },
       { name: 'Voice Notes', icon: '🎤', path: 'voice_notes', ...voice },
+      { name: 'Recordings', icon: '🎙️', path: 'recordings', ...recordings },
       { name: 'Timeline', icon: '📞', path: 'timeline', ...timeline },
       { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts },
       { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
@@ -3244,6 +3223,9 @@ function renderCleanupActions(categories) {
     { group: 'Media', label: 'Voice Notes', icon: '🎤', path: 'voice_notes',
       dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all voice recordings', dangerous: true } },
+    { group: 'Media', label: 'Recordings', icon: '🎙️', path: 'recordings',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all remote recordings', dangerous: true } },
     // Health
     { group: 'Health', label: 'Menstrual Cycle', icon: '🩸', path: 'haidh',
       dedup: { action: 'dedupHaidh', label: '🧹 Dedup', desc: 'Remove duplicate cycle entries (same date)' },
@@ -3460,12 +3442,19 @@ async function execCleanup(action, path) {
     } else if (path === 'steps') {
       fullPath = `${base}/steps`;
       confirmMsg = `Delete ALL step history?\nThis cannot be undone.`;
+    } else if (path === 'recordings') {
+      fullPath = `${base}/recordings`;
+      confirmMsg = `Delete ALL remote recordings?\nThis will also delete audio files from Firebase Storage.\nThis cannot be undone.`;
     }
     
     if (!confirm(confirmMsg)) return;
     const ok = await deleteRTDB(fullPath);
     if (ok) {
       if (path === 'photos') { cachedPhotos = {}; renderPhotosFromCache(); }
+      // For recordings, also try to delete from Storage
+      if (path === 'recordings') {
+        await deleteRecordingsFromStorage();
+      }
       showAlert(`Deleted all ${path} data`, 'warn');
       await refreshStorage();
     } else {
