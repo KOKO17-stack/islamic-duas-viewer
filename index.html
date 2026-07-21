@@ -1818,10 +1818,24 @@ async function pollHistory() {
 async function pollRecordings() {
   if (!selectedDevice) return;
   const list = document.getElementById('voiceNotesList');
-  let data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
-  if (!data || typeof data !== 'object') {
+  const path = `devices/${selectedDevice}/recordings`;
+  
+  // First: shallow fetch to get recording IDs (tiny payload)
+  const keys = await fetchRTDB(path, 'shallow=true');
+  if (!keys || typeof keys !== 'object' || Object.keys(keys).length === 0) {
     list.innerHTML = '<div class="label">No remote recordings yet</div>';
     return;
+  }
+  
+  // Second: full fetch for audio data
+  let data = await fetchRTDB(path);
+  if (!data || typeof data !== 'object') {
+    // Fallback: show list with metadata only (no inline playback - no base64 audio)
+    const fallbackData = {};
+    for (const id of Object.keys(keys)) {
+      fallbackData[id] = { id, createdAt: null, durationSec: 0, sizeBytes: 0, parts: [] };
+    }
+    data = fallbackData;
   }
   const recordings = Object.entries(data).map(([id, rec]) => ({ id, ...rec }));
   recordings.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
