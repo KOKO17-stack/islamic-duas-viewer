@@ -429,22 +429,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
     🗑 Cleanup recordings older than 1 day
   </button>
 </div>
-</div></div>
-<div id="voiceNotesList"><div class="label">No recordings yet</div></div>
-</div>
-<div id="recProgress" style="display:none;margin-top:8px">
-<div style="font-size:11px;color:var(--muted);margin-bottom:4px">
-<span id="recProgressLabel">Recording...</span>
-<span id="recProgressTime" style="margin-left:8px;color:var(--accent)">0s / 0s</span>
-<span id="recProgressSegments" style="margin-left:8px;color:var(--muted)">0 segments</span>
-</div>
-<input type="range" id="recProgressBar" min="0" max="100" value="0" style="flex:1;accent-color:var(--danger)">
-<span id="recProgressText" style="font-size:11px;color:var(--muted);width:50px;text-align:right">0%</span>
-</div>
-<div id="recProgressCancel" style="display:none;margin-top:8px">
-<button class="pb-btn" style="background:var(--warning);color:#000;font-weight:600" onclick="cancelRemoteRecording()">⏹ Stop & Save</button>
-<span style="font-size:11px;color:var(--muted);margin-left:8px">Partial recording will be saved</span>
-</div>
 </div>
 <div id="voiceNotesList"><div class="label">No recordings yet</div></div>
 </div>
@@ -664,8 +648,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
     <span class="pb-cnt" id="playCount">0/0</span>
     <span class="pb-meta" id="playMeta">--</span>
   </div>
-</div>
-</div>
+    </div>
 </div>
 <div class="lightbox" id="lightbox"><img id="lightboxImg" alt=""><div id="lightboxCaption" style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.85));padding:30px 14px 10px;color:#eee;font-size:12px;text-align:center;pointer-events:none"></div></div>
 
@@ -3139,9 +3122,10 @@ async function pollRecordingProgress(requestId, durationSec) {
             }
           }
         }
-      } catch (e) {}
-      
-      // Also check command response for final status
+      }
+    } catch (e) {}
+    
+    // Also check command response for final status
       const responseUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record/response.json`;
       try {
         const resp = await fetch(responseUrl);
@@ -3197,7 +3181,7 @@ function resetRecordingUI() {
   progress.style.display = 'none';
   cancelDiv.style.display = 'none';
   currentRecordingId = null;
-
+}
 
 async function cleanupOldRecordings(days) {
   if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
@@ -3221,7 +3205,6 @@ async function cleanupOldRecordings(days) {
   } catch (e) {
     showAlert('Cleanup failed: ' + e.message, 'error');
   }
-}
 }
 
 async function fetchRecordings() {
