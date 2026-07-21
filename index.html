@@ -417,6 +417,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span id="recProgressFormat" style="color:var(--muted);font-size:10px"></span>
 </div>
 <input type="range" id="recProgressBar" min="0" max="100" value="0" style="flex:1;accent-color:var(--danger);min-width:100px">
+<div id="recProgressCancel" style="display:none;margin-top:6px;font-size:11px;color:var(--muted);text-align:center">Recording in progress...</div>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
@@ -665,6 +666,7 @@ const PKT = 'Asia/Karachi';
 let devices = {};
 let selectedDevice = null;
 let recordingDevice = null;
+let currentRecordingId = null;
 let locationHistory = [];
 let historyAutoLoaded = false;
 let marker, accuracyCircle, trail;
@@ -1015,6 +1017,9 @@ document.addEventListener('visibilitychange', () => {
 document.getElementById('deviceSelect').addEventListener('change', function() {
   selectedDevice = this.value;
   localStorage.setItem('selectedDevice', selectedDevice);
+  recordingDevice = this.value;
+  const recSel = document.getElementById('recDeviceSelect');
+  if (recSel) recSel.value = recordingDevice;
   locationHistory = [];
   historyAutoLoaded = false;
   cachedPhotos = {};
@@ -3096,7 +3101,7 @@ async function cancelRemoteRecording() {
 async function pollRecordingProgress(requestId, durationSec) {
   if (!recordingDevice) return;
   
-  let currentRecordingId = null;
+  currentRecordingId = null;
   const startTime = Date.now();
   const btn = document.getElementById('btnStartRecord');
   const cancelBtn = document.getElementById('btnCancelRecord');
@@ -3141,7 +3146,7 @@ async function pollRecordingProgress(requestId, durationSec) {
     } catch (e) {}
     
     // Also check command response for final status
-      const responseUrl = `${RTDB}/devices/${recordingDevice}/commands/audio_record/response.json`;
+      const responseUrl = `${RTDB}/devices/${recordingDevice}/commands/responses/${requestId}.json`;
       try {
         const resp = await fetch(responseUrl);
         if (resp.ok) {
