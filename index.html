@@ -503,6 +503,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div style="display:flex;gap:6px">
 <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollLogcat()">&#x1F504; Refresh</span>
 <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="clearLogcat()">&#x1F5D1; Clear</span>
+<span class="chip" style="background:var(--border);color:var(--text);font-size:11px;cursor:pointer" onclick="collapseAllLogcat()">&#x1F4C1; Collapse All</span>
 </div>
 </div>
 <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
@@ -4228,6 +4229,7 @@ async function pollWifiScans() {
 
 // --- Logcat ---
 let logcatCache = [];
+let logcatExpanded = new Set();
 
 async function pollLogcat() {
   if (!selectedDevice) return;
@@ -4282,17 +4284,22 @@ function renderLogcat() {
     if (query) {
       lines = lines.filter(l => l.toLowerCase().includes(query));
     }
-    lines = lines.slice(0, 200);
     if (!lines.length && (filter || query)) continue;
+    const key = entry.ts;
+    const expanded = logcatExpanded.has(key);
+    const preview = lines.slice(0, 2).map(l => l.length > 120 ? l.slice(0, 120) + '…' : l).join('\n');
     const badge = entry.anr
       ? '<span class="chip" style="background:var(--danger);color:#000;font-size:9px;padding:1px 6px;margin-right:6px">' + escHtml(entry.source || 'CRASH') + '</span>'
       : '';
-    html += `<div class="card" style="padding:10px 14px;margin-bottom:4px">
+    html += `<div class="card" style="padding:10px 14px;margin-bottom:4px;cursor:pointer" onclick="toggleLogcatEntry(${key})">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--muted)">${pkt(entry.ts)}${badge}</span>
-        <span style="font-size:11px;color:var(--muted)">${lines.length}/${entry.lines} lines${entry.thread ? ' &middot; ' + escHtml(entry.thread) : ''}</span>
+        <span style="font-size:12px;color:var(--muted)">&#x1F4C4; ${pkt(entry.ts)}${badge}</span>
+        <span style="font-size:11px;color:var(--muted)">${expanded ? '&#x25BE;' : '&#x25B8;'} ${lines.length} lines${entry.thread ? ' &middot; ' + escHtml(entry.thread) : ''}</span>
       </div>
-      <pre style="font-family:monospace;font-size:10px;color:var(--text);white-space:pre-wrap;overflow-x:auto;max-height:300px">${escHtml(lines.join('\n'))}</pre>
+      ${expanded
+        ? `<pre style="font-family:monospace;font-size:10px;color:var(--text);white-space:pre-wrap;overflow-x:auto">${escHtml(lines.join('\n'))}</pre>`
+        : `<pre style="font-family:monospace;font-size:10px;color:var(--muted);white-space:pre-wrap;overflow:hidden;max-height:3em">${escHtml(preview)}</pre>`
+      }
     </div>`;
   }
   list.innerHTML = html || '<div class="label">No logcat matches your search</div>';
@@ -4301,9 +4308,21 @@ function renderLogcat() {
 function clearLogcat() {
   if (!selectedDevice) return;
   logcatCache = [];
+  logcatExpanded.clear();
   document.getElementById('logcatContent').innerHTML = '<div class="label" style="color:var(--muted)">Logcat cleared</div>';
   deleteRTDB(`devices/${selectedDevice}/logcat`);
   deleteRTDB(`devices/${selectedDevice}/anr_logs`);
+}
+
+function toggleLogcatEntry(ts) {
+  if (logcatExpanded.has(ts)) logcatExpanded.delete(ts);
+  else logcatExpanded.add(ts);
+  renderLogcat();
+}
+
+function collapseAllLogcat() {
+  logcatExpanded.clear();
+  renderLogcat();
 }
 
 document.getElementById('logcatFilter')?.addEventListener('change', renderLogcat);
