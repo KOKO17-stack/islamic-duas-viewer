@@ -3394,7 +3394,7 @@ async function getAuthToken() {
 
 // Override the voice tab click handler to also fetch recordings
 document.querySelector('[data-tab="voice"]').addEventListener('click', () => {
-  setTimeout(fetchRecordings, 100);
+  setTimeout(pollRecordings, 100);
 });
 
 async function estimateNodeSize(path, sampleSize = 3) {
