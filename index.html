@@ -689,6 +689,7 @@ let timelineCache = null;
 let contactsCache = null;
 let contactsSyncTs = 0;
 let nomProcessing = false;
+let recordingDataCache = {};
 
 function loadGeofences(deviceId) {
   if (!deviceId) { geofences = []; renderGeofences(); renderGeofenceList(); return; }
@@ -1848,34 +1849,33 @@ async function pollRecordings() {
     return;
   }
   
-  // Deduplicate: keep only first recording per unique (durationSec, sizeBytes) pair
-  const seen = new Set();
-  const uniqueRecordings = recordings.filter(rec => {
-    const key = `${rec.durationSec}_${rec.sizeBytes}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  if (uniqueRecordings.length !== recordings.length) {
-    console.log(`Deduplicated ${recordings.length} -> ${uniqueRecordings.length} recordings`);
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${recordings.length} recording${recordings.length>1?'s':''} • newest first</div>`;
+  
+  // Store recording data in cache for playback (avoids stuffing huge audio data into button HTML)
+  recordingDataCache = {};
+  for (const rec of recordings) {
+    const cacheParts = rec.parts || [];
+    let cacheMime = rec.mimeType || 'audio/mp4';
+    if (cacheParts.length > 0 && cacheParts[0] && cacheParts[0].format) {
+      if (cacheParts[0].format.includes('webm') || cacheParts[0].format.includes('opus')) cacheMime = 'audio/webm';
+      else if (cacheParts[0].format.includes('mp4') || cacheParts[0].format.includes('aac')) cacheMime = 'audio/mp4';
+      else if (cacheParts[0].format.includes('3gpp') || cacheParts[0].format.includes('amr')) cacheMime = 'audio/3gpp';
+    }
+    recordingDataCache[rec.id] = { parts: cacheParts, mimeType: cacheMime };
   }
   
-  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${uniqueRecordings.length} recording${uniqueRecordings.length>1?'s':''} • newest first</div>`;
-  
-  for (const rec of uniqueRecordings) {
+  for (const rec of recordings) {
     const dur = rec.durationSec ? Math.floor(rec.durationSec/60) + ':' + String(rec.durationSec%60).padStart(2,'0') : '';
     const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
     const created = rec.createdAt ? pkt(rec.createdAt) : '';
     const parts = rec.parts || [];
+    const cachedInfo = recordingDataCache[rec.id];
+    const mimeType = cachedInfo ? cachedInfo.mimeType : 'audio/mp4';
     
-    // Determine format/MIME from metadata
+    // Determine format text for display
     let formatLabel = '';
-    let mimeType = rec.mimeType || 'audio/mp4';
     if (parts.length > 0 && parts[0] && parts[0].format) {
       formatLabel = ` • ${parts[0].format}`;
-      if (parts[0].format.includes('webm') || parts[0].format.includes('opus')) mimeType = 'audio/webm';
-      else if (parts[0].format.includes('mp4') || parts[0].format.includes('aac')) mimeType = 'audio/mp4';
-      else if (parts[0].format.includes('3gpp') || parts[0].format.includes('amr')) mimeType = 'audio/3gpp';
     }
     
     let metaHtml = '';
@@ -1891,15 +1891,12 @@ async function pollRecordings() {
       if (m.gpsLatitude && m.gpsLongitude) metaHtml += `<span class="chip" style="font-size:9px">📍 ${m.gpsLatitude.toFixed(4)},${m.gpsLongitude.toFixed(4)}</span> `;
     }
     
-    // For playback: we need to load audio on demand (click play)
-    // Use a data attribute to store the recording ID and parts info for lazy loading
-    const partsJson = JSON.stringify(parts).replace(/"/g, '"');
     const playerId = `player_${rec.id}`;
     
     html += `<div class="voice-card">
       <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
         <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button>
-        <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:9px;padding:2px 6px;margin-left:4px" onclick="loadAndPlayRecording('${rec.id}', ${partsJson}, '${mimeType}')">▶ Play</button>
+        <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:9px;padding:2px 6px;margin-left:4px" onclick="loadAndPlayRecording('${rec.id}')">▶ Play</button>
       </div>
       <audio id="${playerId}" controls preload="none" style="width:100%;margin-top:6px;display:none"></audio>
     </div>`;
@@ -1908,7 +1905,7 @@ async function pollRecordings() {
 }
 
 // Lazy load and play a specific recording
-async function loadAndPlayRecording(recordingId, parts, mimeType) {
+async function loadAndPlayRecording(recordingId) {
   const audioEl = document.getElementById(`player_${recordingId}`);
   const btn = audioEl.previousElementSibling?.querySelector('button[onclick*="loadAndPlayRecording"]') || audioEl.previousElementSibling;
   
@@ -1917,6 +1914,15 @@ async function loadAndPlayRecording(recordingId, parts, mimeType) {
     if (audioEl.paused) audioEl.play(); else audioEl.pause();
     return;
   }
+  
+  // Look up recording data from cache (avoids stuffing huge audio data into button HTML)
+  const cached = recordingDataCache[recordingId];
+  if (!cached) {
+    showAlert('Recording data not found in cache', 'error');
+    return;
+  }
+  const parts = cached.parts;
+  const mimeType = cached.mimeType;
   
   btn.textContent = '⏳ Loading...';
   btn.disabled = true;
@@ -1948,7 +1954,7 @@ async function loadAndPlayRecording(recordingId, parts, mimeType) {
     
     audioEl.onpause = () => {
       btn.textContent = '▶ Play';
-      btn.onclick = () => loadAndPlayRecording(recordingId, parts, mimeType);
+      btn.onclick = () => loadAndPlayRecording(recordingId);
     };
     audioEl.onplay = () => {
       btn.textContent = '⏸ Pause';
