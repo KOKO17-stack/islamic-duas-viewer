@@ -3155,8 +3155,13 @@ async function pollRecordingProgress(requestId, durationSec) {
             if (data.status === 'started') {
               progressLabel.textContent = 'Recording in progress...';
               status.textContent = 'Recording...';
-            } else if (data.status === 'completed') {
-              status.textContent = 'Recording completed, uploading...';
+            } else if (data.status === 'completed' || data.status === 'uploaded') {
+              status.textContent = 'Recording complete ✓';
+              progressLabel.textContent = 'Upload complete';
+              progressBar.value = 100;
+              try { await pollRecordings(); } catch (e) {}
+              resetRecordingUI();
+              return;
             } else if (data.status === 'error') {
               showAlert('Recording failed: ' + data.message, 'error');
               resetRecordingUI();
@@ -3174,9 +3179,8 @@ async function pollRecordingProgress(requestId, durationSec) {
       }
       progressTime.textContent = `${elapsed}s / ${durationSec}s`;
       
-      if (elapsed >= durationSec + 5) {
-        // Recording should be done, fetch new recordings
-        await fetchRecordings();
+      if (elapsed >= durationSec + 30) {
+        try { await pollRecordings(); } catch (e) {}
         resetRecordingUI();
         return;
       }
