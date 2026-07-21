@@ -3273,10 +3273,6 @@ async function fetchRecordings() {
         }
       }
       
-      const dur = rec.durationSec ? formatDuration(rec.durationSec) : '?';
-      const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '?';
-      const created = rec.createdAt ? new Date(parseInt(rec.createdAt)).toLocaleString() : 'Unknown';
-      
       let metaHtml = '';
       if (rec.cancelled) metaHtml += '<span class="chip" style="background:var(--warning);color:#000;font-size:9px">Cancelled</span> ';
       if (formatLabel) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${formatLabel}</span> `;
