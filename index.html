@@ -2040,12 +2040,16 @@ async function pollVoiceNotes() {
     const noteIndex = note.noteIndex;
     const playerId = `vn_player_${batchKey}_${noteIndex}`;
     
+    const hasAudio = !!(note.audioData);
     html += `<div class="voice-card">
       <div class="vname">${fileName} ${dateAdded ? `• ${dateAdded}` : ''} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''}
         <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNoteFromList('${batchKey}', ${noteIndex})">Delete</button>
-        <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:9px;padding:2px 6px;margin-left:4px" onclick="loadAndPlayVoiceNote('${batchKey}', ${noteIndex})">▶ Play</button>
+        ${hasAudio
+          ? `<button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:9px;padding:2px 6px;margin-left:4px" onclick="loadAndPlayVoiceNote('${batchKey}', ${noteIndex})">▶ Play</button>`
+          : `<span class="chip" style="background:var(--border);color:var(--muted);border-color:var(--border);font-size:9px;padding:2px 6px;margin-left:4px;cursor:default">No audio</span>`
+        }
       </div>
-      <audio id="${playerId}" controls preload="none" style="width:100%;margin-top:6px;display:none"></audio>
+      ${hasAudio ? `<audio id="${playerId}" controls preload="none" style="width:100%;margin-top:6px;display:none"></audio>` : ''}
     </div>`;
   }
   list.innerHTML = html;
@@ -2056,6 +2060,7 @@ let voiceNoteDataCache = {};
 
 async function loadAndPlayVoiceNote(batchKey, noteIndex) {
   const audioEl = document.getElementById(`vn_player_${batchKey}_${noteIndex}`);
+  if (!audioEl) { showAlert('Voice note player not found', 'error'); return; }
   const btn = audioEl.previousElementSibling?.querySelector('button[onclick*="loadAndPlayVoiceNote"]') || audioEl.previousElementSibling;
   
   if (audioEl.src) {
@@ -2063,7 +2068,6 @@ async function loadAndPlayVoiceNote(batchKey, noteIndex) {
     return;
   }
   
-  // Fetch the batch and get the specific note — store in cache for future
   const cacheKey = `${batchKey}_${noteIndex}`;
   let note = voiceNoteDataCache[cacheKey];
   if (!note) {
