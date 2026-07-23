@@ -2407,7 +2407,7 @@ async function pollVideos() {
   
   let html = '';
   for (const v of allVideos) {
-    const fileName = v.fileName || 'Unknown';
+    const fileName = (v.fileName && v.fileName !== 'undefined' && v.fileName !== 'null') ? v.fileName : 'Unknown';
     const duration = v.durationMs ? formatDuration(v.durationMs) : '';
     const size = v.sizeBytes ? (v.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
     const dateAdded = v.dateAdded ? pkt(v.dateAdded) : '';
