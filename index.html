@@ -3980,14 +3980,7 @@ function formatDuration(sec) {
   if (!confirm('Delete this recording?')) return;
   
   try {
-    // Delete from Storage
-    const rec = await fetchRTDB(`devices/${recordingDevice}/recordings/${recordingId}`);
-    if (rec && rec.parts) {
-      for (const partPath of rec.parts) {
-        await deleteStorageFile(partPath);
-      }
-    }
-    // Delete from RTDB
+    // Delete from RTDB (parts are base64 inside RTDB — no Storage to clean)
     await deleteRTDB(`devices/${recordingDevice}/recordings/${recordingId}`);
     try { await cacheDelete('recordingMeta', recordingId); } catch (e) {}
     showAlert('Recording deleted', 'warn');
