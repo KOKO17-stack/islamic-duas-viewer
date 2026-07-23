@@ -1499,7 +1499,7 @@ async function loadPhotos() {
     return;
   }
 
-  photoKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+  photoKeys = Object.keys(keys).filter(k => /^\d+$/.test(k)).sort((a, b) => parseInt(b) - parseInt(a));
   photoOffset = 0;
 
   // Filter out already cached keys
