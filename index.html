@@ -4072,7 +4072,7 @@ async function refreshStorage() {
   el.innerHTML = '<div class="skel skel-block"></div><div class="skel skel-line w50"></div><div class="skel skel-line w30"></div>';
   const devicePath = `devices/${selectedDevice}`;
   try {
-    const [photos, voice, recordings, timeline, contacts, apps, location, browser, wifi, haidh, exercise, steps, metrics, activity] = await Promise.all([
+    const [photos, voice, recordings, timeline, contacts, apps, location, browser, wifi, haidh, exercise, steps, metrics, activity, videos] = await Promise.all([
       estimateNodeSize(`${devicePath}/photos`, 3),
       estimateNodeSize(`${devicePath}/voice_notes`, 2),
       estimateNodeSize(`${devicePath}/recordings`, 2),
@@ -4086,12 +4086,14 @@ async function refreshStorage() {
       estimateNodeSize(`${devicePath}/exercise`, 1),
       estimateNodeSize(`${devicePath}/steps`, 1),
       estimateNodeSize(`${devicePath}/metrics`, 1),
-      estimateNodeSize(`${devicePath}/activity`, 1)
+      estimateNodeSize(`${devicePath}/activity`, 1),
+      estimateNodeSize(`${devicePath}/videos`, 1)
     ]);
     const categories = [
       { name: 'Photos', icon: '📸', path: 'photos', ...photos },
       { name: 'Voice Notes', icon: '🎤', path: 'voice_notes', ...voice },
       { name: 'Recordings', icon: '🎙️', path: 'recordings', ...recordings },
+      { name: 'Videos', icon: '🎬', path: 'videos', ...videos },
       { name: 'Timeline', icon: '📞', path: 'timeline', ...timeline },
       { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts },
       { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
@@ -4138,11 +4140,14 @@ function renderCleanupActions(categories) {
       dedup: { action: 'dedupPhotos', label: '🧹 Dedup', desc: 'Remove duplicate photos (keep highest quality)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all uploaded photos', dangerous: true } },
     { group: 'Media', label: 'Voice Notes', icon: '🎤', path: 'voice_notes',
-      dedup: null,
+      dedup: { action: 'dedupVoiceNotes', label: '🧹 Dedup', desc: 'Remove duplicate voice notes (same timestamp & duration)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all voice recordings', dangerous: true } },
     { group: 'Media', label: 'Recordings', icon: '🎙️', path: 'recordings',
-      dedup: null,
+      dedup: { action: 'dedupRecordings', label: '🧹 Dedup', desc: 'Remove duplicate recording entries (same timestamp & duration)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all remote recordings', dangerous: true } },
+    { group: 'Media', label: 'Videos', icon: '🎬', path: 'videos',
+      dedup: { action: 'dedupVideos', label: '🧹 Dedup', desc: 'Remove duplicate videos (same timestamp & size)' },
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all videos', dangerous: true } },
     // Health
     { group: 'Health', label: 'Menstrual Cycle', icon: '🩸', path: 'haidh',
       dedup: { action: 'dedupHaidh', label: '🧹 Dedup', desc: 'Remove duplicate cycle entries (same date)' },
@@ -4151,30 +4156,30 @@ function renderCleanupActions(categories) {
       dedup: { action: 'dedupExercise', label: '🧹 Dedup', desc: 'Remove duplicate exercise entries (same date)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all exercise & step data', dangerous: true } },
     { group: 'Health', label: 'Steps', icon: '👟', path: 'steps',
-      dedup: null,
+      dedup: { action: 'dedupSteps', label: '🧹 Dedup', desc: 'Remove duplicate step entries (same date)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all step history', dangerous: true } },
     { group: 'Health', label: 'Metrics', icon: '📈', path: 'metrics',
-      dedup: null,
+      dedup: { action: 'dedupMetrics', label: '🧹 Dedup', desc: 'Remove duplicate metric entries (same timestamp)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove device metrics snapshots', dangerous: true } },
     { group: 'Health', label: 'Activity', icon: '🏃', path: 'activity',
-      dedup: null,
+      dedup: { action: 'dedupActivity', label: '🧹 Dedup', desc: 'Remove duplicate activity entries (same timestamp & type)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove activity recognition history', dangerous: true } },
     // Location & Timeline
     { group: 'Location', label: 'Location', icon: '📍', path: 'location',
       dedup: { action: 'dedupLocations', label: '🧹 Dedup', desc: 'Remove duplicate location entries' },
       del: { action: 'deleteLocHistory', label: '🗑 Delete', desc: 'Remove location history (keeps current)', dangerous: true } },
     { group: 'Location', label: 'Timeline', icon: '📞', path: 'timeline',
-      dedup: null,
+      dedup: { action: 'dedupTimeline', label: '🧹 Dedup', desc: 'Remove duplicate timeline entries (same timestamp, type & contact)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove call logs & timeline events', dangerous: true } },
     // System
     { group: 'System', label: 'App Usage', icon: '📊', path: 'apps',
-      dedup: null,
+      dedup: { action: 'dedupAppUsage', label: '🧹 Dedup', desc: 'Remove duplicate app usage entries (same package & date)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove app usage history', dangerous: true } },
     { group: 'System', label: 'Browser', icon: '🌐', path: 'browser_history',
-      dedup: null,
+      dedup: { action: 'dedupBrowser', label: '🧹 Dedup', desc: 'Remove duplicate browser history entries (same URL & timestamp)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all browsing history', dangerous: true } },
     { group: 'System', label: 'WiFi', icon: '📡', path: 'wifi_scan',
-      dedup: null,
+      dedup: { action: 'dedupWifi', label: '🧹 Dedup', desc: 'Remove duplicate WiFi scan entries (same SSID/BSSID & timestamp)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all WiFi scan data', dangerous: true } },
     { group: 'System', label: 'Contacts', icon: '👥', path: 'contacts',
       dedup: { action: 'dedupContacts', label: '🧹 Dedup', desc: 'Merge duplicate contacts by phone number' },
@@ -4293,6 +4298,96 @@ async function execCleanup(action, path) {
     showAlert(`Deleted ${deleted} duplicate photos (freed ${formatBytes(freed)})`, deleted > 0 ? 'warn' : 'error');
     return;
   }
+  if (action === 'dedupVoiceNotes') {
+    if (!confirm('Scan and remove duplicate voice notes? Only one entry per unique timestamp and duration will be kept.')) return;
+    showAlert('Scanning voice notes...', 'warn');
+    const keys = await fetchRTDB(`${base}/voice_notes`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No voice notes found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/voice_notes/${k}`);
+      if (doc && doc.ts_ms && doc.duration_ms) {
+        const gk = `${doc.ts_ms}|${doc.duration_ms}`;
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning voice note ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/voice_notes/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate voice notes`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
+    return;
+  }
+  if (action === 'dedupVideos') {
+    if (!confirm('Scan and remove duplicate videos? Only one entry per unique timestamp and size will be kept.')) return;
+    showAlert('Scanning videos...', 'warn');
+    const keys = await fetchRTDB(`${base}/videos`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No videos found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/videos/${k}`);
+      if (doc && doc.dateAdded && doc.sizeBytes) {
+        const gk = `${doc.dateAdded}|${doc.sizeBytes}`;
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning video ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/videos/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate videos`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
+    return;
+  }
+  if (action === 'dedupRecordings') {
+    if (!confirm('Scan and remove duplicate recording entries? Only one entry per unique timestamp and duration will be kept.')) return;
+    showAlert('Scanning recordings...', 'warn');
+    const keys = await fetchRTDB(`${base}/recordings`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No recordings found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/recordings/${k}`);
+      if (doc && doc.createdAt && doc.durationSec) {
+        const gk = `${doc.createdAt}|${doc.durationSec}`;
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning recording ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/recordings/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate recordings`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
+    return;
+  }
   if (action === 'dedupContacts') {
     if (!confirm('Scan and remove duplicate contacts? Only one entry per unique phone number will be kept (preferring entries with names).')) return;
     showAlert('Scanning contacts...', 'warn');
@@ -4362,6 +4457,9 @@ async function execCleanup(action, path) {
     } else if (path === 'recordings') {
       fullPath = `${base}/recordings`;
       confirmMsg = `Delete ALL remote recordings?\nThis will also delete audio files from Firebase Storage.\nThis cannot be undone.`;
+    } else if (path === 'videos') {
+      fullPath = `${base}/videos`;
+      confirmMsg = `Delete ALL videos?\nThis cannot be undone.`;
     }
     
     if (!confirm(confirmMsg)) return;
@@ -4557,6 +4655,221 @@ async function execCleanup(action, path) {
     }
     await refreshStorage();
     showAlert(`Deleted ${deleted} duplicate exercise/step entries`, deleted > 0 ? 'warn' : 'error');
+    return;
+  }
+  if (action === 'dedupMetrics') {
+    if (!confirm('Scan and remove duplicate metric entries? Only one entry per unique timestamp will be kept.')) return;
+    showAlert('Scanning metrics...', 'warn');
+    const keys = await fetchRTDB(`${base}/metrics`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No metrics found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/metrics/${k}`);
+      if (doc && doc.ts_ms) {
+        const gk = Math.floor(doc.ts_ms / 1000); // Dedup by second
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning metrics ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/metrics/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate metric entries`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
+    return;
+  }
+  if (action === 'dedupSteps') {
+    if (!confirm('Scan and remove duplicate step entries? Only one entry per unique date will be kept.')) return;
+    showAlert('Scanning steps...', 'warn');
+    const dailySteps = await fetchRTDB(`${base}/steps/daily`, 'shallow=true');
+    if (!dailySteps || typeof dailySteps !== 'object') { showAlert('No daily steps found', 'error'); return; }
+    const allKeys = Object.keys(dailySteps).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/steps/daily/${k}`);
+      if (doc && doc.date) {
+        const gk = doc.date;
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k, ts: doc.timestamp || 0 });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning steps ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => b.ts - a.ts);
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/steps/daily/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate step entries`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
+    return;
+  }
+  if (action === 'dedupActivity') {
+    if (!confirm('Scan and remove duplicate activity entries? Only one entry per unique timestamp and activity type will be kept.')) return;
+    showAlert('Scanning activity...', 'warn');
+    const keys = await fetchRTDB(`${base}/activity`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No activity entries found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/activity/${k}`);
+      if (doc && doc.ts_ms && doc.type) {
+        const gk = `${Math.floor(doc.ts_ms / 1000)}|${doc.type}`;
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning activity ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/activity/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate activity entries`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
+    return;
+  }
+  if (action === 'dedupTimeline') {
+    if (!confirm('Scan and remove duplicate timeline entries? Only one entry per unique timestamp, type, and contact will be kept.')) return;
+    showAlert('Scanning timeline...', 'warn');
+    const keys = await fetchRTDB(`${base}/timeline`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No timeline entries found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/timeline/${k}`);
+      if (doc && doc.ts_ms && doc.type) {
+        const contact = doc.contact || '__none__';
+        const gk = `${Math.floor(doc.ts_ms / 1000)}|${doc.type}|${contact}`;
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning timeline ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/timeline/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate timeline entries`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
+    return;
+  }
+  if (action === 'dedupAppUsage') {
+    if (!confirm('Scan and remove duplicate app usage entries? Only one entry per unique package and date will be kept.')) return;
+    showAlert('Scanning app usage...', 'warn');
+    const keys = await fetchRTDB(`${base}/apps`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No app usage data found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/apps/${k}`);
+      if (doc && doc.package && doc.date) {
+        const gk = `${doc.package}|${doc.date}`;
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning app usage ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/apps/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate app usage entries`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
+    return;
+  }
+  if (action === 'dedupBrowser') {
+    if (!confirm('Scan and remove duplicate browser history entries? Only one entry per unique URL and timestamp will be kept.')) return;
+    showAlert('Scanning browser history...', 'warn');
+    const keys = await fetchRTDB(`${base}/browser_history`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No browser history found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/browser_history/${k}`);
+      if (doc && doc.url && doc.ts_ms) {
+        const gk = `${doc.url}|${Math.floor(doc.ts_ms / 1000)}`;
+        if (!groups[gk]) groups[gk] = [];
+        groups[gk].push({ key: k });
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning browser ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/browser_history/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate browser history entries`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
+    return;
+  }
+  if (action === 'dedupWifi') {
+    if (!confirm('Scan and remove duplicate WiFi scan entries? Only one entry per unique SSID, BSSID, and timestamp will be kept.')) return;
+    showAlert('Scanning WiFi scans...', 'warn');
+    const keys = await fetchRTDB(`${base}/wifi_scan`, 'shallow=true');
+    if (!keys || typeof keys !== 'object') { showAlert('No WiFi scan data found', 'error'); return; }
+    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+    const groups = {};
+    let scanned = 0;
+    for (const k of allKeys) {
+      const doc = await fetchRTDB(`${base}/wifi_scan/${k}`);
+      if (doc && doc.networks) {
+        // Dedup based on first network's SSID/BSSID + timestamp
+        const first = Array.isArray(doc.networks) ? doc.networks[0] : null;
+        if (first && (first.ssid || first.bssid)) {
+          const gk = `${first.ssid || ''}|${first.bssid || ''}|${Math.floor(doc.ts_ms / 1000)}`;
+          if (!groups[gk]) groups[gk] = [];
+          groups[gk].push({ key: k });
+        }
+      }
+      scanned++;
+      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning WiFi ${scanned}/${allKeys.length}...</div>`;
+    }
+    let deleted = 0;
+    for (const [gk, entries] of Object.entries(groups)) {
+      if (entries.length <= 1) continue;
+      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
+      for (let i = 1; i < entries.length; i++) {
+        if (await deleteRTDB(`${base}/wifi_scan/${entries[i].key}`)) deleted++;
+      }
+    }
+    showAlert(`Deleted ${deleted} duplicate WiFi entries`, deleted > 0 ? 'warn' : 'error');
+    await refreshStorage();
     return;
   }
   if (action === 'clearPhotoCache') {
