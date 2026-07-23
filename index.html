@@ -2207,7 +2207,6 @@ async function pollVideos() {
     return;
   }
   
-  // Sort by dateAdded newest first
   allVideos.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
   
   document.getElementById('videoCount').textContent = `(${allVideos.length})`;
@@ -2216,16 +2215,15 @@ async function pollVideos() {
   for (const v of allVideos) {
     const fileName = v.fileName || 'Unknown';
     const duration = v.durationMs ? formatDuration(v.durationMs) : '';
-    const size = v.compressedSizeBytes ? (v.compressedSizeBytes/1024/1024).toFixed(1) + ' MB' : 
-                 v.sizeBytes ? (v.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
+    const size = v.sizeBytes ? (v.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
     const dateAdded = v.dateAdded ? pkt(v.dateAdded) : '';
     const mimeType = v.mimeType || 'video/mp4';
-    const downloadUrl = v.downloadUrl || '';
-    const thumbUrl = v.thumbUrl || '';
     const videoId = v.videoId || '';
     const width = v.width || 0;
     const height = v.height || 0;
     const res = width && height ? `${width}x${height}` : '';
+    const data = v.data || '';
+    const thumb = v.thumb || '';
     
     // Determine source for filter
     let source = 'other';
@@ -2233,24 +2231,21 @@ async function pollVideos() {
     else if (fileName.toLowerCase().includes('camera') || fileName.toLowerCase().includes('dcim') || fileName.toLowerCase().startsWith('vid_')) source = 'camera';
     else if (fileName.toLowerCase().includes('telegram')) source = 'telegram';
     
-    const videoSrc = downloadUrl || `https://firebasestorage.googleapis.com/v0/b/${STORAGE_BUCKET}/o/${encodeURIComponent(v.storagePath || '')}?alt=media`;
-    
-    html += `<div class="pwrap" data-source="${source}" data-video-id="${videoId}" style="aspect-ratio:16/9;cursor:pointer">
-      ${thumbUrl ? `<img data-src="${thumbUrl}" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" loading="lazy" alt="${fileName}" style="width:100%;height:100%;object-fit:cover">` : 
-        `<video src="${videoSrc}" preload="metadata" style="width:100%;height:100%;object-fit:cover" muted></video>`}
+    html += `<div class="pwrap" data-source="${source}" data-video-id="${videoId}" data-base64="${data}" data-mime="${mimeType}" data-filename="${fileName.replace(/"/g,'&quot;')}" style="aspect-ratio:16/9;cursor:pointer">
+      ${thumb ? `<img src="data:image/jpeg;base64,${thumb}" loading="lazy" alt="${fileName}" style="width:100%;height:100%;object-fit:cover">` : 
+        `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);font-size:28px">&#x1F3AC;</div>`}
       <div class="pcap">
         <div>${fileName}</div>
         <div class="ptime">${dateAdded ? `• ${dateAdded}` : ''} ${duration ? `• ${duration}` : ''} ${size ? `• ${size}` : ''} ${res ? `• ${res}` : ''}</div>
       </div>
       <div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">
-        <button class="chip" style="background:rgba(0,0,0,.7);color:#fff;border:none;padding:2px 6px;font-size:9px;border-radius:4px" onclick="event.stopPropagation();openVideo('${videoSrc.replace(/'/g, "\\'")}','${fileName.replace(/'/g, "\\'")}')">▶</button>
+        <button class="chip" style="background:rgba(0,0,0,.7);color:#fff;border:none;padding:2px 6px;font-size:9px;border-radius:4px" onclick="event.stopPropagation();openVideoLightbox(this)">▶</button>
         <button class="chip" style="background:rgba(248,81,73,.9);color:#000;border:none;padding:2px 6px;font-size:9px;border-radius:4px" onclick="event.stopPropagation();deleteVideo('${videoId}')">🗑</button>
       </div>
     </div>`;
   }
   grid.innerHTML = html;
   
-  // Add filter listeners
   document.querySelectorAll('#videoFilterChips .chip').forEach(chip => {
     chip.onclick = () => {
       document.querySelectorAll('#videoFilterChips .chip').forEach(c => c.classList.remove('active'));
@@ -2259,7 +2254,6 @@ async function pollVideos() {
     };
   });
   
-  // Search listener
   document.getElementById('videoSearch').oninput = (e) => filterVideos(document.querySelector('#videoFilterChips .chip.active')?.dataset.filter || 'all', e.target.value);
 }
 
@@ -2282,20 +2276,61 @@ function filterVideos(source, search = '') {
   });
 }
 
-function openVideo(url, fileName) {
-  // Open video in new tab (direct link)
-  window.open(url, '_blank');
+function openVideoLightbox(btn) {
+  const pwrap = btn.closest('.pwrap');
+  if (!pwrap) return;
+  const base64 = pwrap.dataset.base64;
+  const mimeType = pwrap.dataset.mime || 'video/mp4';
+  const fileName = pwrap.dataset.filename || 'Video';
+  
+  if (!base64) { showAlert('No video data', 'error'); return; }
+  
+  try {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    
+    const lightbox = document.getElementById('lightbox');
+    const img = document.getElementById('lightboxImg');
+    img.style.display = 'none';
+    
+    // Remove any old video element
+    const oldVid = lightbox.querySelector('video');
+    if (oldVid) oldVid.remove();
+    
+    const vid = document.createElement('video');
+    vid.controls = true;
+    vid.style.maxWidth = '95vw';
+    vid.style.maxHeight = '95vh';
+    vid.style.display = 'block';
+    vid.style.margin = 'auto';
+    vid.src = url;
+    vid.play();
+    lightbox.appendChild(vid);
+    lightbox.classList.add('open');
+    
+    lightbox.onclick = () => {
+      vid.pause();
+      vid.src = '';
+      URL.revokeObjectURL(url);
+      lightbox.classList.remove('open');
+      if (oldVid) oldVid.remove();
+    };
+    
+    document.getElementById('lightboxCaption').textContent = fileName;
+  } catch (e) {
+    showAlert('Failed to play video: ' + e.message, 'error');
+  }
 }
 
 async function deleteVideo(videoId) {
   if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
-  if (!confirm('Delete this video from dashboard and storage?')) return;
-  
+  if (!confirm('Delete this video from RTDB?')) return;
   try {
-    // Delete from RTDB
     await deleteRTDB(`devices/${selectedDevice}/videos/${videoId}`);
-    // Note: Firebase Storage file deletion would need a Cloud Function or admin SDK
-    showAlert('Video deleted from dashboard', 'warn');
+    showAlert('Video deleted', 'warn');
     pollVideos();
   } catch (e) {
     showAlert('Delete failed: ' + e.message, 'error');
