@@ -1407,11 +1407,11 @@ function renderPhotosFromCache() {
     return;
   }
 
-  // Dedup by (fileName, dateTaken) keeping highest quality
+  // Dedup by (firebaseKey, fileName, dateTaken) keeping highest quality
   const dedup = {};
-  for (const doc of Object.values(cachedPhotos)) {
+  for (const [ts, doc] of Object.entries(cachedPhotos)) {
     if (!doc || !doc.data) continue;
-    const key = (doc.fileName || '') + '|' + (doc.dateTaken || '');
+    const key = ts + '|' + (doc.fileName || '') + '|' + (doc.dateTaken || '');
     const existing = dedup[key];
     if (!existing || (doc.data.length > existing.data.length)) dedup[key] = doc;
   }
