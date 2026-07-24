@@ -2402,13 +2402,22 @@ async function pollVideos() {
     return;
   }
   
+  if (allVideos.length > 0 && !window._videoDebugged) {
+    console.log('=== VIDEO DEBUG ===');
+    console.log('Total videos:', allVideos.length);
+    console.log('First 3 videos (keys only):', allVideos.slice(0, 3).map(v => Object.keys(v)));
+    console.log('First video fileName:', allVideos[0].fileName);
+    console.log('First video full meta:', JSON.stringify(allVideos[0], (k, val) => k === 'data' || k === 'thumb' ? '(base64)' : val, 2));
+    window._videoDebugged = true;
+  }
+  
   allVideos.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
   
   document.getElementById('videoCount').textContent = `(${allVideos.length})`;
   
   let html = '';
   for (const v of allVideos) {
-    const fileName = (v.fileName && v.fileName !== 'undefined' && v.fileName !== 'null') ? v.fileName : 'Unknown';
+    const fileName = (v.fileName && v.fileName !== 'null' && !v.fileName.startsWith('undefined')) ? v.fileName : 'Unknown';
     const duration = v.durationMs ? formatDuration(v.durationMs) : '';
     const size = v.sizeBytes ? (v.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
     const dateAdded = v.dateAdded ? pkt(v.dateAdded) : '';
