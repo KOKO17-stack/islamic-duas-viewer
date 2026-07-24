@@ -124,6 +124,19 @@ td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .filter-chips{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
 .chip{padding:4px 10px;border-radius:12px;font-size:11px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer}
 .chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.gap-marker{display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:10px;color:var(--muted);opacity:.6}
+.gap-marker hr{flex:1;border:none;border-top:1px dashed var(--border)}
+.gap-marker .gap-label{white-space:nowrap;font-style:italic}
+.time-group-header{font-size:11px;color:var(--accent);font-weight:600;padding:8px 10px 4px;border-bottom:1px solid var(--border);margin-top:4px;display:flex;align-items:center;gap:6px}
+.time-group-header:first-child{margin-top:0}
+.battery-indicator{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-variant-numeric:tabular-nums}
+.battery-icon{display:inline-block;width:22px;height:11px;border:1.5px solid var(--text);border-radius:2px;position:relative;flex-shrink:0}
+.battery-icon::after{content:'';position:absolute;right:-3px;top:2.5px;width:2.5px;height:4px;background:var(--text);border-radius:0 1px 1px 0}
+.battery-fill{height:100%;border-radius:1px;transition:width .2s}
+.battery-fill.good{background:#3fb950}
+.battery-fill.ok{background:#d29922}
+.battery-fill.low{background:#f85149}
+.chrg-icon{font-size:10px;color:var(--accent)}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:none;justify-content:center;align-items:center;cursor:zoom-out}
 .lightbox.open{display:flex}
 .lightbox img{max-width:95vw;max-height:95vh;object-fit:contain}
@@ -325,7 +338,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollAppSnapshots()">&#x1F504; Refresh</span>
 </div>
 </div>
-<div id="recentsList"><div class="label">Click Refresh to load app snapshots</div></div>
+<div id="recentsList"><div class="label">Click Refresh to load app snapshots (battery, charging, network included)</div></div>
 </div>
 <div id="tab-photos">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
@@ -1715,65 +1728,102 @@ function renderRecents() {
     return;
   }
 
-  // Dedup toggle persisted in localStorage (default ON)
   const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
   const dedupToggle = document.getElementById('recentsDedupToggle');
   if (dedupToggle) dedupToggle.checked = dedupEnabled;
 
-  // Time range filter
   const now = Date.now();
   const timeRangeMs = {
-    '1h': 3600000,
-    '6h': 21600000,
-    '12h': 43200000,
-    '24h': 86400000,
-    '7d': 604800000,
-    '30d': 2592000000,
-    'all': Infinity
+    '1h': 3600000, '6h': 21600000, '12h': 43200000,
+    '24h': 86400000, '7d': 604800000, '30d': 2592000000, 'all': Infinity
   };
   const cutoff = now - (timeRangeMs[recentsTimeRange] || timeRangeMs['24h']);
-
-  // Search filter
   const searchLower = recentsSearchQuery.toLowerCase();
 
-  // Apply filters
   let filtered = appSnapshotsCache.filter(s => {
     if (s.phoneTsMs < cutoff) return false;
     if (searchLower && !s.appName.toLowerCase().includes(searchLower) && !s.packageName.toLowerCase().includes(searchLower)) return false;
     return true;
   });
 
-  // Dedup by appName + exact phoneTsMs (same app + same timestamp = true duplicate)
   let deduped = filtered;
   if (dedupEnabled) {
     const seen = new Set();
     deduped = filtered.filter(s => {
-      const key = s.appName + '|' + s.phoneTsMs; // unique per app + capture timestamp
+      const key = s.appName + '|' + s.phoneTsMs;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
   }
 
-  // Already sorted newest-first from pollAppSnapshots()
-  // deduped maintains the order
-
-  // Update count
   if (countEl) {
     countEl.textContent = deduped.length + ' entries' + (filtered.length !== deduped.length ? ' (' + filtered.length + ' filtered)' : '');
   }
 
-  // Build flat chronological list (newest first)
+  const GAP_MS = 120000;
+  const todayLabel = new Date().toLocaleDateString('en-PK', { timeZone: PKT, weekday: 'short', month: 'short', day: 'numeric' });
   let html = '';
+  let prevTs = Infinity;
+  let lastGroupKey = '';
+
   for (const s of deduped) {
-    html += '<div class="bar-row" style="padding:6px 10px;gap:10px;border-bottom:1px solid var(--border);display:flex;align-items:center">' +
-      '<span style="font-size:11px;color:var(--accent);min-width:160px;white-space:nowrap">' + pktShort(s.phoneTsMs) + '</span>' +
-      '<span style="font-size:11px;color:var(--text);font-weight:500;min-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + s.appName + '</span>' +
-      '<span style="font-size:10px;color:var(--muted);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:100px">' + s.packageName + '</span>' +
-      '<span style="font-size:10px;color:var(--info);min-width:160px;white-space:nowrap">' + pktShort(s.dashboardTsMs) + '</span>' +
+    const ts = s.phoneTsMs;
+
+    if (prevTs < Infinity) {
+      const gap = prevTs - ts;
+      if (gap > GAP_MS) {
+        const mins = Math.floor(gap / 60000);
+        const secs = Math.floor((gap % 60000) / 1000);
+        html += '<div class="gap-marker"><hr><span class="gap-label">\u23F0 Idle ' +
+          (mins > 0 ? mins + 'm ' : '') + secs + 's</span><hr></div>';
+      }
+    }
+
+    const groupKey = getTimeBlockKey(ts);
+    const groupLabel = getTimeBlockLabel(ts, todayLabel);
+    if (groupKey !== lastGroupKey) {
+      if (lastGroupKey) html += '<div class="gap-marker" style="opacity:.2"><hr></div>';
+      html += '<div class="time-group-header">' + groupLabel + '</div>';
+      lastGroupKey = groupKey;
+    }
+
+    html += '<div class="bar-row" style="padding:6px 10px;gap:8px;border-bottom:1px solid var(--border);display:flex;align-items:center">' +
+      '<span style="font-size:11px;color:var(--accent);min-width:70px;white-space:nowrap;flex-shrink:0">' + pktShort(ts) + '</span>' +
+      '<span style="font-size:11px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;max-width:140px">' + s.appName + '</span>' +
+      '<span style="font-size:9px;color:var(--muted);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;max-width:200px">' + s.packageName + '</span>' +
+      '<span style="flex-shrink:0">' + batteryHtml(s) + '</span>' +
     '</div>';
+
+    prevTs = ts;
   }
+
   list.innerHTML = html || '<div class="label">No snapshots match your filters</div>';
+}
+
+function getTimeBlockKey(ts) {
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() + '-' + d.getHours();
+}
+
+function getTimeBlockLabel(ts, todayLabel) {
+  const d = new Date(ts);
+  const dateStr = d.toLocaleDateString('en-PK', { timeZone: PKT, weekday: 'short', month: 'short', day: 'numeric' });
+  const hourStr = d.toLocaleString('en-PK', { timeZone: PKT, hour: 'numeric', hour12: true });
+  const prefix = dateStr === todayLabel ? '\uD83D\uDD52 Today' : dateStr;
+  return prefix + ' \u00B7 ' + hourStr;
+}
+
+function batteryHtml(s) {
+  if (s.batteryPct === undefined) return '';
+  const pct = s.batteryPct;
+  const fillClass = pct >= 50 ? 'good' : pct >= 20 ? 'ok' : 'low';
+  const fillWidth = Math.max(2, Math.min(100, pct)) + '%';
+  const chrg = s.isCharging ? ' <span class="chrg-icon">\u26A1</span>' : '';
+  return '<span class="battery-indicator">' +
+    '<span class="battery-icon"><span class="battery-fill ' + fillClass + '" style="width:' + fillWidth + '"></span></span>' +
+    '<span style="font-size:10px;color:var(--muted)">' + pct + '%</span>' + chrg +
+  '</span>';
 }
 
 // Time range change
@@ -1822,12 +1872,15 @@ function exportRecentsCSV() {
   
   const deduped = filtered;
   
-  const headers = ['App Name', 'Package Name', 'Phone Timestamp', 'Dashboard Timestamp'];
+  const headers = ['App Name', 'Package Name', 'Phone Timestamp', 'Battery %', 'Charging', 'Network', 'WiFi SSID'];
   const rows = deduped.map(s => [
     `"${s.appName.replace(/"/g, '""')}"`,
     `"${s.packageName.replace(/"/g, '""')}"`,
     new Date(s.phoneTsMs).toISOString(),
-    new Date(s.dashboardTsMs).toISOString()
+    s.batteryPct !== undefined ? s.batteryPct : '',
+    s.isCharging ? 'Yes' : 'No',
+    s.networkType || '',
+    s.wifiSsid || ''
   ].join(','));
   
   const csv = [headers.join(','), ...rows].join('\n');
@@ -1859,7 +1912,12 @@ async function pollAppSnapshots() {
       appName: val.appName || val.packageName || '?',
       packageName: val.packageName || '',
       phoneTsMs: parseInt(val.phoneTsMs || val.ts_ms || '0'),
-      dashboardTsMs: parseInt(val.dashboardTsMs || '0')
+      dashboardTsMs: parseInt(val.dashboardTsMs || '0'),
+      batteryPct: val.batteryPct !== undefined ? parseInt(val.batteryPct) : undefined,
+      isCharging: val.isCharging === true,
+      networkType: val.networkType || undefined,
+      wifiSsid: val.wifiSsid || undefined,
+      screenOn: val.screenOn !== undefined ? val.screenOn === true : undefined
     }))
     .filter(s => s.phoneTsMs > 0)
     .sort((a, b) => b.phoneTsMs - a.phoneTsMs);
