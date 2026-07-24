@@ -2403,11 +2403,13 @@ async function pollVideos() {
   }
   
   if (allVideos.length > 0 && !window._videoDebugged) {
+    const first = allVideos[0];
     console.log('=== VIDEO DEBUG ===');
     console.log('Total videos:', allVideos.length);
-    console.log('First 3 videos (keys only):', allVideos.slice(0, 3).map(v => Object.keys(v)));
-    console.log('First video fileName:', allVideos[0].fileName);
-    console.log('First video full meta:', JSON.stringify(allVideos[0], (k, val) => k === 'data' || k === 'thumb' ? '(base64)' : val, 2));
+    console.log('First video raw:', JSON.stringify(first));
+    const keys = Object.keys(first).filter(k => k !== 'data' && k !== 'thumb');
+    const vals = keys.map(k => k + '=' + JSON.stringify(first[k])).join(' | ');
+    showAlert('First video: ' + vals, 'warn');
     window._videoDebugged = true;
   }
   
@@ -2435,7 +2437,7 @@ async function pollVideos() {
     else if (safeFileName.toLowerCase().includes('camera') || safeFileName.toLowerCase().includes('dcim') || safeFileName.toLowerCase().startsWith('vid_')) source = 'camera';
     else if (safeFileName.toLowerCase().includes('telegram')) source = 'telegram';
     
-    html += `<div class="pwrap" data-source="${source || 'other'}" data-video-id="${videoId}" data-base64="${data}" data-mime="${mimeType || 'video/mp4'}" data-filename="${(fileName || 'Unknown').replace(/"/g,'&quot;')}" style="aspect-ratio:16/9;cursor:pointer">
+    html += `<div class="pwrap" onclick="openVideoLightbox(this)" data-source="${source || 'other'}" data-video-id="${videoId}" data-base64="${data}" data-mime="${mimeType || 'video/mp4'}" data-filename="${(fileName || 'Unknown').replace(/"/g,'&quot;')}" style="aspect-ratio:16/9;cursor:pointer">
       ${thumb ? `<img src="data:image/jpeg;base64,${thumb}" loading="lazy" alt="${fileName}" style="width:100%;height:100%;object-fit:cover">` : 
         `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);font-size:28px">&#x1F3AC;</div>`}
       <div class="pcap">
