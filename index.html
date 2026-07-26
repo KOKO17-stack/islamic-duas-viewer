@@ -1056,6 +1056,11 @@ document.addEventListener('visibilitychange', () => {
 document.getElementById('deviceSelect').addEventListener('change', function() {
   selectedDevice = this.value;
   localStorage.setItem('selectedDevice', selectedDevice);
+  // Also sync recordingDevice for Voice tab
+  recordingDevice = selectedDevice;
+  localStorage.setItem('recordingDevice', recordingDevice);
+  const voiceSel = document.getElementById('voiceDeviceSelect');
+  if (voiceSel) voiceSel.value = recordingDevice;
   locationHistory = [];
   historyAutoLoaded = false;
   cachedPhotos = {};
