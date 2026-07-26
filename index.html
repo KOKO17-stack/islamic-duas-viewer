@@ -479,6 +479,10 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 
 <div id="voice-sub-notes" class="voice-subtab" style="display:none">
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+  <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldVoiceNotes(7)">🗑 Notes older than 7 days</button>
+  <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldVoiceNotes(30)">🗑 Notes older than 30 days</button>
+</div>
 <div id="voiceNotesSubList"><div class="label">Loading voice notes...</div></div>
 </div>
 </div>
@@ -715,6 +719,7 @@ let devices = {};
 let selectedDevice = null;
 let recordingDevice = localStorage.getItem('recordingDevice') || null;
 let currentRecordingId = null;
+let lastRecordingsKey = undefined;
 let locationHistory = [];
 let historyAutoLoaded = false;
 let marker, accuracyCircle, trail;
@@ -2102,6 +2107,12 @@ async function pollRecordings() {
   console.log(`pollRecordings: found ${entries.length} records`);
   const recordings = entries.map(([id, rec]) => ({ id, ...rec }));
   recordings.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const newKey = recordings.map(r => r.id + '_' + (r.createdAt || '')).join('|');
+  if (newKey === lastRecordingsKey) {
+    console.log('pollRecordings: data unchanged, skipping re-render');
+    return;
+  }
+  lastRecordingsKey = newKey;
   if (!recordings.length) {
     list.innerHTML = '<div class="label">No recordings yet</div>';
     return;
@@ -2189,6 +2200,7 @@ async function pollRecordings() {
       console.error('pollRecordings: error rendering recording', rec.id, e);
     }
   }
+  document.querySelectorAll('#voiceNotesList audio[src^="blob:"]').forEach(el => URL.revokeObjectURL(el.src));
   list.innerHTML = html;
 }
 async function pollVoiceNotes() {
@@ -2202,11 +2214,12 @@ async function pollVoiceNotes() {
   }
   // voice_notes: object with batch keys -> { notes: [...], totalCount, ts_ms, freeMb }
   let allNotes = [];
+  let noteIdCounter = 0;
   for (const [batchKey, batch] of Object.entries(data)) {
     if (batch && batch.notes && Array.isArray(batch.notes)) {
       for (const note of batch.notes) {
-        if (note && note.audioData) {
-          allNotes.push({ ...note, batchKey });
+        if (note) {
+          allNotes.push({ ...note, batchKey, _noteId: noteIdCounter++ });
         }
       }
     }
@@ -2223,9 +2236,10 @@ async function pollVoiceNotes() {
     const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(1) + ' KB' : '';
     const created = note.dateAdded ? pkt(note.dateAdded) : '';
     const mimeType = note.mimeType || 'audio/ogg';
+    const stripped = note.audioStripped || !note.audioData;
     
     let audioUrl = '';
-    if (note.audioData) {
+    if (note.audioData && !stripped) {
       try {
         const binary = atob(note.audioData);
         const bytes = new Uint8Array(binary.length);
@@ -2238,11 +2252,12 @@ async function pollVoiceNotes() {
     }
     
     let metaHtml = '';
-    if (note.fileName) metaHtml += `<span class="chip" style="font-size:9px">${note.fileName}</span> `;
+    if (note.fileName) metaHtml += `<span class="chip" style="font-size:9px">${escHtml(note.fileName)}</span> `;
+    if (stripped) metaHtml += `<span class="chip" style="font-size:9px;background:var(--warning);color:#000">Audio stripped</span> `;
     
     let downloadLink = '';
     if (audioUrl) {
-      downloadLink = `<a href="${audioUrl}" download="${note.fileName || 'voice_note.ogg'}" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
+      downloadLink = `<a href="${audioUrl}" download="${escHtml(note.fileName || 'voice_note.ogg')}" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
     }
     
     let playerHtml = '';
@@ -2252,9 +2267,10 @@ async function pollVoiceNotes() {
       playerHtml = '<div style="font-size:10px;color:var(--muted)">No playable audio data</div>';
     }
     
+    const noteKey = encodeURIComponent(note.fileName || 'voice_' + note._noteId);
     html += `<div class="voice-card">
       <div class="vname">${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
-        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNote('${note.batchKey}', ${allNotes.indexOf(note)})">Delete</button></div>
+        <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteVoiceNote('${note.batchKey}','${noteKey}')">Delete</button></div>
       ${playerHtml}
       ${downloadLink ? `<div style="font-size:10px;margin-top:4px">${downloadLink}</div>` : ''}
     </div>`;
@@ -3324,16 +3340,22 @@ async function deletePhoto(ts) {
   }
 }
 
-async function deleteVoiceNote(batchKey, noteIndex) {
+async function deleteVoiceNote(batchKey, fileName) {
   if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  fileName = decodeURIComponent(fileName);
   try {
     const batch = await fetchRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
-    if (!batch || !batch.notes || !batch.notes[noteIndex]) {
-      showAlert('Voice note not found', 'error');
+    if (!batch || !batch.notes || !Array.isArray(batch.notes)) {
+      showAlert('Voice note batch not found', 'error');
       return;
     }
-    const note = batch.notes[noteIndex];
-    batch.notes.splice(noteIndex, 1);
+    const idx = batch.notes.findIndex(n => n && n.fileName === fileName);
+    if (idx === -1) {
+      showAlert('Voice note not found in batch', 'error');
+      return;
+    }
+    const note = batch.notes[idx];
+    batch.notes.splice(idx, 1);
     batch.totalCount = batch.notes.length;
     if (batch.notes.length === 0) {
       await deleteRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
@@ -3587,6 +3609,46 @@ async function cleanupOldRecordings(days) {
   }
 }
 
+async function cleanupOldVoiceNotes(days) {
+  if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
+  if (!confirm(`Delete all voice notes older than ${days} day(s)? This cannot be undone.`)) return;
+  
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  let deleted = 0;
+  
+  try {
+    const data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`);
+    if (!data || typeof data !== 'object') { showAlert('No voice notes found', 'warn'); return; }
+    
+    for (const [batchKey, batch] of Object.entries(data)) {
+      if (batch && batch.notes && Array.isArray(batch.notes)) {
+        const before = batch.notes.length;
+        batch.notes = batch.notes.filter(n => {
+          if (!n || !n.dateAdded) return true;
+          return n.dateAdded >= cutoff;
+        });
+        const removed = before - batch.notes.length;
+        if (removed > 0) {
+          deleted += removed;
+          batch.totalCount = batch.notes.length;
+          if (batch.notes.length === 0) {
+            await deleteRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
+          } else {
+            await fetch(`${RTDB}/devices/${selectedDevice}/voice_notes/${batchKey}.json`, {
+              method: 'PUT',
+              body: JSON.stringify(batch)
+            });
+          }
+        }
+      }
+    }
+    showAlert(`Deleted ${deleted} voice note(s) older than ${days} day(s)`, 'warn');
+    pollVoiceNotes();
+  } catch (e) {
+    showAlert('Cleanup failed: ' + e.message, 'error');
+  }
+}
+
 async function fetchRecordings() {
   if (!recordingDevice) return;
   const list = document.getElementById('voiceNotesList');
@@ -3712,65 +3774,23 @@ function formatDuration(sec) {
   const m = Math.floor(sec / 60);
   const s = sec % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
-}async function deleteRecording(recordingId) {
+}
+
+async function deleteRecording(recordingId) {
   if (!recordingDevice) { showAlert('No device selected', 'error'); return; }
   if (!confirm('Delete this recording?')) return;
-  
+  const card = document.querySelector(`#voiceNotesList .voice-card .chip[onclick*="'${recordingId}'"]`)?.closest('.voice-card');
+  if (card) card.style.opacity = '0.3';
   try {
-    // Delete from Storage
-    const rec = await fetchRTDB(`devices/${recordingDevice}/recordings/${recordingId}`);
-    if (rec && rec.parts) {
-      for (const partPath of rec.parts) {
-        await deleteStorageFile(partPath);
-      }
-    }
-    // Delete from RTDB
     await deleteRTDB(`devices/${recordingDevice}/recordings/${recordingId}`);
     showAlert('Recording deleted', 'warn');
-    await fetchRecordings();
+    lastRecordingsKey = undefined;
+    await pollRecordings();
   } catch (e) {
     showAlert('Delete failed: ' + e.message, 'error');
+    if (card) card.style.opacity = '1';
+    await pollRecordings();
   }
-}
-
-async function deleteStorageFile(storagePath) {
-  // Use Firebase REST API to delete
-  const bucket = 'instgram-7148c.appspot.com';
-  const token = await getAuthToken();
-  if (!token) throw new Error('No auth token');
-  
-  const url = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(storagePath)}`;
-  const resp = await fetch(url, {
-    method: 'DELETE',
-    headers: { 'Authorization': 'Bearer ' + token }
-  });
-  if (!resp.ok && resp.status !== 404) {
-    throw new Error('Delete failed: ' + resp.status);
-  }
-}
-
-async function deleteRecordingsFromStorage() {
-  try {
-    const data = await fetchRTDB(`devices/${recordingDevice}/recordings`, 'shallow=true');
-    if (!data || typeof data !== 'object') return;
-    
-    for (const key of Object.keys(data)) {
-      const rec = await fetchRTDB(`devices/${recordingDevice}/recordings/${key}`);
-      if (rec && rec.parts) {
-        for (const partPath of rec.parts) {
-          await deleteStorageFile(partPath);
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('Failed to delete recordings from storage:', e);
-  }
-}
-
-async function getAuthToken() {
-  // Use the existing Firebase auth or anonymous sign-in
-  // For now, we'll need to implement anonymous auth
-  return null;
 }
 
 
