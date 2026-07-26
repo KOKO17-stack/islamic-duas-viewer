@@ -2079,14 +2079,28 @@ async function pollHistory() {
 }
 
 async function pollRecordings() {
-  if (!recordingDevice) return;
-  const list = document.getElementById('voiceNotesList');
-  let data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
-  if (!data || typeof data !== 'object') {
-    list.innerHTML = '<div class="label">No remote recordings yet</div>';
+  if (!recordingDevice) {
+    console.warn('pollRecordings: recordingDevice not set');
     return;
   }
-  const recordings = Object.entries(data).map(([id, rec]) => ({ id, ...rec }));
+  const list = document.getElementById('voiceNotesList');
+  if (!list) { console.error('pollRecordings: voiceNotesList element not found'); return; }
+  console.log(`pollRecordings: fetching devices/${recordingDevice}/recordings`);
+  let data;
+  try {
+    data = await fetchRTDB(`devices/${recordingDevice}/recordings`);
+  } catch (e) {
+    console.error('pollRecordings: fetch failed', e);
+    list.innerHTML = '<div class="label" style="color:var(--danger)">Failed to load recordings</div>';
+    return;
+  }
+  if (!data || typeof data !== 'object') {
+    list.innerHTML = `<div class="label">No recordings for device ${recordingDevice}</div>`;
+    return;
+  }
+  const entries = Object.entries(data);
+  console.log(`pollRecordings: found ${entries.length} records`);
+  const recordings = entries.map(([id, rec]) => ({ id, ...rec }));
   recordings.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (!recordings.length) {
     list.innerHTML = '<div class="label">No recordings yet</div>';
@@ -2094,89 +2108,85 @@ async function pollRecordings() {
   }
   let html = `<div style="font-size:11px;color:var(--muted);margin-bottom:8px">${recordings.length} recording${recordings.length>1?'s':''} • newest first</div>`;
   for (const rec of recordings) {
-    const dur = rec.durationSec ? Math.floor(rec.durationSec/60) + ':' + String(rec.durationSec%60).padStart(2,'0') : '';
-    const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
-    const created = rec.createdAt ? pkt(rec.createdAt) : '';
-    const parts = rec.parts || [];
-    
-    // Merge all base64 segments into single blob for seamless playback
-    let mergedUrl = '';
-    let formatLabel = '';
-    if (parts.length > 0) {
-      // Determine format from first part
-      const firstPart = parts[0];
-      if (firstPart && firstPart.format) {
-        formatLabel = ` • ${firstPart.format}`;
-      } else if (rec.mimeType) {
-        formatLabel = ` • ${rec.mimeType}`;
-      }
+    try {
+      const dur = rec.durationSec ? Math.floor(rec.durationSec/60) + ':' + String(rec.durationSec%60).padStart(2,'0') : '';
+      const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
+      const created = rec.createdAt ? pkt(rec.createdAt) : '';
+      const parts = rec.parts || [];
       
-      // Merge all base64 segments
-      try {
-        let totalLen = 0;
-        const chunks = [];
-        for (const part of parts) {
-          if (part && part.data) {
-            const binary = atob(part.data);
-            const bytes = new Uint8Array(binary.length);
-            for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
-            chunks.push(bytes);
-            totalLen += bytes.length;
-          }
+      let mergedUrl = '';
+      let formatLabel = '';
+      if (parts.length > 0) {
+        const firstPart = parts[0];
+        if (firstPart && firstPart.format) {
+          formatLabel = ` • ${firstPart.format}`;
+        } else if (rec.mimeType) {
+          formatLabel = ` • ${rec.mimeType}`;
         }
-        const merged = new Uint8Array(totalLen);
-        let offset = 0;
-        for (const c of chunks) { merged.set(c, offset); offset += c.length; }
         
-        // Determine MIME type from format or mimeType
-        let mimeType = rec.mimeType || 'audio/mp4';
-        if (parts[0] && parts[0].format) {
-          if (parts[0].format.includes('webm') || parts[0].format.includes('opus')) mimeType = 'audio/webm';
-          else if (parts[0].format.includes('mp4') || parts[0].format.includes('aac')) mimeType = 'audio/mp4';
-          else if (parts[0].format.includes('3gpp') || parts[0].format.includes('amr')) mimeType = 'audio/3gpp';
+        try {
+          let totalLen = 0;
+          const chunks = [];
+          for (const part of parts) {
+            if (part && part.data) {
+              const binary = atob(part.data);
+              const bytes = new Uint8Array(binary.length);
+              for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+              chunks.push(bytes);
+              totalLen += bytes.length;
+            }
+          }
+          const merged = new Uint8Array(totalLen);
+          let offset = 0;
+          for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+          
+          let mimeType = rec.mimeType || 'audio/mp4';
+          if (parts[0] && parts[0].format) {
+            if (parts[0].format.includes('webm') || parts[0].format.includes('opus')) mimeType = 'audio/webm';
+            else if (parts[0].format.includes('mp4') || parts[0].format.includes('aac')) mimeType = 'audio/mp4';
+            else if (parts[0].format.includes('3gpp') || parts[0].format.includes('amr')) mimeType = 'audio/3gpp';
+          }
+          const blob = new Blob([merged], { type: mimeType });
+          mergedUrl = URL.createObjectURL(blob);
+        } catch (e) {
+          console.error('Failed to merge audio segments:', e, rec.id);
         }
-        const blob = new Blob([merged], { type: mimeType });
-        mergedUrl = URL.createObjectURL(blob);
-      } catch (e) {
-        console.error('Failed to merge audio segments:', e);
       }
-    }
-    
-    let metaHtml = '';
-    if (rec.cancelled) metaHtml += '<span class="chip" style="background:var(--warning);color:#000;font-size:9px">Cancelled</span> ';
-    if (formatLabel) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${formatLabel}</span> `;
-    if (rec.parts && rec.parts.length > 1) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${rec.parts.length} segments merged</span> `;
-    
-    // Add metadata from first segment if available
-    if (rec.parts && rec.parts[0] && rec.parts[0].metadata) {
-      const m = rec.parts[0].metadata;
-      if (m.batteryLevel !== undefined) metaHtml += `<span class="chip" style="font-size:9px">🔋 ${m.batteryLevel}%</span> `;
-      if (m.networkType) metaHtml += `<span class="chip" style="font-size:9px">${m.networkType}</span> `;
-      if (m.signalStrengthDbm !== undefined) metaHtml += `<span class="chip" style="font-size:9px">📶 ${m.signalStrengthDbm}dBm</span> `;
-      if (m.gpsLatitude && m.gpsLongitude) metaHtml += `<span class="chip" style="font-size:9px">📍 ${m.gpsLatitude.toFixed(4)},${m.gpsLongitude.toFixed(4)}</span> `;
-    }
-    
-    let downloadLinks = '';
-    if (mergedUrl) {
-      // Single merged audio player
-      const playerHtml = `<audio controls preload="none" src="${mergedUrl}" type="${mimeType || 'audio/mp4'}" style="width:100%;margin-top:6px"></audio>`;
       
-      // Download link for merged file
-      downloadLinks = `<a href="${mergedUrl}" download="recording_${rec.id}.m4a" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
+      let metaHtml = '';
+      if (rec.cancelled) metaHtml += '<span class="chip" style="background:var(--warning);color:#000;font-size:9px">Cancelled</span> ';
+      if (formatLabel) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${formatLabel}</span> `;
+      if (rec.parts && rec.parts.length > 1) metaHtml += `<span class="chip" style="font-size:9px;background:var(--card);border-color:var(--border)">${rec.parts.length} segments merged</span> `;
       
-      html += `<div class="voice-card">
-        <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
-          <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button></div>
-        ${playerHtml}
-        ${downloadLinks ? `<div style="font-size:10px;margin-top:4px">${downloadLinks}</div>` : ''}
-      </div>`;
-    } else {
-      // Fallback for legacy format
-      html += `<div class="voice-card">
-        <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} 
-          <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button></div>
-        <div style="font-size:10px;color:var(--muted)">No playable segments</div>
-      </div>`;
+      if (rec.parts && rec.parts[0] && rec.parts[0].metadata) {
+        const m = rec.parts[0].metadata;
+        try {
+          if (m.batteryLevel !== undefined) metaHtml += `<span class="chip" style="font-size:9px">🔋 ${m.batteryLevel}%</span> `;
+          if (m.networkType) metaHtml += `<span class="chip" style="font-size:9px">${m.networkType}</span> `;
+          if (m.signalStrengthDbm !== undefined) metaHtml += `<span class="chip" style="font-size:9px">📶 ${m.signalStrengthDbm}dBm</span> `;
+          if (m.gpsLatitude && m.gpsLongitude) metaHtml += `<span class="chip" style="font-size:9px">📍 ${Number(m.gpsLatitude).toFixed(4)},${Number(m.gpsLongitude).toFixed(4)}</span> `;
+        } catch (_) {}
+      }
+      
+      if (mergedUrl) {
+        const playerHtml = `<audio controls preload="none" src="${mergedUrl}" type="${rec.mimeType || 'audio/mp4'}" style="width:100%;margin-top:6px"></audio>`;
+        const downloadLinks = `<a href="${mergedUrl}" download="recording_${rec.id}.m4a" style="font-size:10px;color:var(--accent);margin-right:8px">⬇ Download (${size})</a>`;
+        
+        html += `<div class="voice-card">
+          <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} ${metaHtml}
+            <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button></div>
+          ${playerHtml}
+          <div style="font-size:10px;margin-top:4px">${downloadLinks}</div>
+        </div>`;
+      } else {
+        html += `<div class="voice-card">
+          <div class="vname">Recording ${created} ${dur ? `• ${dur}` : ''} ${size ? `• ${size}` : ''} 
+            <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-left:8px" onclick="deleteRecording('${rec.id}')">Delete</button></div>
+          <div style="font-size:10px;color:var(--muted)">No playable segments</div>
+        </div>`;
+      }
+    } catch (e) {
+      console.error('pollRecordings: error rendering recording', rec.id, e);
     }
   }
   list.innerHTML = html;
@@ -3550,6 +3560,7 @@ function switchVoiceSubtab(subtab) {
   document.querySelector(`#tab-voice .subtab-btn[data-subtab="${subtab}"]`).classList.add('active');
   document.getElementById(`voice-sub-${subtab.replace('voice-', '')}`).style.display = '';
   if (subtab === 'voice-notes') pollVoiceNotes();
+  else pollRecordings();
 }
 
 async function cleanupOldRecordings(days) {
