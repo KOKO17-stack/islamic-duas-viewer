@@ -373,7 +373,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div class="lightbox" id="videoPlayerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;justify-content:center;align-items:center;flex-direction:column;padding:20px">
 <button style="position:absolute;top:16px;right:16px;background:none;border:none;color:#fff;font-size:28px;cursor:pointer;z-index:10" onclick="closeVideoPlayer()">&times;</button>
-<video id="videoPlayer" controls style="max-width:100%;max-height:85vh;border-radius:8px" playsinline></video>
+<video id="videoPlayer" controls preload="none" style="max-width:100%;max-height:85vh;border-radius:8px" playsinline></video>
 <div id="videoPlayerMeta" style="color:var(--muted);font-size:12px;margin-top:8px;text-align:center"></div>
 </div>
 <div id="tab-timeline">
@@ -1369,8 +1369,8 @@ async function loadVideos() {
   try {
     const data = await fetchRTDB(`devices/${selectedDevice}/videos`);
     if (!data || typeof data !== 'object') { videoKeys = []; renderVideos(); return; }
-    // Collect flat video list with metadata
-    videoKeys = Object.keys(data).filter(k => typeof data[k] === 'object' && data[k] !== null && data[k].storageUrl);
+    // Collect flat video list with metadata (include stripped videos too)
+    videoKeys = Object.keys(data).filter(k => typeof data[k] === 'object' && data[k] !== null && (data[k].storageUrl || data[k].videoStripped));
     videoKeys.sort((a, b) => (data[b].ts_ms || 0) - (data[a].ts_ms || 0));
     cachedVideos = data;
     document.getElementById('videoCount').textContent = `(${videoKeys.length})`;
@@ -1385,7 +1385,8 @@ async function loadVideos() {
 async function loadAllVideos() {
   if (!selectedDevice || !videoKeys.length) { await loadVideos(); return; }
   videoLoading = false;
-  while (videoOffset < videoKeys.length) {
+  const total = videoSourceFilter === 'all' ? videoKeys.length : videoKeys.filter(k => cachedVideos[k]?.source === videoSourceFilter).length;
+  while (videoOffset < total) {
     await loadMoreVideos();
     await new Promise(r => setTimeout(r, 10));
   }
@@ -1393,22 +1394,21 @@ async function loadAllVideos() {
 
 async function loadMoreVideos() {
   if (!videoKeys.length) { renderVideos(); return; }
-  const end = Math.min(videoOffset + VIDEO_BATCH, videoKeys.length);
-  const batch = videoKeys.slice(videoOffset, end);
+  // Apply source filter BEFORE slicing
+  const filteredKeys = videoSourceFilter === 'all'
+    ? videoKeys
+    : videoKeys.filter(k => cachedVideos[k]?.source === videoSourceFilter);
+  const end = Math.min(videoOffset + VIDEO_BATCH, filteredKeys.length);
+  const batch = filteredKeys.slice(videoOffset, end);
   videoOffset = end;
-  const filtered = batch.filter(k => {
-    if (videoSourceFilter === 'all') return true;
-    const v = cachedVideos[k];
-    return v && (v.source === videoSourceFilter);
-  });
-  if (filtered.length) renderVideoGroup(filtered);
+  if (batch.length) renderVideoGroup(batch);
   renderVideos();
   const container = document.getElementById('videoLoadMoreContainer');
   container.innerHTML = '';
-  if (videoOffset < videoKeys.length) {
+  if (videoOffset < filteredKeys.length) {
     const btn = document.createElement('button');
     btn.className = 'load-more-btn';
-    btn.textContent = `Load more videos (${videoKeys.length - videoOffset} remaining)`;
+    btn.textContent = `Load more videos (${filteredKeys.length - videoOffset} remaining)`;
     btn.onclick = () => loadMoreVideos();
     container.appendChild(btn);
   }
@@ -1419,7 +1419,8 @@ function renderVideoGroup(keys) {
   const videos = cachedVideos;
   for (const k of keys) {
     const v = videos[k];
-    if (!v || !v.storageUrl) continue;
+    if (!v) continue;
+    const isStripped = v.videoStripped || !v.storageUrl;
     const date = v.dateAdded ? new Date(v.dateAdded) : new Date(v.ts_ms);
     const dateStr = date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -1449,12 +1450,18 @@ function renderVideoGroup(keys) {
     img.loading = 'lazy';
     img.src = thumb;
     img.alt = v.fileName || 'Video';
-    img.onclick = () => openVideoPlayer(v.storageUrl, v);
+    if (!isStripped) {
+      img.onclick = () => openVideoPlayer(v.storageUrl, v);
+    }
     wrap.appendChild(img);
 
     const cap = document.createElement('div');
     cap.className = 'pcap';
-    cap.innerHTML = `<span style="font-size:10px">&#x25B6; ${v.fileName || 'Video'}</span><div class="ptime">${timeStr}${v.source ? ' &middot; ' + v.source : ''}${v.durationMs ? ' &middot; ' + Math.round(v.durationMs/1000) + 's' : ''}</div>`;
+    if (isStripped) {
+      cap.innerHTML = `<span style="font-size:10px">&#x1F512; ${v.fileName || 'Video'}</span><div class="ptime">${timeStr}${v.source ? ' &middot; ' + v.source : ''}${v.durationMs ? ' &middot; ' + Math.round(v.durationMs/1000) + 's' : ''} &middot; <span style="color:var(--warn)">too large</span></div>`;
+    } else {
+      cap.innerHTML = `<span style="font-size:10px">&#x25B6; ${v.fileName || 'Video'}</span><div class="ptime">${timeStr}${v.source ? ' &middot; ' + v.source : ''}${v.durationMs ? ' &middot; ' + Math.round(v.durationMs/1000) + 's' : ''}</div>`;
+    }
     wrap.appendChild(cap);
 
     // Find or create the matching day div
@@ -1488,7 +1495,8 @@ function openVideoPlayer(storageUrl, meta) {
   const dur = meta.durationMs ? Math.round(meta.durationMs / 1000) + 's' : '';
   const dim = meta.width && meta.height ? `${meta.width}x${meta.height}` : '';
   const src = meta.source || '';
-  metaEl.innerHTML = [meta.fileName, dur, dim, src].filter(Boolean).join(' &middot; ');
+  const displayName = meta.fileName && meta.fileName.length > 40 ? meta.fileName.slice(0, 37) + '...' : (meta.fileName || '');
+  metaEl.innerHTML = [displayName, dur, dim, src].filter(Boolean).join(' &middot; ');
   overlay.style.display = 'flex';
   player.play().catch(() => {});
 }
@@ -1497,7 +1505,11 @@ function closeVideoPlayer() {
   const overlay = document.getElementById('videoPlayerOverlay');
   const player = document.getElementById('videoPlayer');
   if (overlay) overlay.style.display = 'none';
-  if (player) { player.pause(); player.src = ''; }
+  if (player) {
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+  }
 }
 
 function dateBucket(ts) {
@@ -3768,7 +3780,7 @@ async function fetchRecordings() {
             <span style="font-weight:500">${date}</span>
             <span class="vmeta">Duration: ${dur}</span>
             <span class="vmeta">Size: ${size}</span>
-            <span class="vmeta">Parts: ${parts}</span>
+            <span class="vmeta">Parts: ${parts.length}</span>
             <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px" onclick="deleteRecording('${rec.id}')">\u{1F5D1} Delete</button>
           </div>
           <div style="font-size:10px;color:var(--muted)">No playable segments</div>
