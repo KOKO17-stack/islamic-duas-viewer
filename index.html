@@ -2328,6 +2328,10 @@ async function pollRemoteRecordings() {
     let recData;
     try { recData = await fetchRTDB(`devices/${deviceId}/recordings/${recId}`); } catch { continue; }
     if (!recData || typeof recData !== 'object') continue;
+    // Support both root-level and meta/ sub-path metadata
+    if (!recData.durationSec && recData.meta && typeof recData.meta === 'object') {
+      recData = recData.meta;
+    }
     const recIdKey = recId;
     const createdAt = recData.createdAt ? new Date(recData.createdAt).toLocaleString() : '';
     const duration = recData.durationSec || 0;
@@ -2470,7 +2474,9 @@ async function cleanupOldRecordings(days) {
   if (!data || typeof data !== 'object') return;
   let deleted = 0;
   for (const id of Object.keys(data)) {
-    const meta = await fetchRTDB(`devices/${deviceId}/recordings/${id}`);
+    const rec = await fetchRTDB(`devices/${deviceId}/recordings/${id}`);
+    if (!rec || typeof rec !== 'object') continue;
+    const meta = rec.durationSec ? rec : (rec.meta || rec);
     if (meta && meta.createdAt && meta.createdAt < cutoff) {
       const parts = await fetchRTDB(`devices/${deviceId}/recordings/${id}/parts`, 'shallow=true');
       if (parts && typeof parts === 'object') {
