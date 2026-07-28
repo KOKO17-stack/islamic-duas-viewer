@@ -1333,8 +1333,8 @@ function openVideoPlayer(src, meta) {
   player.load();
   const dur = meta.durationMs ? Math.round(meta.durationMs / 1000) + 's' : '';
   const dim = meta.width && meta.height ? meta.width + 'x' + meta.height : '';
-  const src = meta.source || '';
-  metaEl.innerHTML = [meta.fileName, dur, dim, src].filter(Boolean).join(' \u00B7 ');
+  const sourceLabel = meta.source || '';
+  metaEl.innerHTML = [meta.fileName, dur, dim, sourceLabel].filter(Boolean).join(' \u00B7 ');
   overlay.style.display = 'flex';
   player.play().catch(() => {});
 }
