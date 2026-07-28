@@ -1506,21 +1506,21 @@ async function fetchDevices() {
     return;
   }
 
-  // Fetch manufacturer+model for each device, then deduplicate
-  const modelMap = {};
+  // Build device list WITHOUT model-based dedup — each Android ID is unique
+  const deviceEntries = [];
   for (const entry of active) {
     const info = await fetchRTDB(`devices/${entry.id}/info`);
     const metrics = info ? null : await fetchRTDB(`devices/${entry.id}/metrics/latest`);
     const devInfo = info || metrics || {};
     const manuf = (devInfo.manufacturer || '').trim();
     const model = (devInfo.deviceModel || '').trim();
-    const modelKey = manuf && model ? manuf + '|' + model : entry.id;
-    if (!modelMap[modelKey] || entry.ts > modelMap[modelKey].ts) {
-      modelMap[modelKey] = { id: entry.id, ts: entry.ts, manuf, model, label: [manuf, model].filter(Boolean).join(' ') || entry.id.slice(0, 8) };
-    }
+    const label = [manuf, model].filter(Boolean).join(' ') || entry.id.slice(0, 8);
+    const disambiguated = deviceEntries.some(d => d.label === label)
+      ? label + ' (' + entry.id.slice(0, 6) + ')'
+      : label;
+    deviceEntries.push({ id: entry.id, ts: entry.ts, label: disambiguated, model, manuf });
   }
-  const dedupedIds = Object.values(modelMap).sort((a, b) => b.ts - a.ts);
-  const activeIds = dedupedIds.map(a => a.id);
+  const activeIds = deviceEntries.map(d => d.id);
 
   selectedDevice = activeIds[0];
   const savedDevice = localStorage.getItem('selectedDevice');
@@ -1528,8 +1528,8 @@ async function fetchDevices() {
   recordingDevice = selectedDevice;
   loadGeofences(selectedDevice);
   localStorage.setItem('selectedDevice', selectedDevice);
-  dedupedIds.forEach(d => { devices[d.id] = { id: d.id, label: d.label, model: d.model, manuf: d.manuf }; });
-  sel.innerHTML = dedupedIds.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
+  deviceEntries.forEach(d => { devices[d.id] = { id: d.id, label: d.label, model: d.model, manuf: d.manuf }; });
+  sel.innerHTML = deviceEntries.map(d => `<option value="${d.id}">${d.label}</option>`).join('');
   sel.value = selectedDevice;
   const remoteSel = document.getElementById('remote-voiceDeviceSelect');
   if (remoteSel) { remoteSel.innerHTML = sel.innerHTML; remoteSel.value = selectedDevice; }
@@ -3086,7 +3086,7 @@ function renderTimeline(docs) {
     return searchText.includes(tlSearch);
   });
   // Type filter
-  const filtered = docs.filter(d => {
+  let filtered = docs.filter(d => {
     const type = (d.type || '').toLowerCase();
     if (timelineFilter === 'all') return true;
     if (timelineFilter === 'location') return type === 'location';
