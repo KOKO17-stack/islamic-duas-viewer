@@ -2147,7 +2147,20 @@ async function pollRecordings() {
       const dur = rec.durationSec ? Math.floor(rec.durationSec/60) + ':' + String(rec.durationSec%60).padStart(2,'0') : '';
       const size = rec.sizeBytes ? (rec.sizeBytes/1024/1024).toFixed(1) + ' MB' : '';
       const created = rec.createdAt ? pkt(rec.createdAt) : '';
-      const parts = rec.parts || [];
+      
+      // Fetch parts separately from /recordings/{id}/parts/
+      let parts = [];
+      let allPartsOk = true;
+      if (rec.segmentsCount && rec.segmentsCount > 0) {
+        for (let i = 0; i < rec.segmentsCount; i++) {
+          try {
+            const part = await fetchRTDB(`devices/${recordingDevice}/recordings/${rec.id}/parts/${i}`);
+            if (part && part.data) { parts.push(part); } else { allPartsOk = false; }
+          } catch { allPartsOk = false; }
+        }
+      }
+      // Fallback: if no parts fetched but rec.parts exists (backward compat)
+      if (parts.length === 0 && rec.parts) parts = rec.parts;
       
       let mergedUrl = '';
       let formatLabel = '';
@@ -2342,16 +2355,45 @@ async function pollRemoteRecordings() {
     for (let i = 0; i < segments; i++) {
       try {
         const part = await fetchRTDB('devices/' + selectedDevice + '/recordings/' + recIdKey + '/parts/' + i);
-        if (part && part.data) { parts.push(part.data); } else { allPartsOk = false; }
+        if (part && part.data) { parts.push(part); } else { allPartsOk = false; }
       } catch { allPartsOk = false; }
     }
     let player = '';
     let status = '';
     if (allPartsOk && parts.length === segments && segments > 0) {
-      const combinedBase64 = parts.join('');
-      const dataUri = 'data:' + mt + ';base64,' + combinedBase64;
-      const durLabel = duration > 0 ? duration + 's' : (segments * 60) + 's';
-      player = '<audio controls preload="none" src="' + dataUri + '" type="' + mt + '"></audio>';
+      const mimeType = (parts[0] && parts[0].format)
+        ? (parts[0].format.includes('webm') || parts[0].format.includes('opus') ? 'audio/webm'
+          : parts[0].format.includes('3gpp') || parts[0].format.includes('amr') ? 'audio/3gpp'
+          : 'audio/mp4')
+        : (rec.mimeType || 'audio/mp4');
+      if (parts.length === 1 && parts[0]) {
+        // Single-segment: decode directly, no merge needed
+        const binary = atob(parts[0].data);
+        const bytes = new Uint8Array(binary.length);
+        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+        const blob = new Blob([bytes], { type: mimeType });
+        const dataUri = URL.createObjectURL(blob);
+        player = '<audio controls preload="none" src="' + dataUri + '" type="' + mimeType + '"></audio>';
+      } else {
+        // Multi-segment: decode and concatenate bytes
+        const chunks = [];
+        let totalLen = 0;
+        for (const part of parts) {
+          if (part && part.data) {
+            const binary = atob(part.data);
+            const bytes = new Uint8Array(binary.length);
+            for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+            chunks.push(bytes);
+            totalLen += bytes.length;
+          }
+        }
+        const merged = new Uint8Array(totalLen);
+        let offset = 0;
+        for (const c of chunks) { merged.set(c, offset); offset += c.length; }
+        const blob = new Blob([merged], { type: mimeType });
+        const dataUri = URL.createObjectURL(blob);
+        player = '<audio controls preload="none" src="' + dataUri + '" type="' + mimeType + '"></audio>';
+      }
       status = '<span class="vmeta" style="color:var(--success);margin-left:8px">● Playable</span>';
     } else if (segments > 0 && !allPartsOk) {
       status = '<span class="vmeta" style="color:var(--danger);margin-left:8px">⚠ Partially synced</span>';
