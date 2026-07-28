@@ -1218,6 +1218,8 @@ async function pollVideos() {
 
 async function loadVideos() {
   if (!selectedDevice) return;
+  if (videoLoading) return;
+  videoLoading = true;
   try {
     const grid = document.getElementById('videoGrid');
     const lmContainer = document.getElementById('videoLoadMoreContainer');
@@ -1243,8 +1245,9 @@ async function loadVideos() {
     videoOffset = 0;
     grid.innerHTML = '';
     if (lmContainer) lmContainer.innerHTML = '';
-    await loadMoreVideos();
+    await loadMoreVideos(true);
   } catch (e) { console.error('loadVideos:', e); }
+  finally { videoLoading = false; }
 }
 
 async function loadAllVideos() {
@@ -1252,18 +1255,25 @@ async function loadAllVideos() {
   if (!videoKeys.length) await loadVideos();
   videoLoading = false;
   while (videoOffset < videoKeys.length) {
-    await loadMoreVideos();
+    await loadMoreVideos(true);
     await new Promise(r => setTimeout(r, 10));
   }
 }
 
-async function loadMoreVideos() {
+async function loadMoreVideos(skipGuard = false) {
   if (!videoKeys.length) { renderVideos(); return; }
+  if (!skipGuard && videoLoading) return;
+  videoLoading = true;
   const end = Math.min(videoOffset + VIDEO_BATCH, videoKeys.length);
   const batch = videoKeys.slice(videoOffset, end);
   videoOffset = end;
 
   // Fetch uncached entries in this batch and deduplicate
+  const lmContainer = document.getElementById('videoLoadMoreContainer');
+  const uncachedCount = batch.filter(k => !cachedVideos[k]).length;
+  if (uncachedCount > 0 && lmContainer) {
+    lmContainer.innerHTML = '<div class="load-more-btn" disabled>&#x23F3; Loading ' + uncachedCount + ' video(s)...</div>';
+  }
   const dedupSet = new Set();
   for (const v of Object.values(cachedVideos)) {
     if (v && v.fileName && v.dateAdded) dedupSet.add(v.fileName + '|' + v.dateAdded);
@@ -1280,6 +1290,7 @@ async function loadMoreVideos() {
       }
     } catch {}
   }
+  videoLoading = false;
 
   const filtered = batch.filter(k => {
     if (videoSourceFilter === 'all') return true;
@@ -1390,6 +1401,7 @@ document.querySelectorAll('.chip[data-vsource]').forEach(chip => {
     chip.classList.add('active');
     videoSourceFilter = chip.dataset.vsource;
     videoOffset = 0;
+    videoLoading = false;
     const grid = document.getElementById('videoGrid');
     grid.innerHTML = '';
     const container = document.getElementById('videoLoadMoreContainer');
