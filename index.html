@@ -951,8 +951,8 @@ const OSRM_BATCH_SIZE = 80;
 const ROUTE_CACHE_TTL = 24 * 60 * 60 * 1000;
 const ROUTE_CACHE_KEY = 'osrm_route_cache_v2';
 
-function getRouteCacheKey(deviceId, periodSeconds, maxAcc, gpsOnly) {
-  return deviceId + '_' + periodSeconds + '_' + maxAcc + '_' + (gpsOnly ? 'gps' : 'all');
+function getRouteCacheKey(deviceId, numPoints, firstTs, lastTs) {
+  return deviceId + '_' + numPoints + '_' + (firstTs || 0) + '_' + (lastTs || 0);
 }
 
 function getCachedRoute(key) {
@@ -4188,7 +4188,7 @@ async function updateTrail(skipRouting) {
   if (routeUseRoad && !skipRouting) {
     document.getElementById('routeStatus').textContent = 'Routing...';
     routingInProgress = true;
-    const cacheKey = getRouteCacheKey(selectedDevice || 'unknown', 0, 0, false);
+    const cacheKey = getRouteCacheKey(selectedDevice || 'unknown', pts.length, pts[0]?.ts || 0, pts[pts.length-1]?.ts || 0);
     const cached = getCachedRoute(cacheKey);
     let routed = null;
     if (cached) {
