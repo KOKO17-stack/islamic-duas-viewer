@@ -4125,7 +4125,7 @@ function buildGradientTrail(pts, routedGeometry) {
   const group = L.layerGroup();
   if (routedGeometry && routedGeometry.length > 1) {
     const indices = routePointIndices;
-    if (indices.length !== pts.length) {
+    if (indices.length === pts.length) {
       for (let i = 0; i < pts.length - 1; i++) {
         const fi = indices[i] !== undefined ? indices[i] : 0;
         const ti = indices[i + 1] !== undefined ? indices[i + 1] : routedGeometry.length - 1;
@@ -4402,15 +4402,23 @@ document.getElementById('loopBtn').addEventListener('click', function() {
   this.title = 'Loop: ' + (playbackLoop ? 'On' : 'Off');
 });
 
-document.getElementById('routeToggleBtn').addEventListener('click', function() {
+document.getElementById('routeToggleBtn').addEventListener('click', async function() {
   routeUseRoad = !routeUseRoad;
   this.textContent = routeUseRoad ? '\uD83C\uDFD3 Road View' : '\u27F6 Direct View';
   this.style.background = routeUseRoad ? 'var(--success)' : 'var(--accent)';
   this.style.borderColor = routeUseRoad ? 'var(--success)' : 'var(--accent)';
   if (locationHistory.length >= 2) {
-    updateTrail();
+    if (routeUseRoad) {
+      document.getElementById('routeStatus').textContent = 'Routing...';
+    } else {
+      document.getElementById('routeStatus').textContent = 'Straight lines';
+      playbackRoute = null;
+      routePointIndices = [];
+      routeDistances = [];
+      routeTotalDistance = 0;
+    }
+    await updateTrail();
   }
-  document.getElementById('routeStatus').textContent = routeUseRoad ? 'Routing on roads' : 'Straight lines';
 });
 
 // --- Scrubber ---
@@ -4502,7 +4510,7 @@ async function reloadHistory(showAlertMsg) {
     return;
   }
   locationHistory = pts;
-  updateTrail();
+  await updateTrail();
   renderPlaybackTab();
   if (pts.length) map.fitBounds(pts.map(p => [p.lat, p.lng]));
   if (showAlertMsg) {
