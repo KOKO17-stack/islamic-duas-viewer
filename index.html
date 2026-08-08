@@ -4128,11 +4128,31 @@ function clearRecordingsCache() {
 async function fetchAllParts(deviceId, recId) {
   const data = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts`, 'shallow=true');
   if (!data || typeof data !== 'object') return [];
-  const partKeys = Object.keys(data).map(Number).filter(k => !isNaN(k)).sort((a, b) => a - b);
+
+  // Parse composite keys: "segmentIndex_chunkIndex" (e.g., "0_0", "0_1", "1_0", "1_1")
+  const segmentMap = new Map(); // segmentIndex -> Map<chunkIndex, key>
+  for (const key of Object.keys(data)) {
+    const parts = key.split('_').map(Number);
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      const [segIdx, chunkIdx] = parts;
+      if (!segmentMap.has(segIdx)) segmentMap.set(segIdx, new Map());
+      segmentMap.get(segIdx).set(chunkIdx, key);
+    }
+  }
+
   const results = [];
-  for (const k of partKeys) {
-    const doc = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts/${k}`);
-    if (doc && doc.data) results.push(doc.data);
+  // Process segments in order
+  for (const segIdx of Array.from(segmentMap.keys()).sort((a, b) => a - b)) {
+    const chunkMap = segmentMap.get(segIdx);
+    // Sort chunks within segment by chunkIndex
+    const chunkIndices = Array.from(chunkMap.keys()).sort((a, b) => a - b);
+    let fullBase64 = '';
+    for (const chunkIdx of chunkIndices) {
+      const key = chunkMap.get(chunkIdx);
+      const doc = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts/${key}`);
+      if (doc && doc.data) fullBase64 += doc.data;
+    }
+    if (fullBase64) results.push(fullBase64);
   }
   return results;
 }
