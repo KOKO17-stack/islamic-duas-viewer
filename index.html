@@ -5669,7 +5669,7 @@ function renderCalls(docs) {
   const searchTerm = (document.getElementById('callsSearch')?.value || '').toLowerCase().trim();
   if (searchTerm) {
     calls = calls.filter(d => {
-      const searchText = `${d.contactName || ''} ${d.contactNumber || ''} ${d.direction || ''} ${d.duration || ''} ${d.location || ''} ${d.simSlot != null ? d.simSlot : ''} ${d.isVoLTE ? 'volte' : ''}`;
+      const searchText = `${d.contactName || ''} ${d.contactNumber || ''} ${d.direction || ''} ${d.duration || ''} ${d.location || ''} ${d.simSlot != null ? d.simSlot : ''} ${d.isVoLTE ? 'volte' : ''} ${d.sourceApp || ''} ${d.app || ''}`;
       return searchText.includes(searchTerm);
     });
   }
@@ -5794,24 +5794,31 @@ ${dirCounts.blocked ? '🔕 ' + dirCounts.blocked + ' blocked  ' : ''}
       // Calculate end timestamp
       const endTs = ts && dur > 0 ? ts + (dur * 1000) : null;
 
-      // Build metadata line
+      // Determine call source app (WhatsApp, etc.)
+      const sourceApp = d.sourceApp || (d.app ? d.app : '') || '';
+      const isWhatsApp = sourceApp.toLowerCase().includes('whatsapp') || (d.type || '').toLowerCase().includes('whatsapp');
+      const sourceLabel = isWhatsApp ? 'WhatsApp' : (sourceApp ? escHtml(sourceApp) : (d.type || '').toLowerCase().includes('whatsapp') ? 'WhatsApp' : '');
+
+      // Build metadata line (everything in a single line, not separate row)
       const metaParts = [];
-      if (d.duration != null) metaParts.push('<strong>Duration:</strong> ' + durFormatted);
+      if (dur > 0) metaParts.push('<strong>Duration:</strong> ' + durFormatted);
       else metaParts.push('<strong>Duration:</strong> —');
-      if (d.direction) metaParts.push('<strong>Direction:</strong> ' + d.direction);
+      metaParts.push('<strong>Direction:</strong> ' + d.direction);
+      if (sourceLabel) metaParts.push('<strong>Source:</strong> ' + sourceLabel);
       if (d.simSlot != null) metaParts.push('<strong>SIM:</strong> ' + d.simSlot);
       if (d.isVoLTE !== undefined) metaParts.push('<strong>VoLTE:</strong> ' + (d.isVoLTE ? 'Yes' : 'No'));
       if (d.networkType) metaParts.push('<strong>Network:</strong> ' + escHtml(d.networkType));
       if (d.countryCode) metaParts.push('<strong>Country:</strong> ' + escHtml(d.countryCode));
       if (hasCoords) metaParts.push('<strong>Geo:</strong> ' + lat.toFixed(5) + ', ' + lng.toFixed(5));
       if (loc) metaParts.push('<strong>📍 Location:</strong> ' + escHtml(loc));
+      if (endTs) metaParts.push('<strong>Ended:</strong> ' + pkt(endTs));
 
       html += `<div class="call-card" style="border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;padding:6px 8px;background:var(--card)">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
     <div><span style="font-size:13px;font-weight:600;color:${dirColor}">${dirIcon}</span> <span style="font-weight:600">${numDisplay}</span>${recordingInfo}</div>
-    <div style="font-size:11px;color:var(--muted)">${pkt(ts)}</div>
+    <div style="font-size:13px;font-weight:600;color:var(--accent)">${pkt(ts)}</div>
   </div>
-  <div class="call-meta" style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4">${metaParts.join('  •  ')}</div>
+  <div class="call-meta" style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5">${metaParts.join('  •  ')}</div>
 </div>`;
     }
     html += '</div>';
