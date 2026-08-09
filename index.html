@@ -4129,30 +4129,44 @@ async function fetchAllParts(deviceId, recId) {
   const data = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts`, 'shallow=true');
   if (!data || typeof data !== 'object') return [];
 
+  const keys = Object.keys(data);
+  const results = [];
+  const isInt = (s) => /^\d+$/.test(s);
+
   // Parse composite keys: "segmentIndex_chunkIndex" (e.g., "0_0", "0_1", "1_0", "1_1")
   const segmentMap = new Map(); // segmentIndex -> Map<chunkIndex, key>
-  for (const key of Object.keys(data)) {
-    const parts = key.split('_').map(Number);
-    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-      const [segIdx, chunkIdx] = parts;
+  for (const key of keys) {
+    const sp = key.split('_');
+    if (sp.length === 2 && isInt(sp[0]) && isInt(sp[1])) {
+      const segIdx = parseInt(sp[0], 10), chunkIdx = parseInt(sp[1], 10);
       if (!segmentMap.has(segIdx)) segmentMap.set(segIdx, new Map());
       segmentMap.get(segIdx).set(chunkIdx, key);
     }
   }
 
-  const results = [];
-  // Process segments in order
-  for (const segIdx of Array.from(segmentMap.keys()).sort((a, b) => a - b)) {
-    const chunkMap = segmentMap.get(segIdx);
-    // Sort chunks within segment by chunkIndex
-    const chunkIndices = Array.from(chunkMap.keys()).sort((a, b) => a - b);
-    let fullBase64 = '';
-    for (const chunkIdx of chunkIndices) {
-      const key = chunkMap.get(chunkIdx);
-      const doc = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts/${key}`);
-      if (doc && doc.data) fullBase64 += doc.data;
+  if (segmentMap.size) {
+    // Process segments in order
+    for (const segIdx of Array.from(segmentMap.keys()).sort((a, b) => a - b)) {
+      const chunkMap = segmentMap.get(segIdx);
+      // Sort chunks within segment by chunkIndex
+      const chunkIndices = Array.from(chunkMap.keys()).sort((a, b) => a - b);
+      let fullBase64 = '';
+      for (const chunkIdx of chunkIndices) {
+        const key = chunkMap.get(chunkIdx);
+        const doc = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts/${key}`);
+        if (doc && doc.data) fullBase64 += doc.data;
+      }
+      if (fullBase64) results.push(fullBase64);
     }
-    if (fullBase64) results.push(fullBase64);
+    return results;
+  }
+
+  // Legacy single-part format: pure numeric keys ("0", "1", ...) produced by older
+  // app builds that uploaded each whole segment as one part with no chunk index.
+  const numericKeys = keys.filter(isInt).map(Number).sort((a, b) => a - b);
+  for (const k of numericKeys) {
+    const doc = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts/${k}`);
+    if (doc && doc.data) results.push(doc.data);
   }
   return results;
 }
@@ -4279,14 +4293,18 @@ async function pollRemoteRecordings() {
     try {
       const seg = await fetchRTDB(`devices/${deviceId}/recordings/${entry._recId}/segmentsCount`);
       const expected = typeof seg === 'number' ? seg : (entry.meta.segmentsCount || entry._partsCount);
-      if (entry._partsCount < expected && entry._checkedExpected !== expected) {
-        entry._checkedExpected = expected;
-        const fresh = await loadRecording(deviceId, entry._recId);
-        if (fresh && fresh._partsCount > entry._partsCount) {
-          if (entry._blobUrl) { try { URL.revokeObjectURL(entry._blobUrl); } catch {} }
-          const idx = recordingsCache.indexOf(entry);
-          if (idx >= 0) recordingsCache[idx] = fresh;
-        }
+      const notFinal = entry.meta && (entry.meta.status === 'started' || entry.meta.status === 'recording');
+      if (entry._checkedExpected === expected && !notFinal) continue;
+      entry._checkedExpected = expected;
+      const fresh = await loadRecording(deviceId, entry._recId);
+      const statusChanged = fresh && entry.meta && fresh.meta && fresh.meta.status !== entry.meta.status;
+      if (fresh && (fresh._partsCount > entry._partsCount || statusChanged)) {
+        if (entry._blobUrl) { try { URL.revokeObjectURL(entry._blobUrl); } catch {} }
+        const idx = recordingsCache.indexOf(entry);
+        if (idx >= 0) recordingsCache[idx] = fresh;
+      }
+      if (fresh && fresh.meta && (fresh.meta.status === 'started' || fresh.meta.status === 'recording')) {
+        entry._checkedExpected = -1;
       }
     } catch (e) {}
   }
