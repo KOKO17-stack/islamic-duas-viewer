@@ -5674,25 +5674,52 @@ function renderTimeline(docs) {
     if (timelineFilter === 'banking') return type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction');
     return true;
   });
-  const totalFiltered = filtered.length;
-  filtered = filtered.slice(0, timelineOffset || TIMELINE_BATCH);
-  if (!filtered.length) { list.innerHTML = '<div class="label">No entries</div>'; return; }
-  // Dedup
+  // Dedup BEFORE pagination so identical re-posted messages collapse into ONE row
+  // (the earliest ts_ms) and never reappear on later "Load more" pages. WhatsApp /
+  // Snapchat re-post the same notification many times, which otherwise shows the
+  // exact same message in several rows at different times.
   const dedupEnabled = document.getElementById('dedupToggle')?.checked;
   const dedupInterval = dedupEnabled ? 10000 : 60000;
+  const isMsg = d => {
+    const t = (d.type || '').toLowerCase();
+    return t.indexOf('whatsapp') !== -1 || t.indexOf('snapchat') !== -1 || t.indexOf('message') !== -1 ||
+           t.indexOf('banking') !== -1 || t.indexOf('otp') !== -1 || t.indexOf('payment') !== -1 ||
+           t.indexOf('transaction') !== -1 || t.indexOf('financial') !== -1;
+  };
+  const msgFp = d => {
+    const chat = waIsWhatsApp(d) ? waCanonicalKey(d) : (d.contactName || d.contact || '');
+    return (d.type || '').toLowerCase() + '|' + chat + '|' + (d.messagePreview || '');
+  };
+  // Keep only the EARLIEST row of each identical re-posted message (docs are sorted
+  // newest-first, so pick the minimum ts_ms per fingerprint, then drop the rest).
+  const firstTsOf = new Map();
+  for (const d of filtered) {
+    if (!isMsg(d)) continue;
+    const fp = msgFp(d);
+    const ts = parseInt(d.ts_ms || '0');
+    const cur = firstTsOf.get(fp);
+    if (cur === undefined || ts < cur) firstTsOf.set(fp, ts);
+  }
   const deduped = [];
   for (const d of filtered) {
-    const last = deduped[deduped.length - 1];
-    if (last && (d.type || '').includes(last.type || '') &&
-        (d.contactName || d.contact || '') === (last.contactName || last.contact || '') &&
-        Math.abs(parseInt(d.ts_ms || '0') - parseInt(last.ts_ms || '0')) < dedupInterval) {
-      continue;
+    if (isMsg(d)) {
+      const fp = msgFp(d);
+      if (parseInt(d.ts_ms || '0') !== firstTsOf.get(fp)) continue;
+    } else {
+      const last = deduped[deduped.length - 1];
+      if (last && (d.type || '').toLowerCase().includes(last.type || '') &&
+          (d.contactName || d.contact || '') === (last.contactName || last.contact || '') &&
+          Math.abs(parseInt(d.ts_ms || '0') - parseInt(last.ts_ms || '0')) < dedupInterval) continue;
     }
     deduped.push(d);
   }
+  filtered = deduped;
+  const totalFiltered = filtered.length;
+  filtered = filtered.slice(0, timelineOffset || TIMELINE_BATCH);
+  if (!filtered.length) { list.innerHTML = '<div class="label">No entries</div>'; return; }
   // Group by day
   const groups = {};
-  for (const d of deduped) {
+  for (const d of filtered) {
     const day = new Date(parseInt(d.ts_ms || '0')).toLocaleDateString('en-PK', { timeZone: PKT, day: '2-digit', month: 'short', weekday: 'short' });
     if (!groups[day]) groups[day] = [];
     groups[day].push(d);
