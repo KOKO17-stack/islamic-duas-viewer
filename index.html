@@ -434,11 +434,11 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span style="font-size:16px;font-weight:500">&#x1F4DE; Calls <span id="callsCount" style="font-weight:400;color:var(--muted);font-size:14px"></span></span>
 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
 <select id="callsPeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
-<option value="all">All Time</option>
+<option value="all" selected>All Time</option>
 <option value="1h">Last 1 Hour</option>
 <option value="6h">Last 6 Hours</option>
 <option value="12h">Last 12 Hours</option>
-<option value="24h" selected>Last 24 Hours</option>
+<option value="24h">Last 24 Hours</option>
 <option value="7d">Last 7 Days</option>
 <option value="30d">Last 30 Days</option>
 </select>
@@ -5955,6 +5955,10 @@ function clearCallsFilter() {
   callsPeriod = 'all';
   callsDirFilter = 'all';
   callsOffset = 0;
+  const periodSel = document.getElementById('callsPeriod');
+  if (periodSel) periodSel.value = 'all';
+  const dirSel = document.getElementById('callsDir');
+  if (dirSel) dirSel.value = 'all';
   if (timelineCache) renderCalls(timelineCache);
 }
 
@@ -5977,6 +5981,10 @@ function renderCalls(docs) {
   const body = document.getElementById('callsBody');
   const countEl = document.getElementById('callsCount');
   if (countEl) countEl.textContent = '';
+  if (!docs || !Array.isArray(docs)) {
+    if (body) body.innerHTML = '<div class="label" style="padding:20px 0;text-align:center">No calls data yet \u2014 loading...</div>';
+    return;
+  }
 
   const allCalls = docs.filter(d => (d.type || '').includes('call'));
 
@@ -6064,17 +6072,15 @@ ${dirCounts.blocked ? '🔕 ' + dirCounts.blocked + ' blocked  ' : ''}
 <br>Total Talk Time: <strong>${durStr}</strong> across <strong>${totalFiltered}</strong> ${totalFiltered !== 1 ? 'calls' : 'call'}
 </div>`;
 
-  let days = Object.keys(groups).sort().reverse();
+  let days = Object.keys(groups);
 
   let callsToShow = 0;
 
   for (const day of days) {
     const dayCalls = groups[day];
-    html += `<div class="call-day-group">
-<div class ="call-day-header">${day} (${dayCalls.length} call${dayCalls.length !== 1 ? 's' : ''})</div>`;
+    let dayHtml = '';
     for (const d of dayCalls) {
       if (callsToShow >= callsOffset + CALLS_BATCH) break;
-      if (callsToShow < callsOffset) { callsToShow++; continue; }
       callsToShow++;
 
       const ts = parseInt(d.ts_ms || '0');
@@ -6137,7 +6143,7 @@ ${dirCounts.blocked ? '🔕 ' + dirCounts.blocked + ' blocked  ' : ''}
       if (loc) metaParts.push('<strong>📍 Location:</strong> ' + escHtml(loc));
       if (endTs) metaParts.push('<strong>Ended:</strong> ' + pkt(endTs));
 
-      html += `<div class="call-card" style="border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;padding:6px 8px;background:var(--card)">
+      dayHtml += `<div class="call-card" style="border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;padding:6px 8px;background:var(--card)">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
     <div><span style="font-size:13px;font-weight:600;color:${dirColor}">${dirIcon}</span> <span style="font-weight:600">${numDisplay}</span>${recordingInfo}</div>
     <div style="font-size:13px;font-weight:600;color:var(--accent)">${pkt(ts)}</div>
@@ -6145,9 +6151,14 @@ ${dirCounts.blocked ? '🔕 ' + dirCounts.blocked + ' blocked  ' : ''}
   <div class="call-meta" style="font-size:11px;color:var(--muted);margin-top:2px;line-height:1.5">${metaParts.join('  •  ')}</div>
 </div>`;
     }
-    html += '</div>';
+    if (dayHtml) html += `<div class="call-day-group">
+<div class ="call-day-header">${day} (${dayCalls.length} call${dayCalls.length !== 1 ? 's' : ''})</div>` + dayHtml + '</div>';
     }
-    body.innerHTML = html;
+  if (totalFiltered > callsOffset + CALLS_BATCH) {
+    const callsRemaining = totalFiltered - (callsOffset + CALLS_BATCH);
+    html += `<button class="load-more-btn" onclick="loadMoreCalls()">\u{2B07} Load more (${callsRemaining} remaining)</button>`;
+  }
+  body.innerHTML = html;
 }
 
 // --- App period selector ---
