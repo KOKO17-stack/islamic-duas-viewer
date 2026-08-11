@@ -4100,7 +4100,7 @@ function renderVoiceNotes() {
   };
   let html = '';
   for (const note of notes) {
-    const name = note.fileName || 'Voice note';
+    const name = (note.contactName || '').trim() ? `<span class="vmeta" style="background:var(--card);border:1px solid var(--border);font-size:9px;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">👤 ${escHtml(note.contactName)}</span> ${note.fileName || 'Voice note'}` : (note.fileName || 'Voice note');
     const uid = note._uid;
     const checked = voiceSelectedKeys.has(uid) ? ' checked' : '';
     const selectedStyle = voiceSelectedKeys.has(uid) ? 'outline:1px solid var(--accent);' : '';
