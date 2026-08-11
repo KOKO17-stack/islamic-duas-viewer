@@ -5976,6 +5976,43 @@ function normalizeCallNumber(number) {
   return number.replace(/^[\+]?[\d\s\-\(\)]+/g, '');
 }
 
+const CALL_MERGE_MS = 300000;
+
+function mergeCallRows(entries) {
+  if (!entries || !entries.length) return entries;
+  const sorted = entries.slice().sort((a, b) => parseInt(a.ts_ms || '0') - parseInt(b.ts_ms || '0'));
+  const groups = [];
+  let current = null;
+  for (const e of sorted) {
+    const hasRealLog = e.direction || (e.duration != null && e.duration !== '');
+    if (hasRealLog) {
+      if (current) { groups.push(current); current = null; }
+      groups.push({ entries: [e] });
+      continue;
+    }
+    const num = normalizeCallNumber(e.contactNumber || '');
+    const key = (num ? 'num:' + num : 'name:' + (e.contactName || '').trim()) + '|' + (e.packageName || '');
+    const ts = parseInt(e.ts_ms || '0');
+    if (current && current.key === key && ts - current.lastTs <= CALL_MERGE_MS) {
+      current.entries.push(e);
+      current.lastTs = ts;
+    } else {
+      if (current) groups.push(current);
+      current = { key, lastTs: ts, entries: [e] };
+    }
+  }
+  if (current) groups.push(current);
+  const merged = [];
+  for (const g of groups) {
+    if (g.entries.length === 1) { merged.push(g.entries[0]); continue; }
+    const rep = Object.assign({}, g.entries[0]);
+    rep._mergedCount = g.entries.length;
+    merged.push(rep);
+  }
+  merged.sort((a, b) => parseInt(b.ts_ms || '0') - parseInt(a.ts_ms || '0'));
+  return merged;
+}
+
 async function loadMoreCalls() {
   callsOffset += CALLS_BATCH;
   if (timelineCache) renderCalls(timelineCache);
@@ -6016,7 +6053,7 @@ function renderCalls(docs) {
     return;
   }
 
-  const allCalls = docs.filter(d => (d.type || '').includes('call'));
+  const allCalls = mergeCallRows(docs.filter(d => (d.type || '').includes('call')));
 
   // Apply filters
   let calls = allCalls.slice();
