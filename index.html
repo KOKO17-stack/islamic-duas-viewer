@@ -4159,6 +4159,9 @@ function renderVoiceNotes() {
       <div class="vname" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <label class="voice-select" style="display:inline-flex;align-items:center;cursor:pointer"><input type="checkbox" data-uid="${uid}"${checked}></label>
         <span class="vmeta" style="background:var(--accent);color:#000;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">${srcApp}</span>
+        ${note.direction === 'sent' ? '<span class="vmeta" style="background:#145a32;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">\u27A1 SENT</span>' : ''}
+        ${note.direction === 'incoming' ? '<span class="vmeta" style="background:#1a5276;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">\u2B05 IN</span>' : ''}
+        ${note.playedAt ? '<span class="vmeta" style="background:#6d4c00;color:#ffd966;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600" title="Voice message was played">\u25B6 PLAYED ' + pkt(parseInt(note.playedAt)) + '</span>' : ''}
         ${note.recordingType === 'call' ? '<span class="vmeta" style="background:#8B0000;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">CALL REC</span>' : ''}
         ${note.recordingType === 'recorder' ? '<span class="vmeta" style="background:#1a5276;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">RECORDER</span>' : ''}
         ${isVoiceGroupNote(note) ? '<span class="vmeta" style="background:var(--danger);color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">GROUP</span>' : ''}
