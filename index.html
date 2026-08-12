@@ -4080,7 +4080,7 @@ async function loadOlderVoiceNotes() {
   renderVoiceNotes();
 }
 
-function renderVoiceNotes() {
+async function renderVoiceNotes() {
   const list = document.getElementById('voiceNotesList');
   if (!list) return;
   const countBadge = document.getElementById('voiceCountBadge');
