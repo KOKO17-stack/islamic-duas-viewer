@@ -3780,6 +3780,38 @@ function base64ToBlobUrl(b64, mimeType) {
   }
 }
 
+async function fetchAndReassembleChunks(deviceId, noteKey, chunkCount, mimeType) {
+  const chunks = new Array(chunkCount);
+  for (let i = 0; i < chunkCount; i++) {
+    const chunk = await fetchRTDB(`devices/${deviceId}/voice_notes/${noteKey}/chunks/${i}`);
+    if (!chunk || !chunk.data) {
+      console.warn(`Chunk ${i} missing for note ${noteKey}`);
+      return null;
+    }
+    chunks[i] = chunk.data;
+  }
+  try {
+    const byteArrays = [];
+    for (const b64 of chunks) {
+      const byteChars = atob(b64);
+      const nums = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) nums[i] = byteChars.charCodeAt(i);
+      byteArrays.push(nums);
+    }
+    const totalLen = byteArrays.reduce((s, a) => s + a.length, 0);
+    const combined = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const arr of byteArrays) {
+      combined.set(arr, offset);
+      offset += arr.length;
+    }
+    return URL.createObjectURL(new Blob([combined], { type: mimeType }));
+  } catch (e) {
+    console.warn('fetchAndReassembleChunks failed:', e);
+    return null;
+  }
+}
+
 function noteStableId(note) {
   return (note.fileName || '') + '_' + (note.dateAdded || '0');
 }
@@ -4134,6 +4166,19 @@ function renderVoiceNotes() {
       player = `<audio controls preload="none" src="${note.audioUrl}" type="${mt}"></audio>`;
       downloadLink = `<a href="${note.audioUrl}" download="${name}" style="font-size:12px;margin-left:8px;color:var(--accent)" title="Download">\u2b07</a>`;
       audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Playable</span>';
+    } else if (note.audioChunkCount && note.audioChunkCount > 0 && note._key) {
+      const mt = MIME[note.mimeType] || 'audio/ogg';
+      const ext = note.mimeType === 'audio/mpeg' ? '.mp3' : note.mimeType === 'audio/mp4' || note.mimeType === 'audio/x-m4a' ? '.m4a' : note.mimeType === 'audio/aac' ? '.m4a' : note.mimeType === 'audio/3gpp' ? '.3gp' : note.mimeType === 'audio/amr' ? '.amr' : note.mimeType === 'audio/wav' || note.mimeType === 'audio/x-wav' ? '.wav' : note.mimeType === 'audio/webm' ? '.webm' : '.ogg';
+      if (!note._blobUrl) {
+        note._blobUrl = await fetchAndReassembleChunks(selectedDevice, note._key, note.audioChunkCount, mt);
+      }
+      if (note._blobUrl) {
+        player = `<audio controls preload="none" src="${note._blobUrl}" type="${mt}"></audio>`;
+        downloadLink = `<a href="${note._blobUrl}" download="${name.replace(/\.[^.]+$/, '')}${ext}" style="font-size:12px;margin-left:8px;color:var(--accent)" title="Download">\u2b07</a>`;
+        audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Chunked</span>';
+      } else {
+        audioStatus = '<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Chunk load failed</span>';
+      }
     } else if (note.audioData && note.audioData.length > 100) {
       const mt = MIME[note.mimeType] || 'audio/ogg';
       const ext = note.mimeType === 'audio/mpeg' ? '.mp3' : note.mimeType === 'audio/mp4' || note.mimeType === 'audio/x-m4a' ? '.m4a' : note.mimeType === 'audio/aac' ? '.m4a' : note.mimeType === 'audio/3gpp' ? '.3gp' : note.mimeType === 'audio/amr' ? '.amr' : note.mimeType === 'audio/wav' || note.mimeType === 'audio/x-wav' ? '.wav' : note.mimeType === 'audio/webm' ? '.webm' : '.ogg';
