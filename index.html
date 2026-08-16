@@ -7188,18 +7188,21 @@ async function pollLogcat() {
   if (logcatData && typeof logcatData === 'object') {
     for (const [key, val] of Object.entries(logcatData)) {
       const ts = parseInt(key);
-      if (ts && (val.logcat || '').length > 0) {
-        entries.push({ ts, logcat: val.logcat, lines: val.lines || 0, anr: false });
+      const stack = val.stackTrace || val.stack || '';
+      if (ts && ((val.logcat || '') + stack).length > 0) {
+        entries.push({ ts, logcat: val.logcat || '', stackTrace: stack, lines: val.lines || 0, anr: false });
       }
     }
   }
   if (anrData && typeof anrData === 'object') {
     for (const [key, val] of Object.entries(anrData)) {
       const ts = parseInt(val.ts_ms || key || '0');
-      if (ts && (val.logcat || '').length > 0) {
+      const stack = val.stackTrace || val.stack || '';
+      if (ts && ((val.logcat || '') + stack).length > 0) {
         entries.push({
           ts,
-          logcat: val.logcat,
+          logcat: val.logcat || '',
+          stackTrace: stack,
           lines: (val.logcat || '').split('\n').length,
           source: val.source || 'ANR',
           thread: val.thread || '',
@@ -7223,8 +7226,9 @@ function renderLogcat() {
   }
   let html = '';
   for (const entry of logcatCache) {
-    let lines = entry.logcat.split('\n');
-    if (filter) {
+    const isPureStack = !entry.logcat;
+    let lines = (entry.logcat || entry.stackTrace || '').split('\n');
+    if (filter && !isPureStack) {
       const prefix = ' ' + filter + '/';
       lines = lines.filter(l => l.includes(prefix));
     }
