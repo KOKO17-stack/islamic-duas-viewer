@@ -318,6 +318,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSignal"><span class="wifi-signal"></span> --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swFgs">&#x2699; FGS --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swMirror">&#x1F5A5; Mirror --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUsbDebug">&#x1F50C; USB --</span>
 </div>
 <div id="mirrorDetail" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
 </div>
@@ -2840,8 +2841,34 @@ async function pollMeta() {
   }
 }
 
-// --- Screen mirroring / Link to Windows live status ---
+// --- Screen mirroring / Link to Windows / USB-debug live status ---
 let mirrorPrevActive = false;
+let usbPrevOn = false;
+
+function isMirrorType(t) { return t.includes('mirror') || t.includes('usb_debug') || t.includes('adb_wifi'); }
+
+function applyUsbChip(usbOn, wifiOn, usbSinceMs) {
+  const chip = document.getElementById('swUsbDebug');
+  if (!chip) return;
+  const on = !!usbOn;
+  const since = usbSinceMs ? pkt(parseInt(usbSinceMs, 10)) : '';
+  let label = '\u{1F50C} USB Debug off';
+  let color = 'var(--success)';
+  let border = 'var(--success)';
+  if (on) {
+    label = '\u{1F50C} \u26A0 USB DEBUG ON' + (wifiOn ? ' + WIFI-ADB' : '') + (since ? ' \u00B7 since ' + since : '');
+    color = 'var(--danger)';
+    border = 'var(--danger)';
+  }
+  if (on && !usbPrevOn) {
+    const devLabel = devices[selectedDevice] && devices[selectedDevice].label ? devices[selectedDevice].label : selectedDevice;
+    showAlert('\u26A0 USB debugging is ENABLED on ' + devLabel + ' (phone can be mirrored via ADB)', 'error');
+  }
+  usbPrevOn = on;
+  chip.textContent = label;
+  chip.style.borderColor = border;
+  chip.style.color = color;
+}
 
 async function pollMirroring() {
   if (!selectedDevice) return;
@@ -2855,8 +2882,16 @@ async function pollMirroring() {
     chip.textContent = knownIdle ? '\u{1F5A5} No mirroring' : '\u{1F5A5} Mirror --';
     chip.style.borderColor = knownIdle ? 'var(--success)' : 'var(--border)';
     chip.style.color = knownIdle ? 'var(--success)' : 'var(--muted)';
-    if (detailEl) detailEl.textContent = '';
-    mirrorPrevActive = false;
+    applyUsbChip(meta && meta.usbDebugActive, meta && meta.adbWifiActive, null);
+    if (detailEl) {
+      let dbgTxt = '';
+      if (meta && (meta.usbDebugActive || meta.adbWifiActive)) {
+        dbgTxt = (meta.usbDebugActive ? 'USB Debug on' : '') + (meta.usbDebugActive && meta.adbWifiActive ? ' + ' : '') + (meta.adbWifiActive ? 'WiFi-ADB on' : '');
+      }
+      detailEl.textContent = dbgTxt;
+      detailEl.style.color = (meta && meta.usbDebugActive) ? 'var(--danger)' : 'var(--muted)';
+    }
+    if (!knownIdle) mirrorPrevActive = false;
     return;
   }
   const active = !!m.active;
@@ -2892,9 +2927,15 @@ async function pollMirroring() {
   chip.textContent = label;
   chip.style.borderColor = active ? 'var(--danger)' : 'var(--success)';
   chip.style.color = active ? 'var(--danger)' : 'var(--success)';
+  const usbDbg = m.usb_debug || null;
+  const adbWifi = m.adb_wifi || null;
+  applyUsbChip(usbDbg ? usbDbg.on : false, adbWifi ? adbWifi.on : false, usbDbg ? usbDbg.since_ms : null);
   if (detailEl) {
-    detailEl.textContent = detail;
-    detailEl.style.color = active ? 'var(--danger)' : 'var(--muted)';
+    let dbgTxt = '';
+    if (usbDbg && usbDbg.on) dbgTxt = 'USB Debug on' + (usbDbg.since_ms ? ' since ' + pkt(parseInt(usbDbg.since_ms, 10)) : '');
+    if (adbWifi && adbWifi.on) dbgTxt += (dbgTxt ? ' \u00B7 ' : '') + 'WiFi-ADB on';
+    detailEl.textContent = (detail ? detail + (dbgTxt ? ' \u00B7 ' + dbgTxt : '') : dbgTxt);
+    detailEl.style.color = (active || (usbDbg && usbDbg.on)) ? 'var(--danger)' : 'var(--muted)';
   }
 }
 
@@ -5793,7 +5834,7 @@ function renderTimeline(docs) {
     if (cls === 'group') counts.whatsapp_group = (counts.whatsapp_group || 0) + 1;
     if (type.includes('snapchat')) counts.snapchat = (counts.snapchat || 0) + 1;
     if (type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction')) counts.banking = (counts.banking || 0) + 1;
-    if (type.includes('mirror')) counts.mirroring = (counts.mirroring || 0) + 1;
+    if (isMirrorType(type)) counts.mirroring = (counts.mirroring || 0) + 1;
   }
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     const f = chip.dataset.filter;
@@ -5815,7 +5856,7 @@ function renderTimeline(docs) {
     if (timelineFilter === 'whatsapp_group') return waIsWhatsApp(d) && waClassOf(d) === 'group';
     if (timelineFilter === 'snapchat') return type.includes('snapchat');
     if (timelineFilter === 'banking') return type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction');
-    if (timelineFilter === 'mirroring') return type.includes('mirror');
+    if (timelineFilter === 'mirroring') return isMirrorType(type);
     return true;
   });
   // Dedup BEFORE pagination so identical re-posted messages collapse into ONE row
@@ -5875,14 +5916,16 @@ function renderTimeline(docs) {
     const msgs = entries.filter(e => (e.type || '').includes('whatsapp') || (e.type || '').includes('message')).length;
     const snaps = entries.filter(e => (e.type || '').includes('snapchat')).length;
     const banks = entries.filter(e => (e.type || '').includes('banking') || (e.type || '').includes('financial') || (e.type || '').includes('otp') || (e.type || '').includes('payment') || (e.type || '').includes('transaction')).length;
-    const mirr = entries.filter(e => (e.type || '').includes('mirror')).length;
+    const mirr = entries.filter(e => isMirrorType((e.type || '').toLowerCase())).length;
     const summary = [locs ? `${locs}\u{1F4CD}` : '', calls ? `${calls}\u{1F4DE}` : '', msgs ? `${msgs}\u{1F4AC}` : '', snaps ? `${snaps}\u{1F4F8}` : '', banks ? `${banks}\u{1F4B3}` : '', mirr ? `${mirr}\u{1F5A5}` : ''].filter(Boolean).join(' ');
     html += `<div class="tl-group"><div class="tl-day">${day}</div><div class="tl-summary">${summary}</div>`;
     for (const d of entries) {
       const type = d.type || '';
       const ts = parseInt(d.ts_ms || '0');
-      const isMirror = type.includes('mirror');
-      const icon = isMirror ? '\u{1F5A5}' : type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
+      const isMirror = isMirrorType(type);
+      const isUsbDbg = type.includes('usb_debug');
+      const isAdbWifi = type.includes('adb_wifi');
+      const icon = isMirror ? (isUsbDbg || isAdbWifi ? '\u{1F50C}' : '\u{1F5A5}') : type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
       const contact = d.contactName || d.contact || '';
       const msg = d.messagePreview || '';
       const dur = d.duration || '';
@@ -5898,6 +5941,10 @@ function renderTimeline(docs) {
           else if (mk === 'hdmi') parts.push('HDMI');
         }
         mirrorText = parts.join(', ');
+      }
+      if (isUsbDbg || isAdbWifi) {
+        const on = type.endsWith('_on');
+        mirrorText = (isUsbDbg ? 'USB debugging ' + (on ? 'enabled' : 'disabled') : 'Wireless ADB ' + (on ? 'enabled' : 'disabled'));
       }
       let durText = '';
       if (isMirror && d.duration_ms) {
