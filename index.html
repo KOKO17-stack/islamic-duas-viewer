@@ -642,7 +642,9 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
   <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollPermissions()">&#x1F504; Refresh</span>
 </div>
 <input type="text" id="permSearch" placeholder="&#x1F50D; Search app or permission..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
+<div style="display:flex;gap:6px;margin-bottom:8px" id="permChips"></div>
 <div style="font-size:12px;color:var(--muted);margin-bottom:6px" id="permSyncInfo"></div>
+<div id="permRecent"></div>
 <div id="permList"><div class="label">No permissions data yet</div></div>
 </div>
 <div id="tab-wifi">
@@ -7071,15 +7073,115 @@ function fmtPermission(name) {
   return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+const PERM_SENSITIVE = [
+  { label: 'SMS', code: 'SMS', rx: /sms/ },
+  { label: 'Call Logs', code: 'Call', rx: /call_log|call_phone|process_outgoing_calls|read_phone_numbers/ },
+  { label: 'Location', code: 'Loc', rx: /location/ },
+  { label: 'Camera', code: 'Cam', rx: /camera/ },
+  { label: 'Microphone', code: 'Mic', rx: /record_audio/ },
+  { label: 'Contacts', code: 'Con', rx: /contacts/ },
+  { label: 'Phone State', code: 'Ph', rx: /phone_state/ },
+  { label: 'Storage', code: 'Stor', rx: /external_storage|media_images|media_video|media_audio/ },
+  { label: 'Activity Recog', code: 'Act', rx: /activity_recognition/ }
+];
+function permSensitiveLabel(name) {
+  const n = (name || '').toLowerCase();
+  for (const s of PERM_SENSITIVE) if (s.rx.test(n)) return s.label;
+  return null;
+}
+function permChip(label, key, active) {
+  return '<span class="chip" style="' + (active ? 'background:var(--accent);color:#000' : 'background:var(--card);color:var(--muted)') + ';font-size:12px;cursor:pointer;border:1px solid var(--border)" onclick="window.permFilter=\'' + key + '\';renderPermissions()">' + label + '</span>';
+}
+
+function renderPermRecent() {
+  const rec = window.permCache.filter(a => a.firstInstallTime > 0).sort((a, b) => b.firstInstallTime - a.firstInstallTime).slice(0, 10);
+  if (!rec.length) return '';
+  let h = '<div style="font-size:13px;color:var(--info);font-weight:600;padding:4px 0">\u{1F550} Recently installed</div>';
+  h += '<div class="card" style="padding:6px 10px;margin-bottom:4px">';
+  for (const app of rec) {
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:12px">' +
+      '<span style="font-weight:500;color:var(--text)">\u2B50 ' + app.appName + '</span>' +
+      '<span style="color:var(--info);white-space:nowrap">installed ' + pktShort(app.firstInstallTime) + '</span></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderPermSensitive() {
+  let h = '<div style="font-size:13px;color:var(--accent);font-weight:600;padding:6px 0 4px">\u{1F9F2} Sensitive permissions granted</div>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+  for (const s of PERM_SENSITIVE) {
+    const n = window.permCache.filter(a => a.permissions.some(p => p.granted && permSensitiveLabel(p.name) === s.label)).length;
+    h += '<span style="font-size:12px;padding:3px 8px;border-radius:4px;' + (n ? 'background:rgba(88,166,255,0.12);color:var(--info);border:1px solid rgba(88,166,255,0.25)' : 'background:var(--card);color:var(--muted);border:1px solid var(--border)') + '" title="' + s.label + '">' + s.code + ' \u00B7 ' + n + '</span>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderPermHeatmap() {
+  const apps = window.permCache.filter(a => a.permissions.some(p => p.granted && permSensitiveLabel(p.name)))
+    .sort((a, b) => b.permissions.filter(p => p.granted && permSensitiveLabel(p.name)).length - a.permissions.filter(p => p.granted && permSensitiveLabel(p.name)).length)
+    .slice(0, 20);
+  if (!apps.length) return '';
+  let h = '<div style="font-size:13px;color:var(--accent);font-weight:600;padding:6px 0 4px">\u{1F4CA} Apps \u00D7 sensitive perms</div>';
+  h += '<div class="card" style="padding:6px 8px;overflow-x:auto;margin-bottom:4px"><table style="border-collapse:collapse;font-size:11px;width:100%"><tr>' +
+    '<th style="text-align:left;color:var(--muted);padding:2px 6px 4px 0;font-weight:500">App</th>';
+  for (const s of PERM_SENSITIVE) {
+    h += '<th style="color:var(--muted);padding:2px 3px 4px;font-weight:500;text-align:center" title="' + s.label + '">' + s.code + '</th>';
+  }
+  h += '</tr>';
+  for (const app of apps) {
+    h += '<tr><td style="padding:2px 6px 2px 0;color:var(--text);white-space:nowrap;max-width:170px;overflow:hidden;text-overflow:ellipsis" title="' + app.appName + '">' + app.appName + '</td>';
+    for (const s of PERM_SENSITIVE) {
+      const ps = app.permissions.filter(p => permSensitiveLabel(p.name) === s.label);
+      if (!ps.length) h += '<td style="text-align:center;padding:2px 3px"><span style="color:#30363d">\u00B7</span></td>';
+      else if (ps.some(p => p.granted)) h += '<td style="text-align:center;padding:2px 3px"><span style="color:var(--success)" title="' + s.label + ' granted">\u25CF</span></td>';
+      else h += '<td style="text-align:center;padding:2px 3px"><span style="color:var(--danger)" title="' + s.label + ' denied">\u25CB</span></td>';
+    }
+    h += '</tr>';
+  }
+  h += '</table></div>';
+  return h;
+}
+
+function renderPermDeniedRanking() {
+  const map = new Map();
+  for (const app of window.permCache) {
+    for (const p of app.permissions) {
+      if (!p.granted) {
+        const key = fmtPermission(p.name);
+        map.set(key, (map.get(key) || 0) + 1);
+      }
+    }
+  }
+  const top = [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+  if (!top.length) return '';
+  const max = top[0][1];
+  let h = '<div style="font-size:13px;color:var(--danger);font-weight:600;padding:6px 0 4px">\u{1F5E1} Most denied permissions</div>';
+  h += '<div class="card" style="padding:6px 10px;margin-bottom:4px">';
+  for (const [name, cnt] of top) {
+    const w = Math.max(8, Math.round(cnt / max * 100));
+    h += '<div style="display:flex;align-items:center;gap:8px;padding:2px 0;font-size:12px">' +
+      '<span style="color:var(--muted);min-width:90px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="' + name + '">' + name + '</span>' +
+      '<div style="flex:1;height:12px;background:rgba(255,255,255,0.07);border-radius:3px;overflow:hidden"><div style="height:100%;width:' + w + '%;background:linear-gradient(90deg,var(--danger),#ff8c42);border-radius:3px;min-width:4px"></div></div>' +
+      '<span style="color:var(--danger);min-width:28px;text-align:right">' + cnt + '</span></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
 function renderPermissions() {
   const list = document.getElementById('permList');
   const syncInfo = document.getElementById('permSyncInfo');
   if (!window.permCache || !window.permCache.length) {
     list.innerHTML = '<div class="label">No permissions data yet</div>';
+    const chipsEl = document.getElementById('permChips'); if (chipsEl) chipsEl.innerHTML = '';
+    const recentEl = document.getElementById('permRecent'); if (recentEl) recentEl.innerHTML = '';
     if (syncInfo) syncInfo.textContent = '';
     return;
   }
   const query = (document.getElementById('permSearch')?.value || '').toLowerCase();
+  const filter = window.permFilter || 'all';
   let totalGranted = 0, totalDenied = 0, totalPerms = 0;
   for (const app of window.permCache) {
     for (const p of app.permissions) {
@@ -7089,8 +7191,15 @@ function renderPermissions() {
   }
   const ratio = totalPerms > 0 ? (totalGranted / totalPerms * 100).toFixed(0) : 0;
   if (syncInfo) {
-    syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 ' + totalPerms + ' perms \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
+    syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 ' + totalPerms + ' perms \u2022 ' + totalGranted + ' granted \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
   }
+  const chipsEl = document.getElementById('permChips');
+  if (chipsEl) chipsEl.innerHTML = permChip('All apps', 'all', filter === 'all') + permChip('Sensitive perms', 'sensitive', filter === 'sensitive') + permChip('Denied perms', 'denied', filter === 'denied');
+
+  const matches = a => !query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query) || a.permissions.some(p => p.name.toLowerCase().includes(query));
+  const hasDenied = a => a.permissions.some(p => !p.granted);
+  const hasSensitiveGranted = a => a.permissions.some(p => p.granted && permSensitiveLabel(p.name));
+
   let html = '';
   // Summary bar
   html += '<div style="margin-bottom:8px;background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)">' +
@@ -7098,9 +7207,23 @@ function renderPermissions() {
     '<div style="background:var(--success);width:' + ratio + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#000;min-width:fit-content;padding:0 6px">\u2713 ' + totalGranted + ' Granted</div>' +
     '<div style="background:var(--danger);width:' + (100 - ratio) + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;min-width:fit-content;padding:0 6px">\u2717 ' + totalDenied + ' Denied</div>' +
     '</div></div>';
-  // Denied apps section
-  const deniedApps = window.permCache.filter(a => a.permissions.some(p => !p.granted) && (!query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query) || a.permissions.some(p => p.name.toLowerCase().includes(query))));
-  const grantedApps = window.permCache.filter(a => a.permissions.every(p => p.granted) && (!query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query)));
+  // Recently installed
+  html += renderPermRecent();
+  // Sensitive overview
+  html += renderPermSensitive();
+  // Heatmap
+  html += renderPermHeatmap();
+  // Denied ranking
+  html += renderPermDeniedRanking();
+
+  // Filter to visible apps
+  let visible = window.permCache.filter(matches);
+  if (filter === 'sensitive') visible = visible.filter(hasSensitiveGranted);
+  if (filter === 'denied') visible = visible.filter(hasDenied);
+
+  const deniedApps = visible.filter(hasDenied);
+  const grantedApps = visible.filter(a => !hasDenied);
+
   if (deniedApps.length) {
     html += '<div style="font-size:13px;color:var(--danger);font-weight:600;padding:4px 0;margin-bottom:4px">\u26A0 ' + deniedApps.length + ' app' + (deniedApps.length > 1 ? 's' : '') + ' with denied permissions</div>';
     for (const app of deniedApps) {
@@ -7115,7 +7238,8 @@ function renderPermissions() {
       if (denied.length) {
         html += '<div style="padding:4px 6px;background:rgba(248,81,73,0.08);border-radius:4px;margin-bottom:4px">';
         for (const p of denied) {
-          html += '<div style="font-size:12px;color:var(--danger);padding:1px 0"><span style="opacity:0.6">\u2717</span> ' + fmtPermission(p.name) + '</div>';
+          const sens = permSensitiveLabel(p.name);
+          html += '<div style="font-size:12px;color:var(--danger);padding:1px 0"><span style="opacity:0.6">\u2717</span> ' + fmtPermission(p.name) + (sens ? ' <span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--danger);color:#fff;opacity:0.85">' + sens + '</span>' : '') + '</div>';
         }
         html += '</div>';
       }
@@ -7126,10 +7250,11 @@ function renderPermissions() {
         }
         html += '</div></details>';
       }
+      const pct = app.permissions.length ? Math.round(granted.length / app.permissions.length * 100) : 0;
+      html += '<div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;margin-top:6px"><div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,var(--success),var(--accent));border-radius:2px"></div></div>';
       html += '</div>';
     }
   }
-  // Fully granted apps section
   if (grantedApps.length) {
     html += '<div style="font-size:13px;color:var(--success);font-weight:600;padding:6px 0 4px">\u2713 ' + grantedApps.length + ' app' + (grantedApps.length > 1 ? 's' : '') + ' fully granted</div>';
     html += '<div style="display:flex;flex-wrap:wrap;gap:3px">';
@@ -7153,6 +7278,8 @@ async function pollPermissions() {
   window.permCache = Object.values(data).map(v => ({
     appName: v.appName || v.packageName || '?',
     packageName: v.packageName || '',
+    firstInstallTime: v.firstInstallTime || 0,
+    lastUpdateTime: v.lastUpdateTime || 0,
     permissions: (v.permissions || []).map(p => ({
       name: p.name || '',
       granted: p.granted === true
