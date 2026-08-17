@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--accent:#ffca28;--text:#c9d1d9;--muted:#8b949e;--danger:#f85149;--success:#3fb950;--radius:8px}
+:root{--bg:#0d1117;--card:#161b22;--border:#30363d;--accent:#ffca28;--text:#c9d1d9;--muted:#8b949e;--danger:#f85149;--success:#3fb950;--info:#58a6ff;--warning:#f97316;--radius:8px}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);overflow-x:hidden}
 .header{background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -699,9 +699,28 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div style="font-size:14px;color:var(--muted)" id="healthActivityConfidence">--</div>
 </div>
 </div>
+<div id="healthStepsStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px"></div>
 <div style="margin-top:12px">
-<div class="label">&#x1F4C5; Step History (Last 7 Days) <span style="font-weight:400;color:var(--muted);font-size:13px;cursor:pointer" onclick="exportStepChart()">&#x1F4E5; Export</span></div>
+<div class="label">&#x1F4C5; Step History
+<span class="pg" style="gap:4px;margin-left:6px">
+<span class="chip" id="stepRange7" onclick="setStepRange(7)">7 days</span>
+<span class="chip active" id="stepRange30" onclick="setStepRange(30)">30 days</span>
+</span>
+<span style="font-weight:400;color:var(--muted);font-size:13px;cursor:pointer" onclick="exportStepChart()">&#x1F4E5; Export</span>
+</div>
 <canvas id="healthStepCanvas" class="chart-canvas"></canvas>
+</div>
+<div style="margin-top:12px">
+<div class="label">&#x1F4C6; Steps Calendar (Previous + Current Month)</div>
+<div id="stepsCalendarContainer"></div>
+</div>
+<div style="margin-top:12px">
+<div class="label">&#x23F0; Activity Distribution (Last 24h)</div>
+<div id="activityDistribution"></div>
+</div>
+<div style="margin-top:12px">
+<div class="label">&#x1F552; Activity by Hour (Last 24h)</div>
+<div id="activityStrip"></div>
 </div>
 <div style="margin-top:12px">
 <div class="label">&#x1F3C3; Activity Timeline</div>
@@ -714,7 +733,11 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <span class="label">&#x1F4B8; Menstrual Cycle</span>
 <span id="haidhLastSync" style="font-size:13px;color:var(--muted)"></span>
 </div>
+<div id="haidhPrediction" style="margin-bottom:12px"></div>
+<div id="haidhStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
 <div id="haidhSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div id="haidhSymptoms" style="margin-bottom:12px"></div>
+<div id="haidhFlowChart" style="margin-bottom:12px"></div>
 <div style="margin-top:12px">
 <div class="label">&#x1F4C5; Cycle Calendar (Previous + Current Month)</div>
 <div id="haidhCalendarContainer"></div>
@@ -723,9 +746,12 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div style="margin-top:16px" id="exerciseSection">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
 <span class="label">&#x1F3CB;&#xFE0F; Exercise</span>
+<span style="font-weight:400;color:var(--muted);font-size:13px;cursor:pointer" onclick="exportExerciseData()">&#x1F4E5; Export</span>
 <span id="exerciseLastSync" style="font-size:13px;color:var(--muted)"></span>
 </div>
 <div id="exerciseSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div id="exerciseCompare" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div id="exerciseChart" style="margin-bottom:12px"></div>
 <div style="margin-top:12px">
 <div class="label">&#x1F4C5; Exercise Calendar (Previous + Current Month)</div>
 <div id="exerciseCalendarContainer"></div>
@@ -734,9 +760,12 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div style="margin-top:16px" id="medicationSection">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
 <span class="label">&#x1F48A; Medications</span>
+<span style="font-weight:400;color:var(--muted);font-size:13px;cursor:pointer" onclick="exportMedicationData()">&#x1F4E5; Export</span>
 <span id="medicationLastSync" style="font-size:13px;color:var(--muted)"></span>
 </div>
+<div id="medicationRefills" style="margin-bottom:12px"></div>
 <div id="medicationSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div id="medicationAdherence" style="margin-bottom:12px"></div>
 <div id="medicationList" style="display:flex;flex-direction:column;gap:8px"></div>
 </div>
 </div>
@@ -7353,6 +7382,12 @@ document.getElementById('wifiSearch')?.addEventListener('input', renderWifiScans
 
 // --- Health Tab ---
 let healthStepCache = [];
+let stepRange = 30;
+let healthStepsAll = {};
+let activityHistoryCache = [];
+let haidhCyclesCache = [];
+let exerciseDailyCache = [];
+let medicationListCache = [];
 
 async function pollHealth() {
   if (!selectedDevice) return;
@@ -7393,12 +7428,18 @@ async function pollHealth() {
 
   // Step history chart (canvas)
   if (stepsData && typeof stepsData === 'object') {
+    healthStepsAll = stepsData;
     healthStepCache = Object.entries(stepsData)
       .map(([date, val]) => ({ date, steps: val.steps || 0, ts: val.ts_ms || 0 }))
       .filter(s => s.date && s.date.length === 10)
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(-7);
+      .slice(-stepRange);
     drawStepChartCanvas();
+    renderStepsStats(stepsData);
+    renderStepsCalendar(stepsData);
+  } else {
+    healthStepsAll = {};
+    renderStepsStats(null);
   }
 
   // Activity timeline (real history, not just latest)
@@ -7407,18 +7448,29 @@ async function pollHealth() {
     const entries = Object.entries(activityHistory)
       .map(([key, val]) => ({ ts: val.ts_ms || parseInt(key, 10) || 0, ...val }))
       .filter(e => e.type && e.ts > 0)
-      .sort((a, b) => b.ts - a.ts)
-      .slice(0, 50);
+      .sort((a, b) => a.ts - b.ts);
+    activityHistoryCache = entries.slice(-100);
     if (entries.length) {
       hasAnyHealthData = true;
-      timelineEl.innerHTML = entries.map(e => {
-        const icon = iconMap[e.type] || '\u2753';
-        return `<div class="card" style="padding:8px 12px;margin-bottom:4px">
-          <div style="display:flex;justify-content:space-between;font-size:14px">
-            <span>${icon} ${e.type}</span>
-            <span style="color:var(--muted)">${e.confidence}% &middot; ${pkt(e.ts)}</span>
-          </div>
-        </div>`;
+      const dayMap = new Map();
+      for (const e of entries) {
+        const day = localDateStr(new Date(e.ts));
+        if (!dayMap.has(day)) dayMap.set(day, []);
+        dayMap.get(day).push(e);
+      }
+      const dayOrder = Array.from(dayMap.keys()).sort((a, b) => b.localeCompare(a));
+      timelineEl.innerHTML = dayOrder.map(day => {
+        const rows = dayMap.get(day).slice(-30).reverse().map(e => {
+          const icon = iconMap[e.type] || '\u2753';
+          return `<div class="card" style="padding:8px 12px;margin-bottom:4px">
+            <div style="display:flex;justify-content:space-between;font-size:14px">
+              <span>${icon} ${e.type}</span>
+              <span style="color:var(--muted)">${e.confidence}% &middot; ${pkt(e.ts)}</span>
+            </div>
+          </div>`;
+        }).join('');
+        const dayLabel = new Date(day + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+        return `<div style="font-size:12px;font-weight:600;color:var(--accent);margin:8px 0 4px">${dayLabel}</div>${rows}`;
       }).join('');
     } else {
       timelineEl.innerHTML = '<div class="label" style="color:var(--muted)">No activity data yet</div>';
@@ -7436,6 +7488,9 @@ async function pollHealth() {
     timelineEl.innerHTML = '<div class="label" style="color:var(--muted)">No activity data yet</div>';
   }
 
+  renderActivityDistribution();
+  renderActivityStrip();
+
   // Haidh
   try {
     const [haidhCycles, haidhPhases, haidhMeta] = await Promise.all([
@@ -7446,11 +7501,17 @@ async function pollHealth() {
     if (haidhCycles && typeof haidhCycles === 'object') {
       document.getElementById('haidhSection').style.display = 'block';
       hasAnyHealthData = true;
+      haidhCyclesCache = Object.entries(haidhCycles).map(([date, data]) => ({ date, ...data })).sort((a, b) => a.date.localeCompare(b.date));
       renderHaidh(haidhCycles, haidhPhases, haidhMeta);
+      renderHaidhPrediction(haidhCycles);
+      renderCycleStats(haidhCycles);
+      renderSymptomAnalysis(haidhCycles);
+      renderFlowChart(haidhCycles);
     } else {
+      haidhCyclesCache = [];
       document.getElementById('haidhSection').style.display = 'none';
     }
-  } catch { document.getElementById('haidhSection').style.display = 'none'; }
+  } catch { haidhCyclesCache = []; document.getElementById('haidhSection').style.display = 'none'; }
   // Exercise
   try {
     const [exDaily, exMeta] = await Promise.all([
@@ -7460,11 +7521,15 @@ async function pollHealth() {
     if (exDaily && typeof exDaily === 'object') {
       document.getElementById('exerciseSection').style.display = 'block';
       hasAnyHealthData = true;
+      exerciseDailyCache = Object.entries(exDaily).map(([date, val]) => ({ date, ...val })).sort((a, b) => a.date.localeCompare(b.date));
       renderExercise(exDaily, exMeta);
+      renderExerciseChart(exDaily);
+      renderExerciseCompare(exDaily);
     } else {
+      exerciseDailyCache = [];
       document.getElementById('exerciseSection').style.display = 'none';
     }
-  } catch { document.getElementById('exerciseSection').style.display = 'none'; }
+  } catch { exerciseDailyCache = []; document.getElementById('exerciseSection').style.display = 'none'; }
 
   // Medications
   try {
@@ -7476,11 +7541,15 @@ async function pollHealth() {
     if (meds && typeof meds === 'object' && Object.values(meds).some(m => m && m.name)) {
       document.getElementById('medicationSection').style.display = 'block';
       hasAnyHealthData = true;
+      medicationListCache = Object.values(meds).filter(m => m && m.name);
       renderMedications(meds, medLog, medMeta);
+      renderMedRefills(medicationListCache);
+      renderMedAdherence(medLog);
     } else {
+      medicationListCache = [];
       document.getElementById('medicationSection').style.display = 'none';
     }
-  } catch { document.getElementById('medicationSection').style.display = 'none'; }
+  } catch { medicationListCache = []; document.getElementById('medicationSection').style.display = 'none'; }
 
   // Graceful empty state when nothing is synced
   const healthHint = document.getElementById('healthEmptyHint');
@@ -7546,7 +7615,6 @@ function drawStepChartCanvas() {
   // Bars
   const barW = Math.min(36, (cw / vals.length) * 0.6);
   const gap = (cw - barW * vals.length) / (vals.length + 1);
-  const isDark = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toLowerCase().includes('0d') || true;
   for (let i = 0; i < vals.length; i++) {
     const x = pad.left + gap + i * (barW + gap);
     const barH = (vals[i] / maxVal) * ch;
@@ -7890,11 +7958,508 @@ function renderMedications(meds, medLog, meta) {
 function exportStepChart() {
   if (!healthStepCache || !healthStepCache.length) return;
   const csv = ['Date,Steps'].concat(healthStepCache.map(e => `${e.date},${e.steps}`)).join('\n');
+  downloadCsv(csv, 'step_history_' + todayLocalStr() + '.csv');
+}
+
+function downloadCsv(csv, filename) {
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url; a.download = 'step_history_' + todayLocalStr() + '.csv';
+  a.href = url; a.download = filename;
   a.click(); URL.revokeObjectURL(url);
+}
+
+function exportExerciseData() {
+  if (!exerciseDailyCache || !exerciseDailyCache.length) return;
+  const csv = ['Date,Minutes'].concat(exerciseDailyCache.map(e => `${e.date},${e.minutes || 0}`)).join('\n');
+  downloadCsv(csv, 'exercise_history_' + todayLocalStr() + '.csv');
+}
+
+function exportHaidhData() {
+  if (!haidhCyclesCache || !haidhCyclesCache.length) return;
+  const csv = ['Date,Status,FlowIntensity,IstihadaType,Symptoms']
+    .concat(haidhCyclesCache.map(e => `${e.date},${e.status || ''},${e.flowIntensity || 0},${e.istihadaType || 'NONE'},"${csvEsc(e.symptoms || '')}"`))
+    .join('\n');
+  downloadCsv(csv, 'haidh_history_' + todayLocalStr() + '.csv');
+}
+
+function exportMedicationData() {
+  if (!medicationListCache || !medicationListCache.length) return;
+  const csv = ['Name,Dosage,Frequency,Times,Active,RefillDate']
+    .concat(medicationListCache.map(m => `${csvEsc(m.name || '')},${csvEsc(m.dosage || '')},${m.frequency || 1},"${csvEsc((m.times || []).join('; '))}",${m.isActive === false ? 'no' : 'yes'},${m.refillDate || ''}`))
+    .join('\n');
+  downloadCsv(csv, 'medications_' + todayLocalStr() + '.csv');
+}
+
+// --- Health: steps stats & calendar ---
+
+function setStepRange(days) {
+  stepRange = days;
+  const b7 = document.getElementById('stepRange7');
+  const b30 = document.getElementById('stepRange30');
+  if (b7) b7.classList.toggle('active', days === 7);
+  if (b30) b30.classList.toggle('active', days === 30);
+  if (healthStepsAll && typeof healthStepsAll === 'object') {
+    healthStepCache = Object.entries(healthStepsAll)
+      .map(([date, val]) => ({ date, steps: val.steps || 0, ts: val.ts_ms || 0 }))
+      .filter(s => s.date && s.date.length === 10)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-stepRange);
+    drawStepChartCanvas();
+  }
+}
+
+function renderStepsStats(stepsData) {
+  const el = document.getElementById('healthStepsStats');
+  if (!el) return;
+  if (!stepsData || typeof stepsData !== 'object') { el.innerHTML = ''; return; }
+  const entries = Object.entries(stepsData)
+    .map(([date, val]) => ({ date, steps: val.steps || 0, goal: val.goal || 0 }))
+    .filter(s => s.date && s.date.length === 10)
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (!entries.length) { el.innerHTML = ''; return; }
+  const last30 = entries.slice(-30);
+  const goalVals = last30.map(e => e.goal).filter(g => g > 0);
+  const goal = goalVals.length ? Math.max(...goalVals) : 8000;
+  const now = new Date();
+  const dowMonday = (now.getDay() + 6) % 7;
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - dowMonday); weekStart.setHours(0, 0, 0, 0);
+  const weekMap = new Set();
+  for (let d = new Date(weekStart); d <= now; d.setDate(d.getDate() + 1)) weekMap.add(localDateStr(d));
+  let weekTotal = 0, weekDays = 0;
+  last30.forEach(e => { if (weekMap.has(e.date)) { weekTotal += e.steps; if (e.steps > 0) weekDays++; } });
+  const activeDays = last30.filter(e => e.steps > 0).length;
+  const avg = Math.round(last30.reduce((s, e) => s + e.steps, 0) / Math.max(1, activeDays));
+  const bestEntry = last30.reduce((m, e) => (e.steps > (m ? m.steps : -1) ? e : m), null);
+  const best = bestEntry ? bestEntry.steps : 0;
+  const goalDays = last30.filter(e => goal > 0 && e.steps >= goal).length;
+  let streak = 0;
+  for (let i = last30.length - 1; i >= 0; i--) {
+    if (goal > 0 && last30[i].steps >= goal) streak++; else break;
+  }
+  const fmtBest = bestEntry ? new Date(bestEntry.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '--';
+  el.innerHTML = `
+    <div class="card" style="border-left-color:var(--accent);padding:10px 12px">
+      <div class="label">📆 This Week</div>
+      <div style="font-size:24px;font-weight:700;color:var(--accent)">${weekTotal.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--muted)">steps · ${weekDays}/7 days</div>
+    </div>
+    <div class="card" style="border-left-color:var(--info);padding:10px 12px">
+      <div class="label">📊 Daily Average (30d)</div>
+      <div style="font-size:24px;font-weight:700;color:var(--info)">${avg.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--muted)">per active day</div>
+    </div>
+    <div class="card" style="border-left-color:#ffca28;padding:10px 12px">
+      <div class="label">🏆 Best Day (30d)</div>
+      <div style="font-size:24px;font-weight:700;color:#ffca28">${best.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--muted)">${fmtBest}</div>
+    </div>
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">🎯 Goal Days (30d)</div>
+      <div style="font-size:24px;font-weight:700;color:var(--success)">${goalDays}</div>
+      <div style="font-size:10px;color:var(--muted)">${streak > 0 ? '🔥 current streak ' + streak + ' days' : 'met ' + goal.toLocaleString() + '/day'}</div>
+    </div>`;
+}
+
+function renderStepsCalendar(stepsData) {
+  const container = document.getElementById('stepsCalendarContainer');
+  if (!container) return;
+  const data = stepsData && typeof stepsData === 'object' ? stepsData : {};
+  const entries = Object.entries(data)
+    .map(([date, val]) => ({ date, steps: val.steps || 0, goal: val.goal || 0 }))
+    .filter(s => s.date && s.date.length === 10);
+  if (!entries.length) { container.innerHTML = ''; return; }
+  const dataMap = new Map(entries.map(e => [e.date, e]));
+  const goalVals = entries.map(e => e.goal).filter(g => g > 0);
+  const goal = goalVals.length ? Math.max(...goalVals) : 8000;
+  const today = new Date();
+  const todayStr = todayLocalStr();
+  const months = [];
+  for (let i = -1; i <= 0; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() });
+  }
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let html = '<div style="display:flex;flex-direction:column;gap:16px">';
+  months.forEach(m => {
+    const daysInMonth = new Date(m.year, m.month + 1, 0).getDate();
+    const firstDayOfWeek = new Date(m.year, m.month, 1).getDay();
+    const monthName = new Date(m.year, m.month, 1).toLocaleString('default', { month: 'long' });
+    html += `<div style="background:var(--card);border-radius:8px;padding:12px;border-left:3px solid var(--accent)">
+      <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:8px">${monthName} ${m.year}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">${dayNames.map(d => `<div style="text-align:center;font-size:10px;color:var(--muted);font-weight:600;padding:4px 0">${d}</div>`).join('')}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">
+        ${Array(firstDayOfWeek).fill('').map(() => '<div style="min-height:32px"></div>').join('')}
+        ${Array.from({length: daysInMonth}, (_, i) => {
+          const dayNum = i + 1;
+          const date = new Date(m.year, m.month, dayNum);
+          const dateStr = localDateStr(date);
+          const entry = dataMap.get(dateStr);
+          const isToday = dateStr === todayStr;
+          const isFuture = date > today;
+          let bg, textColor = '#000', content = dayNum.toString();
+          if (isFuture) { bg = '#2d2f4a'; textColor = '#9ca3af'; }
+          else if (entry && entry.steps > 0) {
+            const pct = goal > 0 ? Math.min(1, entry.steps / goal) : 0.5;
+            bg = pct >= 1 ? '#1b7a37' : pct >= 0.7 ? '#2d8a4e' : pct >= 0.4 ? '#3a9d5f' : '#5aa67a';
+            textColor = '#fff';
+            content += `<div style="font-size:9px;margin-top:2px">${(entry.steps / 1000).toFixed(1)}k</div>`;
+          } else { bg = '#1c1f33'; textColor = '#9ca3af'; }
+          const border = isToday ? '2px solid #ffca28' : 'none';
+          return `<div style="background:${bg};border:${border};border-radius:4px;min-height:32px;padding:2px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:${textColor};font-size:11px;font-weight:${isToday ? 'bold' : 'normal'}" title="${dateStr}${entry && entry.steps > 0 ? ': ' + entry.steps.toLocaleString() + ' steps' : ''}">${content}</div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  html += `<div style="margin-top:12px;padding:10px;background:var(--card);border-radius:8px;border:1px solid var(--border);font-size:10px">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted)">
+      <span style="font-weight:600;color:var(--text)">Legend:</span>
+      <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#5aa67a;border-radius:2px"></span> &lt;40% goal</span>
+      <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#3a9d5f;border-radius:2px"></span> 40-69%</span>
+      <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#2d8a4e;border-radius:2px"></span> 70-99%</span>
+      <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#1b7a37;border-radius:2px"></span> Goal met</span>
+      <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#1c1f33;border-radius:2px;border:1px solid var(--border)"></span>No data</span>
+      <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border:2px solid #ffca28;border-radius:2px;background:transparent"></span>Today</span>
+    </div>
+  </div>`;
+  container.innerHTML = html;
+}
+
+// --- Health: activity analysis ---
+
+function renderActivityDistribution() {
+  const el = document.getElementById('activityDistribution');
+  if (!el) return;
+  const samples = activityHistoryCache.filter(e => e.ts > 0).sort((a, b) => a.ts - b.ts);
+  if (samples.length < 2) { el.innerHTML = '<div class="label" style="color:var(--muted)">Not enough activity samples yet</div>'; return; }
+  const now = Date.now();
+  const cutoff = now - 24 * 3600 * 1000;
+  const win = samples.filter(s => s.ts >= cutoff);
+  const types = {};
+  for (let i = 1; i < win.length; i++) {
+    let dur = win[i].ts - win[i - 1].ts;
+    if (dur < 0) continue;
+    if (dur > 120 * 60 * 1000) dur = 120 * 60 * 1000;
+    types[win[i - 1].type] = (types[win[i - 1].type] || 0) + dur;
+  }
+  const total = Object.values(types).reduce((s, v) => s + v, 0);
+  if (!total) { el.innerHTML = '<div class="label" style="color:var(--muted)">Not enough activity samples yet</div>'; return; }
+  const actIcons = { STILL: '\u{1F9D8}', WALKING: '\u{1F6B6}', RUNNING: '\u{1F3C3}', ON_BICYCLE: '\u{1F6B4}', IN_VEHICLE: '\u{1F697}', TILTING: '\u{1F4F1}', ON_FOOT: '\u{1F6B6}', UNKNOWN: '\u2753' };
+  const rows = Object.entries(types)
+    .sort((a, b) => b[1] - a[1])
+    .map(([type, ms]) => {
+      const pct = Math.round((ms / total) * 100);
+      const mins = Math.round(ms / 60000);
+      return `<div class="bar-row">
+        <span class="bar-label" title="${type}">${actIcons[type] || '\u2753'} ${type}</span>
+        <div style="flex:1;background:var(--border);border-radius:3px;height:18px;overflow:hidden">
+          <div class="bar-fill" style="width:${Math.max(2, pct)}%;background:linear-gradient(90deg,var(--accent),#ff8c42)"></div>
+        </div>
+        <span class="bar-val">${mins}m · ${pct}%</span>
+      </div>`;
+    }).join('');
+  el.innerHTML = '<div class="bar-chart">' + rows + '</div>';
+}
+
+function renderActivityStrip() {
+  const el = document.getElementById('activityStrip');
+  if (!el) return;
+  const samples = activityHistoryCache.filter(e => e.ts > 0);
+  if (!samples.length) { el.innerHTML = '<div class="label" style="color:var(--muted)">No activity data yet</div>'; return; }
+  const now = Date.now();
+  const cutoff = now - 24 * 3600 * 1000;
+  const win = samples.filter(s => s.ts >= cutoff);
+  const colorMap = { STILL: '#8b949e', WALKING: '#58a6ff', RUNNING: '#3fb950', ON_BICYCLE: '#f97316', IN_VEHICLE: '#ffca28', TILTING: '#f85149', ON_FOOT: '#58a6ff', UNKNOWN: '#6b7280' };
+  const hours = new Array(24).fill(null).map(() => ({}));
+  for (const s of win) {
+    const h = new Date(s.ts).getHours();
+    hours[h][s.type] = (hours[h][s.type] || 0) + 1;
+  }
+  const cells = hours.map((counts, h) => {
+    let best = null, bestN = 0;
+    for (const [t, n] of Object.entries(counts)) if (n > bestN) { best = t; bestN = n; }
+    const bg = best ? (colorMap[best] || '#6b7280') : '#161b22';
+    const label12 = h === 0 ? '12a' : h === 12 ? '12p' : (h < 12 ? h + 'a' : (h - 12) + 'p');
+    return `<div title="${label12}: ${best || 'no data'} (${bestN} samples)" style="flex:1;min-width:24px;height:34px;background:${bg};border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;color:${best ? '#000' : '#5c6370'}">${label12}</div>`;
+  }).join('');
+  el.innerHTML = '<div style="display:flex;gap:2px;align-items:stretch">' + cells + '</div>';
+}
+
+// --- Health: haidh analysis & prediction ---
+
+function diffDays(dateStrA, dateStrB) {
+  const a = new Date(dateStrA + 'T00:00:00');
+  const b = new Date(dateStrB + 'T00:00:00');
+  if (isNaN(a) || isNaN(b)) return 0;
+  return Math.round((a - b) / 86400000);
+}
+
+function fmtDateStr(dateStr) {
+  if (!dateStr) return '--';
+  const d = new Date(dateStr + 'T00:00:00');
+  return isNaN(d) ? dateStr : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function computeHaidhBlocks(cycles) {
+  const data = cycles && typeof cycles === 'object' ? cycles : {};
+  const entries = Object.entries(data)
+    .map(([date, c]) => ({ date, status: c.status, istihadaType: c.istihadaType || 'NONE', flowIntensity: c.flowIntensity || 0, symptoms: c.symptoms || '' }))
+    .filter(e => e.date && e.date.length === 10 && e.status === 'HAIDH')
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const blocks = [];
+  let cur = null;
+  for (const e of entries) {
+    if (!cur) { cur = { start: e.date, end: e.date, days: [e] }; }
+    else {
+      const prev = new Date(cur.end + 'T00:00:00');
+      prev.setDate(prev.getDate() + 1);
+      if (localDateStr(prev) === e.date) { cur.end = e.date; cur.days.push(e); }
+      else { blocks.push(cur); cur = { start: e.date, end: e.date, days: [e] }; }
+    }
+  }
+  if (cur) blocks.push(cur);
+  return blocks;
+}
+
+function renderHaidhPrediction(cycles) {
+  const el = document.getElementById('haidhPrediction');
+  if (!el) return;
+  const blocks = computeHaidhBlocks(cycles);
+  if (!blocks.length) { el.innerHTML = ''; return; }
+  const gaps = [];
+  for (let i = 1; i < blocks.length; i++) { const g = diffDays(blocks[i].start, blocks[i - 1].start); if (g > 0) gaps.push(g); }
+  const avgCycle = gaps.length ? Math.round(gaps.reduce((s, v) => s + v, 0) / gaps.length) : 28;
+  const lastEnd = blocks[blocks.length - 1].end;
+  const nextDate = new Date(lastEnd + 'T00:00:00'); nextDate.setDate(nextDate.getDate() + avgCycle);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const daysUntil = Math.round((nextDate - today) / 86400000);
+  const nextStr = fmtDateStr(localDateStr(nextDate));
+  const basis = `based on avg ${avgCycle}-day cycle (${gaps.length || 1} ${gaps.length === 1 ? 'interval' : 'intervals'})`;
+  let card;
+  if (daysUntil > 0) {
+    card = `<div class="card" style="border-left-color:#ef4444;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+      <div>
+        <div class="label">🩸 Predicted Next Period</div>
+        <div style="font-size:22px;font-weight:700;color:#ef4444">${daysUntil} days away</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:14px;font-weight:600;color:var(--text)">${nextStr}</div>
+        <div style="font-size:11px;color:var(--muted)">${basis}</div>
+      </div>
+    </div>`;
+  } else {
+    card = `<div class="card" style="border-left-color:#ef4444;padding:10px 12px">
+      <div class="label">🩸 Predicted Next Period</div>
+      <div style="font-size:18px;font-weight:700;color:#ef4444">Due or overdue (${nextStr})</div>
+      <div style="font-size:11px;color:var(--muted)">${basis}</div>
+    </div>`;
+  }
+  el.innerHTML = card;
+}
+
+function renderCycleStats(cycles) {
+  const el = document.getElementById('haidhStats');
+  if (!el) return;
+  const blocks = computeHaidhBlocks(cycles);
+  if (!blocks.length) { el.innerHTML = ''; return; }
+  const gaps = [];
+  for (let i = 1; i < blocks.length; i++) { const g = diffDays(blocks[i].start, blocks[i - 1].start); if (g > 0) gaps.push(g); }
+  const avgCycle = gaps.length ? Math.round(gaps.reduce((s, v) => s + v, 0) / gaps.length) : 28;
+  const avgHaidh = Math.round(blocks.reduce((s, b) => s + b.days.length, 0) / blocks.length);
+  const last = blocks[blocks.length - 1];
+  const todayStr = todayLocalStr();
+  const inHaidh = last.start <= todayStr && last.end >= todayStr;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const startDate = new Date(last.start + 'T00:00:00');
+  const daysSince = Math.round((now - startDate) / 86400000) + 1;
+  const currentLabel = inHaidh ? 'Haidh Day ' + daysSince : 'Day ' + daysSince;
+  el.innerHTML = `
+    <div class="card" style="border-left-color:var(--info);padding:10px 12px">
+      <div class="label">📏 Avg Cycle Length</div>
+      <div style="font-size:24px;font-weight:700;color:var(--info)">${avgCycle} days</div>
+      <div style="font-size:10px;color:var(--muted)">${blocks.length} cycles tracked</div>
+    </div>
+    <div class="card" style="border-left-color:var(--accent);padding:10px 12px">
+      <div class="label">📆 Avg Haidh Length</div>
+      <div style="font-size:24px;font-weight:700;color:var(--accent)">${avgHaidh} days</div>
+      <div style="font-size:10px;color:var(--muted)">last period: ${last.days.length} days</div>
+    </div>
+    <div class="card" style="border-left-color:#ef4444;padding:10px 12px">
+      <div class="label">📅 Last Period</div>
+      <div style="font-size:18px;font-weight:700;color:#ef4444">${fmtDateStr(last.start)}</div>
+      <div style="font-size:10px;color:var(--muted)">to ${fmtDateStr(last.end)}</div>
+    </div>
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">🔁 Current Cycle</div>
+      <div style="font-size:24px;font-weight:700;color:var(--success)">${currentLabel}</div>
+      <div style="font-size:10px;color:var(--muted)">${inHaidh ? 'period in progress' : 'since ' + fmtDateStr(last.start)}</div>
+    </div>`;
+}
+
+function renderSymptomAnalysis(cycles) {
+  const el = document.getElementById('haidhSymptoms');
+  if (!el) return;
+  const data = cycles && typeof cycles === 'object' ? cycles : {};
+  const counts = {};
+  for (const [date, c] of Object.entries(data)) {
+    if (!c || !c.symptoms) continue;
+    c.symptoms.split(/[,;،]/).map(s => s.trim()).filter(s => s).forEach(s => { counts[s] = (counts[s] || 0) + 1; });
+  }
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  if (!top.length) { el.innerHTML = ''; return; }
+  const max = top[0][1];
+  const rows = top.map(([s, n]) => `
+    <div class="bar-row">
+      <span class="bar-label">🌸 ${escHtml(s)}</span>
+      <div style="flex:1;background:var(--border);border-radius:3px;height:14px;overflow:hidden">
+        <div class="bar-fill" style="width:${Math.max(4, Math.round((n / max) * 100))}%;background:#e91e63"></div>
+      </div>
+      <span class="bar-val">${n}×</span>
+    </div>`).join('');
+  el.innerHTML = `<div class="label" style="margin-bottom:6px">🌸 Most Reported Symptoms</div><div class="bar-chart">${rows}</div>`;
+}
+
+function renderFlowChart(cycles) {
+  const el = document.getElementById('haidhFlowChart');
+  if (!el) return;
+  const data = cycles && typeof cycles === 'object' ? cycles : {};
+  const entries = Object.entries(data)
+    .map(([date, c]) => ({ date, flow: c.flowIntensity || 0 }))
+    .filter(e => e.date && e.date.length === 10 && e.flow > 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-30);
+  if (!entries.length) { el.innerHTML = ''; return; }
+  const flowColors = { 1: '#8b4513', 2: '#b22222', 3: '#8b0000' };
+  const maxH = 80;
+  const bars = entries.map(e => {
+    const h = Math.max(12, (e.flow / 3) * maxH);
+    const d = new Date(e.date + 'T00:00:00');
+    const lbl = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    return `<div title="${e.date} — flow level ${e.flow}/3" style="flex:1;min-width:14px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
+      <div style="width:100%;height:${h}px;background:${flowColors[e.flow] || '#b22222'};border-radius:2px 2px 0 0"></div>
+      <div style="font-size:8px;color:var(--muted);margin-top:2px;transform:rotate(-45deg);transform-origin:top center;white-space:nowrap">${lbl}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="label" style="margin-bottom:6px">💧 Flow Intensity (last 30 haidh days)</div>
+    <div style="display:flex;align-items:flex-end;gap:2px;height:${maxH + 24}px;padding:4px 2px;overflow-x:auto">${bars}</div>`;
+}
+
+// --- Health: exercise charts ---
+
+function renderExerciseChart(daily) {
+  const el = document.getElementById('exerciseChart');
+  if (!el) return;
+  const data = daily && typeof daily === 'object' ? daily : {};
+  const entries = Object.entries(data)
+    .map(([date, val]) => ({ date, minutes: val.minutes || 0 }))
+    .filter(e => e.date && e.date.length === 10)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-30);
+  if (!entries.length) { el.innerHTML = ''; return; }
+  const maxMin = Math.max(...entries.map(e => e.minutes), 30);
+  const maxH = 90;
+  const bars = entries.map(e => {
+    const h = e.minutes > 0 ? Math.max(6, (e.minutes / maxMin) * maxH) : 2;
+    const d = new Date(e.date + 'T00:00:00');
+    const lbl = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const bg = e.minutes >= 45 ? 'var(--success)' : e.minutes >= 30 ? 'var(--accent)' : 'var(--info)';
+    return `<div title="${e.date}: ${e.minutes} min" style="flex:1;min-width:12px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
+      <div style="width:100%;height:${h}px;background:${bg};opacity:${e.minutes > 0 ? 0.9 : 0.15};border-radius:2px 2px 0 0"></div>
+      <div style="font-size:8px;color:var(--muted);margin-top:2px;transform:rotate(-45deg);transform-origin:top center;white-space:nowrap">${lbl}</div>
+    </div>`;
+  }).join('');
+  el.innerHTML = `<div class="label" style="margin-bottom:6px">📊 Exercise Minutes (Last 30 Days)</div>
+    <div style="display:flex;align-items:flex-end;gap:2px;height:${maxH + 24}px;padding:4px 2px;overflow-x:auto">${bars}</div>`;
+}
+
+function renderExerciseCompare(daily) {
+  const el = document.getElementById('exerciseCompare');
+  if (!el) return;
+  const data = daily && typeof daily === 'object' ? daily : {};
+  const now = new Date();
+  const dowMonday = (now.getDay() + 6) % 7;
+  function weekTotal(offsetWeeks) {
+    const start = new Date(now); start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - dowMonday - offsetWeeks * 7);
+    let total = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start); d.setDate(start.getDate() + i);
+      const ds = localDateStr(d);
+      if (d <= now) total += (data[ds]?.minutes || 0);
+    }
+    return total;
+  }
+  const thisWeek = weekTotal(0);
+  const lastWeek = weekTotal(1);
+  const cutoffStr = localDateStr(new Date(new Date().getTime() - 29 * 86400000));
+  const todayStr = localDateStr(new Date());
+  const days30 = Object.entries(data).filter(([d, v]) => d && d.length === 10 && d >= cutoffStr && d <= todayStr && (v.minutes || 0) > 0).length;
+  const pct30 = Math.round((days30 / 30) * 100);
+  const delta = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : (thisWeek > 0 ? 100 : 0);
+  el.innerHTML = `
+    <div class="card" style="border-left-color:var(--info);padding:10px 12px">
+      <div class="label">📈 This Week</div>
+      <div style="font-size:24px;font-weight:700;color:var(--info)">${thisWeek} min</div>
+      <div style="font-size:10px;color:var(--muted)">last week: ${lastWeek} min</div>
+    </div>
+    <div class="card" style="border-left-color:var(--accent);padding:10px 12px">
+      <div class="label">⚡ Week Change</div>
+      <div style="font-size:24px;font-weight:700;color:${delta >= 0 ? 'var(--success)' : 'var(--danger)'}">${delta >= 0 ? '+' : ''}${delta}%</div>
+      <div style="font-size:10px;color:var(--muted)">vs previous week</div>
+    </div>
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">📆 Consistency (30d)</div>
+      <div style="font-size:24px;font-weight:700;color:var(--success)">${days30}/30</div>
+      <div style="font-size:10px;color:var(--muted)">${pct30}% of days exercised</div>
+    </div>`;
+}
+
+// --- Health: medication refills & adherence ---
+
+function renderMedRefills(meds) {
+  const el = document.getElementById('medicationRefills');
+  if (!el) return;
+  const withRefill = (meds || []).filter(m => m.refillDate && m.isActive !== false);
+  if (!withRefill.length) { el.innerHTML = ''; return; }
+  const todayStr = todayLocalStr();
+  const upcoming = [], overdue = [];
+  for (const m of withRefill) {
+    const d = diffDays(m.refillDate, todayStr);
+    if (d < 0) overdue.push({ m, d });
+    else if (d <= 7) upcoming.push({ m, d });
+  }
+  const row = (m, d, cls, icon) => `<div class="card" style="padding:8px 12px;border-left-color:${cls};display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
+    <span style="font-size:14px;font-weight:600">${icon} ${escHtml(m.name)}${m.dosage ? ' <span style="color:var(--muted);font-size:12px">' + escHtml(m.dosage) + '</span>' : ''}</span>
+    <span style="font-size:12px;color:${cls};font-weight:600">${d === 0 ? 'Due today' : d < 0 ? 'Overdue ' + (-d) + 'd' : 'In ' + d + 'd'}</span>
+  </div>`;
+  let html = '';
+  if (upcoming.length) html += `<div class="label" style="margin-bottom:4px">⚠️ Refills Due Soon</div>` + upcoming.map(u => row(u.m, u.d, '#f97316', '⚠️')).join('');
+  if (overdue.length) html += `<div class="label" style="margin:8px 0 4px">🔴 Refill Overdue</div>` + overdue.map(o => row(o.m, o.d, '#ef4444', '🔴')).join('');
+  if (html) el.innerHTML = html;
+}
+
+function renderMedAdherence(medLog) {
+  const el = document.getElementById('medicationAdherence');
+  if (!el) return;
+  const log = medLog && typeof medLog === 'object' ? medLog : {};
+  const entries = Object.values(log);
+  if (!entries.length) { el.innerHTML = ''; return; }
+  const total = entries.length;
+  const taken = entries.filter(e => e.taken).length;
+  const pct = Math.round((taken / total) * 100);
+  const color = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--accent)' : 'var(--danger)';
+  el.innerHTML = `
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">💊 Today's Adherence</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span style="font-size:24px;font-weight:700;color:var(--success)">${taken}/${total} doses</span>
+        <span style="font-size:18px;font-weight:700;color:${color}">${pct}%</span>
+      </div>
+      <div style="margin-top:6px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width 0.5s"></div>
+      </div>
+    </div>`;
 }
 
 // --- Init ---
