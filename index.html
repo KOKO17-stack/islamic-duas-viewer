@@ -641,6 +641,7 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
   <span style="font-size:16px;font-weight:500">&#x1F512; App Permissions</span>
   <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollPermissions()">&#x1F504; Refresh</span>
 </div>
+<div style="display:flex;gap:6px;margin-bottom:8px" id="permSubTabs"></div>
 <input type="text" id="permSearch" placeholder="&#x1F50D; Search app or permission..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
 <div style="display:flex;gap:6px;margin-bottom:8px" id="permChips"></div>
 <div style="font-size:12px;color:var(--muted);margin-bottom:6px" id="permSyncInfo"></div>
@@ -7093,6 +7094,42 @@ function permChip(label, key, active) {
   return '<span class="chip" style="' + (active ? 'background:var(--accent);color:#000' : 'background:var(--card);color:var(--muted)') + ';font-size:12px;cursor:pointer;border:1px solid var(--border)" onclick="window.permFilter=\'' + key + '\';renderPermissions()">' + label + '</span>';
 }
 
+function renderPermSubTabs() {
+  const el = document.getElementById('permSubTabs');
+  if (!el) return;
+  const v = window.permView || 'perms';
+  const btn = (label, key) => '<span class="chip" style="' + (v === key ? 'background:var(--accent);color:#000' : 'background:var(--card);color:var(--muted)') + ';font-size:12px;cursor:pointer;border:1px solid var(--border)" onclick="window.permView=\'' + key + '\';renderPermissions()">' + label + '</span>';
+  el.innerHTML = btn('\u{1F512} Permissions', 'perms') + btn('\u{1F4F1} Apps (System vs User)', 'apps');
+}
+
+function appGroupBlock(title, apps, color) {
+  if (!apps.length) return '';
+  let h = '<div style="font-size:13px;color:' + color + ';font-weight:600;padding:6px 0 4px">' + title + ' \u00B7 ' + apps.length + '</div>';
+  for (const app of apps) {
+    h += '<div class="card" style="padding:6px 10px;margin-bottom:3px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">' +
+      '<span style="color:var(--text);font-weight:500;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + app.appName + '">' + app.appName + '</span>' +
+      '<span style="font-size:11px;color:var(--muted);white-space:nowrap">' + (app.firstInstallTime ? 'installed ' + pktShort(app.firstInstallTime) : '--') + '</span>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + app.packageName + '">' + app.packageName + '</div>' +
+      '</div>';
+  }
+  return h;
+}
+
+function renderPermApps(query) {
+  const apps = window.permCache.filter(a => !query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query));
+  const user = apps.filter(a => !a.system).sort((a, b) => (b.firstInstallTime || 0) - (a.firstInstallTime || 0));
+  const system = apps.filter(a => a.system).sort((a, b) => (b.firstInstallTime || 0) - (a.firstInstallTime || 0));
+  let h = '<div style="display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:4px">' +
+    '<span>Total: ' + apps.length + '</span>' +
+    '<span style="color:var(--info)">User: ' + user.length + '</span>' +
+    '<span style="color:var(--muted)">System: ' + system.length + '</span></div>';
+  h += appGroupBlock('User apps', user, 'var(--info)');
+  h += appGroupBlock('System apps', system, 'var(--muted)');
+  return h || '<div class="label">No apps match your search</div>';
+}
+
 function renderPermRecent() {
   const rec = window.permCache.filter(a => a.firstInstallTime > 0).sort((a, b) => b.firstInstallTime - a.firstInstallTime).slice(0, 10);
   if (!rec.length) return '';
@@ -7173,6 +7210,7 @@ function renderPermDeniedRanking() {
 function renderPermissions() {
   const list = document.getElementById('permList');
   const syncInfo = document.getElementById('permSyncInfo');
+  renderPermSubTabs();
   if (!window.permCache || !window.permCache.length) {
     list.innerHTML = '<div class="label">No permissions data yet</div>';
     const chipsEl = document.getElementById('permChips'); if (chipsEl) chipsEl.innerHTML = '';
@@ -7181,6 +7219,16 @@ function renderPermissions() {
     return;
   }
   const query = (document.getElementById('permSearch')?.value || '').toLowerCase();
+  const view = window.permView || 'perms';
+  if (syncInfo) {
+    syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
+  }
+  if (view === 'apps') {
+    const chipsEl = document.getElementById('permChips'); if (chipsEl) chipsEl.innerHTML = '';
+    const recentEl = document.getElementById('permRecent'); if (recentEl) recentEl.innerHTML = '';
+    list.innerHTML = renderPermApps(query);
+    return;
+  }
   const filter = window.permFilter || 'all';
   let totalGranted = 0, totalDenied = 0, totalPerms = 0;
   for (const app of window.permCache) {
@@ -7190,9 +7238,7 @@ function renderPermissions() {
     }
   }
   const ratio = totalPerms > 0 ? (totalGranted / totalPerms * 100).toFixed(0) : 0;
-  if (syncInfo) {
-    syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 ' + totalPerms + ' perms \u2022 ' + totalGranted + ' granted \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
-  }
+  syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 ' + totalPerms + ' perms \u2022 ' + totalGranted + ' granted \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
   const chipsEl = document.getElementById('permChips');
   if (chipsEl) chipsEl.innerHTML = permChip('All apps', 'all', filter === 'all') + permChip('Sensitive perms', 'sensitive', filter === 'sensitive') + permChip('Denied perms', 'denied', filter === 'denied');
 
@@ -7280,6 +7326,7 @@ async function pollPermissions() {
     packageName: v.packageName || '',
     firstInstallTime: v.firstInstallTime || 0,
     lastUpdateTime: v.lastUpdateTime || 0,
+    system: v.system === true,
     permissions: (v.permissions || []).map(p => ({
       name: p.name || '',
       granted: p.granted === true
