@@ -2850,9 +2850,11 @@ async function pollMirroring() {
   const detailEl = document.getElementById('mirrorDetail');
   const m = await fetchRTDB(`devices/${selectedDevice}/mirroring`);
   if (!m || m.active === undefined) {
-    chip.textContent = '\u{1F5A5} Mirror --';
-    chip.style.borderColor = 'var(--border)';
-    chip.style.color = 'var(--muted)';
+    const meta = await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
+    const knownIdle = meta && meta.mirrorActive !== undefined && !meta.mirrorActive;
+    chip.textContent = knownIdle ? '\u{1F5A5} No mirroring' : '\u{1F5A5} Mirror --';
+    chip.style.borderColor = knownIdle ? 'var(--success)' : 'var(--border)';
+    chip.style.color = knownIdle ? 'var(--success)' : 'var(--muted)';
     if (detailEl) detailEl.textContent = '';
     mirrorPrevActive = false;
     return;
