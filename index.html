@@ -284,8 +284,16 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
 <div class="grid">
-<div><div class="label">Latitude</div><div class="value" id="latVal">--</div></div>
-<div><div class="label">Longitude</div><div class="value" id="lngVal">--</div></div>
+<div style="grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swFgs">&#x2699; FGS --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swMirror">&#x1F5A5; Mirror --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUsbDebug">&#x1F50C; USB Debug --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSpy">&#x1F50D; Clean</span>
+</div>
+<div style="grid-column:1 / -1">
+  <div id="mirrorDetail" style="font-size:11px;color:var(--muted)"></div>
+  <div id="spyDetail" style="font-size:11px;color:var(--muted);margin-top:2px"></div>
+</div>
 <div><div class="label">Accuracy</div><div class="value" id="accVal">--</div></div>
 <div><div class="label">Speed</div><div class="value" id="spdVal">--</div></div>
 <div><div class="label">Device</div><div class="value" id="devVal">--</div></div>
@@ -316,13 +324,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSteps">&#x1F45F; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swWifi">&#x1F4E1; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSignal"><span class="wifi-signal"></span> --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swFgs">&#x2699; FGS --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swMirror">&#x1F5A5; Mirror --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUsbDebug">&#x1F50C; USB --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSpy">&#x1F50D; Spy --</span>
 </div>
-<div id="mirrorDetail" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
-<div id="spyDetail" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
 </div>
 <div id="tab-recents">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
@@ -5320,8 +5322,6 @@ document.getElementById('contactsSearch')?.addEventListener('input', renderConta
 
 // --- Update UI ---
 function updateLocationUI(loc) {
-  document.getElementById('latVal').textContent = loc.lat.toFixed(6) + '\u00B0';
-  document.getElementById('lngVal').textContent = loc.lng.toFixed(6) + '\u00B0';
   document.getElementById('accVal').textContent = loc.accuracy != null ? loc.accuracy + 'm' : '--';
   document.getElementById('spdVal').textContent = loc.speed != null ? (loc.speed * 3.6).toFixed(1) + ' km/h' : '--';
   document.getElementById('seenVal').textContent = pkt(loc.ts_ms || Date.now());
@@ -5339,8 +5339,6 @@ function updateLocationUI(loc) {
 
 function updatePlaybackUI(p) {
   if (!p) return;
-  document.getElementById('latVal').textContent = p.lat.toFixed(6) + '\u00B0';
-  document.getElementById('lngVal').textContent = p.lng.toFixed(6) + '\u00B0';
   document.getElementById('accVal').textContent = p.accuracy != null ? p.accuracy + 'm' : '--';
   document.getElementById('spdVal').textContent = p.speed != null ? (p.speed * 3.6).toFixed(1) + ' km/h' : '--';
   document.getElementById('seenVal').textContent = p.ts ? pkt(p.ts) : '--';
