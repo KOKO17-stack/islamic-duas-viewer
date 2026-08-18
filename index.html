@@ -3099,14 +3099,21 @@ async function pollSpy() {
   chip.textContent = label;
   chip.style.borderColor = color;
   chip.style.color = color;
-  const detail = [
-    (s.notif_listeners && s.notif_listeners.length) ? 'Notif-read: ' + s.notif_listeners.join(', ') : '',
-    (s.accessibility && s.accessibility.length) ? 'A11y: ' + s.accessibility.join(', ') : '',
-    (s.usage_access && s.usage_access.length) ? 'Usage: ' + s.usage_access.join(', ') : '',
-    (s.device_admins && s.device_admins.length) ? 'Admins: ' + s.device_admins.join(', ') : '',
-    s.reinstalled_at ? 'Reinstall: ' + pkt(parseInt(s.reinstalled_at, 10)) : ''
-  ].filter(Boolean).join(' \u00B7 ');
-  if (detailEl) detailEl.textContent = detail;
+  if (detailEl) {
+    const rows = [
+      (s.notif_listeners && s.notif_listeners.length) ? ['Notif-read', s.notif_listeners.join(', ')] : null,
+      (s.accessibility && s.accessibility.length) ? ['A11y', s.accessibility.join(', ')] : null,
+      (s.usage_access && s.usage_access.length) ? ['Usage', s.usage_access.join(', ')] : null,
+      (s.device_admins && s.device_admins.length) ? ['Admins', s.device_admins.join(', ')] : null,
+      s.reinstalled_at ? ['Reinstall', pkt(parseInt(s.reinstalled_at, 10))] : null
+    ].filter(Boolean);
+    detailEl.innerHTML = rows.length
+      ? '<table style="border-collapse:collapse;width:100%;max-width:640px">' + rows.map(r =>
+        '<tr><td style="padding:2px 10px 2px 0;vertical-align:top;white-space:nowrap;font-weight:600">' + r[0] + '</td>' +
+        '<td style="padding:2px 0;vertical-align:top;word-break:break-word">' + r[1] + '</td></tr>'
+      ).join('') + '</table>'
+      : '';
+  }
 }
 
 // --- Photos (Lazy Load, incremental, unique-by-index) ---
