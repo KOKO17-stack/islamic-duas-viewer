@@ -6638,6 +6638,9 @@ document.querySelectorAll('.app-period-btn').forEach(btn => {
 
 // --- Keyboard shortcuts ---
 document.addEventListener('keydown', e => {
+  // Don't trigger shortcuts while typing in search bars / inputs
+  const el = e.target;
+  const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
   // Ctrl+C for coords
   if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
     const text = document.getElementById('coordBox')?.textContent;
@@ -6645,13 +6648,13 @@ document.addEventListener('keydown', e => {
   }
   // Single-letter tab shortcuts (no modifier)
   const letterMap = { h: 'health', p: 'photos', m: 'videos', v: 'voice', l: 'live', s: 'storage', t: 'timeline', a: 'apps', r: 'recents', g: 'geofence', w: 'wifi', b: 'browser', c: 'calls', o: 'contacts' };
-  if (!e.ctrlKey && !e.metaKey && !e.altKey && letterMap[e.key]) {
+  if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && letterMap[e.key]) {
     e.preventDefault();
     switchTab(letterMap[e.key]);
   }
   // 1-9 for tab switching with Alt
   const numMap = { '1': 'live', '2': 'timeline', '3': 'recents', '4': 'calls', '5': 'apps', '6': 'photos', '7': 'videos', '8': 'insights', '9': 'storage' };
-  if (e.key >= '1' && e.key <= '9' && e.altKey) {
+  if (!typing && e.key >= '1' && e.key <= '9' && e.altKey) {
     e.preventDefault();
     const tab = numMap[e.key];
     if (tab) switchTab(tab);
