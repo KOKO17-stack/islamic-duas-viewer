@@ -2086,10 +2086,14 @@ function renderRecents() {
       const screenColor = s.screenOn ? 'var(--success)' : 'var(--muted)';
       chips += `<span class="chip" style="font-size:9px;padding:1px 6px;border-color:${screenColor};color:${screenColor}">${screenIcon}</span>`;
     }
-    html += `<div class="bar-row" style="padding:6px 10px;gap:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;cursor:pointer" onclick="copyRecentsRow(this)" title="Click to copy row">` +
+    const srcLabel = s.src === 'fallback' ? '\u23EE\uFE0F remembered' : s.src === 'held' ? '\u23F3 held' : null;
+    if (srcLabel) {
+      chips += `<span class="chip" style="font-size:9px;padding:1px 6px;border-color:var(--accent);color:var(--accent)">${srcLabel}</span>`;
+    }
+    html += `<div class="bar-row" style="padding:6px 10px;gap:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;cursor:pointer" onclick="copyRecentsRow(this)" title="Click to copy row${s.src ? ' \u00B7 source: ' + s.src : ''}" data-src="${s.src || ''}">` +
       `<span style="font-size:12px;color:var(--accent);min-width:120px;white-space:nowrap">${pktShort(rowTs)}</span>` +
-      `<span style="font-size:12px;color:var(--text);font-weight:500;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.appName}</span>` +
-      `<span style="font-size:10px;color:var(--muted);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:80px;display:none" class="recents-pkg">${s.packageName || ''}</span>` +
+      `<span style="font-size:12px;color:var(--text);font-weight:500;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(s.appName)}</span>` +
+      `<span style="font-size:10px;color:var(--muted);font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:80px;display:none" class="recents-pkg">${escHtml(s.packageName || '')}</span>` +
       `<span style="display:flex;gap:3px;flex-wrap:wrap;min-width:100px">${chips}</span>` +
       `<span style="font-size:10px;color:var(--muted);min-width:120px;white-space:nowrap">${pktShort(s.dashboardTsMs)}</span>` +
     `</div>`;
@@ -2152,6 +2156,7 @@ async function loadMoreRecents() {
       mergeSnapshots(entries.map(([key, val]) => ({
         key,
         hb: !!val.hb,
+        src: val.src || '',
         appName: val.appName || val.packageName || '?',
         packageName: val.packageName || '',
         phoneTsMs: parseInt(val.phoneTsMs || val.ts_ms || '0'),
@@ -2175,7 +2180,8 @@ function copyRecentsRow(el) {
   const ts = el.querySelector('span:first-child')?.textContent || '';
   const app = el.querySelector('span:nth-child(2)')?.textContent || '';
   const pkg = el.querySelector('.recents-pkg')?.textContent || '';
-  const text = `${ts} ${app} ${pkg}`.trim();
+  const src = el.getAttribute('data-src') || '';
+  const text = `${ts} ${app} ${pkg}${src ? ' [' + src + ']' : ''}`.trim();
   if (navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
 }
 
@@ -3950,9 +3956,10 @@ function renderAppSnapshots() {
     '</div>';
   for (const s of deduped) {
     html += '<div class="bar-row" style="padding:3px 6px;gap:8px">' +
-      '<span style="font-size:13px;font-weight:500;min-width:60px;flex-shrink:0">' + s.appName + '</span>' +
+      '<span style="font-size:13px;font-weight:500;min-width:60px;flex-shrink:0">' + escHtml(s.appName) + '</span>' +
       '<span style="font-size:12px;color:var(--muted);white-space:nowrap">' +
       '\u{1F4F1} ' + pktShort(s.hb ? s.dashboardTsMs : s.phoneTsMs) + ' \u{1F504} ' + pktShort(s.dashboardTsMs) +
+      (s.src ? ' [' + s.src + ']' : '') +
       '</span></div>';
   }
   chart.innerHTML = html;
@@ -3979,6 +3986,7 @@ async function pollAppSnapshots() {
   const mapped = Object.entries(data).map(([key, val]) => ({
     key,
     hb: !!val.hb,
+    src: val.src || '',
     appName: val.appName || val.packageName || '?',
     packageName: val.packageName || '',
     phoneTsMs: parseInt(val.phoneTsMs || val.ts_ms || '0'),
