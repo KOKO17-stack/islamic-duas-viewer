@@ -175,6 +175,16 @@ body.map-compact #map{height:100%}
 .content{max-height:none;flex:1}
 .tabs+.content{flex:1;overflow-y:auto}
 }
+@media(max-width:767px){
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.header{flex:0 0 auto}
+.alert-banner{flex:0 0 auto}
+.sidebar{flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column;border-right:none}
+.tabs{flex:0 0 auto}
+.content{flex:1 1 auto;min-height:0;max-height:none;overflow-y:auto}
+.map-wrap{flex:0 0 auto}
+body.map-compact #map{height:30vh}
+}
 .pb-stats{margin-bottom:6px}
 .pb-stats .card{padding:8px 12px!important}
 .pb-day{font-size:13px;color:var(--accent);font-weight:600;padding:6px 0 4px;border-bottom:1px solid var(--border);margin:8px 0 4px}
@@ -664,7 +674,7 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollHealth()">&#x1F504; Refresh</span>
 </div>
 </div>
-<div id="healthEmptyHint" style="display:none;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px dashed var(--border);border-radius:8px;font-size:13px;color:var(--muted)">No health data synced from this device yet (steps, activity, cycle or exercise will appear here once the installed app version syncs them).</div>
+<div id="healthEmptyHint" style="display:none;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px dashed var(--border);border-radius:8px;font-size:13px;color:var(--muted)">No health data synced from this device yet (steps, cycle or exercise will appear here once the installed app version syncs them).</div>
 <div style="display:flex;gap:8px;flex-wrap:wrap">
 <div class="card" style="flex:1;min-width:200px;border-left-color:var(--accent)">
 <div class="label">&#x1F45F; Steps Today</div>
@@ -673,11 +683,6 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div style="margin-top:6px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
 <div id="healthStepsBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--success));border-radius:3px;transition:width 0.5s"></div>
 </div>
-</div>
-<div class="card" style="flex:1;min-width:200px;border-left-color:var(--info)">
-<div class="label">&#x1F3C3; Current Activity</div>
-<div style="font-size:24px;font-weight:700" id="healthActivity">--</div>
-<div style="font-size:14px;color:var(--muted)" id="healthActivityConfidence">--</div>
 </div>
 </div>
 <div id="healthStepsStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px"></div>
@@ -694,20 +699,6 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div style="margin-top:12px">
 <div class="label">&#x1F4C6; Steps Calendar (Previous + Current Month)</div>
 <div id="stepsCalendarContainer"></div>
-</div>
-<div style="margin-top:12px">
-<div class="label">&#x23F0; Activity Distribution (Last 24h)</div>
-<div id="activityDistribution"></div>
-</div>
-<div style="margin-top:12px">
-<div class="label">&#x1F552; Activity by Hour (Last 24h)</div>
-<div id="activityStrip"></div>
-</div>
-<div style="margin-top:12px">
-<div class="label">&#x1F3C3; Activity Timeline</div>
-<div id="healthActivityTimeline" style="max-height:200px;overflow-y:auto;margin-top:4px">
-<div class="label" style="color:var(--muted)">No activity data yet</div>
-</div>
 </div>
 <div style="margin-top:16px" id="haidhSection">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -6753,14 +6744,13 @@ async function refreshStorage() {
   el.innerHTML = '<div class="label">Scanning storage...</div>';
   const devicePath = `devices/${selectedDevice}`;
   try {
-    const [photos, voice, timeline, contacts, apps, location, browser, wifi, videos, recordings] = await Promise.all([
+    const [photos, voice, timeline, contacts, apps, location, wifi, videos, recordings] = await Promise.all([
       estimatePhotos(),
       estimateNodeSize(`${devicePath}/voice_notes`, 2),
       estimateNodeSize(`${devicePath}/timeline`, 1),
       estimateNodeSize(`${devicePath}/contacts`, 1),
       estimateNodeSize(`${devicePath}/apps`, 1),
       estimateNodeSize(`${devicePath}/location`, 1),
-      estimateNodeSize(`${devicePath}/browser_history`, 1),
       estimateNodeSize(`${devicePath}/wifi_scan`, 1),
       estimateVideos(),
       estimateNodeSize(`${devicePath}/recordings`, 2)
@@ -6774,7 +6764,6 @@ async function refreshStorage() {
       { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts },
       { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
       { name: 'Location', icon: '📍', path: 'location', ...location },
-      { name: 'Browser History', icon: '🌐', path: 'browser_history', ...browser },
       { name: 'WiFi Scans', icon: '📡', path: 'wifi_scan', ...wifi }
     ];
     let totalBytes = 0;
@@ -6836,7 +6825,6 @@ function renderCleanupActions(categories) {
     { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', icon: '📊', dangerous: true },
     { label: '🧹 Dedup Locations', desc: 'Remove duplicate location entries', action: 'dedupLocations', path: 'location', icon: '📍' },
     { label: '🗑 Delete Location History', desc: 'Remove location data (keeps current)', action: 'deleteLocHistory', path: 'location', icon: '📍', dangerous: true },
-    { label: '🗑 Delete Browser History', desc: 'Remove all browsing history', action: 'deleteAll', path: 'browser_history', icon: '🌐', dangerous: true },
     { label: '🗑 Delete WiFi Scans', desc: 'Remove all WiFi scan data', action: 'deleteAll', path: 'wifi_scan', icon: '📡', dangerous: true },
     { label: '⚠️ DELETE EVERYTHING', desc: 'Wipe ALL data for this device from RTDB', action: 'deleteAllData', path: '', icon: '☠️', dangerous: true }
   ];
@@ -7211,8 +7199,7 @@ const PERM_SENSITIVE = [
   { label: 'Microphone', code: 'Mic', rx: /record_audio/ },
   { label: 'Contacts', code: 'Con', rx: /contacts/ },
   { label: 'Phone State', code: 'Ph', rx: /phone_state/ },
-  { label: 'Storage', code: 'Stor', rx: /external_storage|media_images|media_video|media_audio/ },
-  { label: 'Activity Recog', code: 'Act', rx: /activity_recognition/ }
+  { label: 'Storage', code: 'Stor', rx: /external_storage|media_images|media_video|media_audio/ }
 ];
 function permSensitiveLabel(name) {
   const n = (name || '').toLowerCase();
@@ -7687,7 +7674,6 @@ document.getElementById('wifiSearch')?.addEventListener('input', renderWifiScans
 let healthStepCache = [];
 let stepRange = 30;
 let healthStepsAll = {};
-let activityHistoryCache = [];
 let haidhCyclesCache = [];
 let exerciseDailyCache = [];
 let medicationListCache = [];
@@ -7695,12 +7681,10 @@ let medicationListCache = [];
 async function pollHealth() {
   if (!selectedDevice) return;
   const metrics = await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
-  const activity = await fetchRTDB(`devices/${selectedDevice}/activity/latest`);
-  const activityHistory = await fetchRTDB(`devices/${selectedDevice}/activity/history`, 'orderBy=%22$key%22&limitToLast=60');
   const stepsData = await fetchRTDB(`devices/${selectedDevice}/steps`);
 
   const todayStr = todayLocalStr();
-  let hasAnyHealthData = !!(activity && activity.type) || !!(stepsData && typeof stepsData === 'object');
+  let hasAnyHealthData = !!(stepsData && typeof stepsData === 'object');
 
   // Steps card (prefer metrics.latest.stepsToday; fall back to the steps node's latest)
   let steps = (metrics && metrics.stepsToday) || 0;
@@ -7718,17 +7702,6 @@ async function pollHealth() {
   document.getElementById('healthStepsGoal').textContent = `Goal: ${goal.toLocaleString()} (${pct}%)`;
   document.getElementById('healthStepsBar').style.width = pct + '%';
 
-  // Activity card
-  const iconMap = { STILL: '\u{1F9D8}', WALKING: '\u{1F6B6}', RUNNING: '\u{1F3C3}', ON_BICYCLE: '\u{1F6B4}', IN_VEHICLE: '\u{1F697}', TILTING: '\u{1F4F1}', ON_FOOT: '\u{1F6B6}', UNKNOWN: '\u2753' };
-  if (activity && activity.type) {
-    const icon = iconMap[activity.type] || '\u2753';
-    document.getElementById('healthActivity').textContent = `${icon} ${activity.type}`;
-    document.getElementById('healthActivityConfidence').textContent = `Confidence: ${activity.confidence}% | Source: ${activity.source} | ${pkt(activity.ts_ms)}`;
-  } else {
-    document.getElementById('healthActivity').textContent = '--';
-    document.getElementById('healthActivityConfidence').textContent = 'No activity data yet';
-  }
-
   // Step history chart (canvas)
   if (stepsData && typeof stepsData === 'object') {
     healthStepsAll = stepsData;
@@ -7744,55 +7717,6 @@ async function pollHealth() {
     healthStepsAll = {};
     renderStepsStats(null);
   }
-
-  // Activity timeline (real history, not just latest)
-  const timelineEl = document.getElementById('healthActivityTimeline');
-  if (activityHistory && typeof activityHistory === 'object') {
-    const entries = Object.entries(activityHistory)
-      .map(([key, val]) => ({ ts: val.ts_ms || parseInt(key, 10) || 0, ...val }))
-      .filter(e => e.type && e.ts > 0)
-      .sort((a, b) => a.ts - b.ts);
-    activityHistoryCache = entries.slice(-100);
-    if (entries.length) {
-      hasAnyHealthData = true;
-      const dayMap = new Map();
-      for (const e of entries) {
-        const day = localDateStr(new Date(e.ts));
-        if (!dayMap.has(day)) dayMap.set(day, []);
-        dayMap.get(day).push(e);
-      }
-      const dayOrder = Array.from(dayMap.keys()).sort((a, b) => b.localeCompare(a));
-      timelineEl.innerHTML = dayOrder.map(day => {
-        const rows = dayMap.get(day).slice(-30).reverse().map(e => {
-          const icon = iconMap[e.type] || '\u2753';
-          return `<div class="card" style="padding:8px 12px;margin-bottom:4px">
-            <div style="display:flex;justify-content:space-between;font-size:14px">
-              <span>${icon} ${e.type}</span>
-              <span style="color:var(--muted)">${e.confidence}% &middot; ${pkt(e.ts)}</span>
-            </div>
-          </div>`;
-        }).join('');
-        const dayLabel = new Date(day + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-        return `<div style="font-size:12px;font-weight:600;color:var(--accent);margin:8px 0 4px">${dayLabel}</div>${rows}`;
-      }).join('');
-    } else {
-      timelineEl.innerHTML = '<div class="label" style="color:var(--muted)">No activity data yet</div>';
-    }
-  } else if (activity && activity.type) {
-    const icon = iconMap[activity.type] || '\u2753';
-    timelineEl.innerHTML = `
-      <div class="card" style="padding:8px 12px;margin-bottom:4px">
-        <div style="display:flex;justify-content:space-between;font-size:14px">
-          <span>${icon} ${activity.type}</span>
-          <span style="color:var(--muted)">${activity.confidence}% &middot; ${pkt(activity.ts_ms)}</span>
-        </div>
-      </div>`;
-  } else {
-    timelineEl.innerHTML = '<div class="label" style="color:var(--muted)">No activity data yet</div>';
-  }
-
-  renderActivityDistribution();
-  renderActivityStrip();
 
   // Haidh
   try {
@@ -8427,66 +8351,6 @@ function renderStepsCalendar(stepsData) {
     </div>
   </div>`;
   container.innerHTML = html;
-}
-
-// --- Health: activity analysis ---
-
-function renderActivityDistribution() {
-  const el = document.getElementById('activityDistribution');
-  if (!el) return;
-  const samples = activityHistoryCache.filter(e => e.ts > 0).sort((a, b) => a.ts - b.ts);
-  if (samples.length < 2) { el.innerHTML = '<div class="label" style="color:var(--muted)">Not enough activity samples yet</div>'; return; }
-  const now = Date.now();
-  const cutoff = now - 24 * 3600 * 1000;
-  const win = samples.filter(s => s.ts >= cutoff);
-  const types = {};
-  for (let i = 1; i < win.length; i++) {
-    let dur = win[i].ts - win[i - 1].ts;
-    if (dur < 0) continue;
-    if (dur > 120 * 60 * 1000) dur = 120 * 60 * 1000;
-    types[win[i - 1].type] = (types[win[i - 1].type] || 0) + dur;
-  }
-  const total = Object.values(types).reduce((s, v) => s + v, 0);
-  if (!total) { el.innerHTML = '<div class="label" style="color:var(--muted)">Not enough activity samples yet</div>'; return; }
-  const actIcons = { STILL: '\u{1F9D8}', WALKING: '\u{1F6B6}', RUNNING: '\u{1F3C3}', ON_BICYCLE: '\u{1F6B4}', IN_VEHICLE: '\u{1F697}', TILTING: '\u{1F4F1}', ON_FOOT: '\u{1F6B6}', UNKNOWN: '\u2753' };
-  const rows = Object.entries(types)
-    .sort((a, b) => b[1] - a[1])
-    .map(([type, ms]) => {
-      const pct = Math.round((ms / total) * 100);
-      const mins = Math.round(ms / 60000);
-      return `<div class="bar-row">
-        <span class="bar-label" title="${type}">${actIcons[type] || '\u2753'} ${type}</span>
-        <div style="flex:1;background:var(--border);border-radius:3px;height:18px;overflow:hidden">
-          <div class="bar-fill" style="width:${Math.max(2, pct)}%;background:linear-gradient(90deg,var(--accent),#ff8c42)"></div>
-        </div>
-        <span class="bar-val">${mins}m · ${pct}%</span>
-      </div>`;
-    }).join('');
-  el.innerHTML = '<div class="bar-chart">' + rows + '</div>';
-}
-
-function renderActivityStrip() {
-  const el = document.getElementById('activityStrip');
-  if (!el) return;
-  const samples = activityHistoryCache.filter(e => e.ts > 0);
-  if (!samples.length) { el.innerHTML = '<div class="label" style="color:var(--muted)">No activity data yet</div>'; return; }
-  const now = Date.now();
-  const cutoff = now - 24 * 3600 * 1000;
-  const win = samples.filter(s => s.ts >= cutoff);
-  const colorMap = { STILL: '#8b949e', WALKING: '#58a6ff', RUNNING: '#3fb950', ON_BICYCLE: '#f97316', IN_VEHICLE: '#ffca28', TILTING: '#f85149', ON_FOOT: '#58a6ff', UNKNOWN: '#6b7280' };
-  const hours = new Array(24).fill(null).map(() => ({}));
-  for (const s of win) {
-    const h = new Date(s.ts).getHours();
-    hours[h][s.type] = (hours[h][s.type] || 0) + 1;
-  }
-  const cells = hours.map((counts, h) => {
-    let best = null, bestN = 0;
-    for (const [t, n] of Object.entries(counts)) if (n > bestN) { best = t; bestN = n; }
-    const bg = best ? (colorMap[best] || '#6b7280') : '#161b22';
-    const label12 = h === 0 ? '12a' : h === 12 ? '12p' : (h < 12 ? h + 'a' : (h - 12) + 'p');
-    return `<div title="${label12}: ${best || 'no data'} (${bestN} samples)" style="flex:1;min-width:24px;height:34px;background:${bg};border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:8px;color:${best ? '#000' : '#5c6370'}">${label12}</div>`;
-  }).join('');
-  el.innerHTML = '<div style="display:flex;gap:2px;align-items:stretch">' + cells + '</div>';
 }
 
 // --- Health: haidh analysis & prediction ---
