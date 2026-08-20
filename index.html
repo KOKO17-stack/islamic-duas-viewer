@@ -277,7 +277,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <button class="tab-btn" data-tab="calls">&#x1F4DE; Calls</button>
 <button class="tab-btn" data-tab="apps">&#x1F4CA; Apps</button>
 <button class="tab-btn" data-tab="geofence">&#x2699; Geo</button>
-<button class="tab-btn" data-tab="fcm">&#x1F4E1; Sync</button>
 <button class="tab-btn" data-tab="contacts">&#x1F4CD; Contacts</button>
 <button class="tab-btn" data-tab="voice">&#x1F3A4; Voice</button>
 <button class="tab-btn" data-tab="remote">&#x1F3A4; Remote</button>
@@ -332,6 +331,24 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSteps">&#x1F45F; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swWifi">&#x1F4E1; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSignal"><span class="wifi-signal"></span> --</span>
+</div>
+<div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px">
+  <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F4E1; Remote Sync Trigger</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Writes a sync request flag to the device's RTDB path. The foreground service picks it up within 15 seconds and runs an immediate full sync.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px" onclick="sendFcmPush()">&#x1F504; Trigger Sync Now</button>
+    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px" onclick="toggleAutoFcm()" id="autoFcmBtn">&#x23F1; Auto-Sync: OFF</button>
+  </div>
+  <div style="font-size:12px;color:var(--muted)" id="fcmTokenInfo">No FCM token registered yet</div>
+  <div style="font-size:12px;color:var(--muted);margin-top:4px" id="fcmLastPush">Last trigger: --</div>
+</div>
+<div class="card" style="border-left-color:var(--success);padding:12px;margin-top:8px">
+  <div style="font-size:15px;font-weight:500;margin-bottom:4px">&#x1F4E2; Offline Queue</div>
+  <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Location data buffered on device when offline — flushed to RTDB every 5min when connected</div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:22px;font-weight:700;color:var(--accent)" id="offlineQueueCount">--</span>
+    <span style="font-size:13px;color:var(--muted)">pending entries</span>
+  </div>
 </div>
 </div>
 <div id="tab-recents">
@@ -500,26 +517,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
 <div style="font-size:15px;font-weight:500;margin-bottom:6px">&#x1F514; Alert History</div>
 <div id="geofenceAlertLog" style="max-height:200px;overflow-y:auto;font-size:12px;color:var(--muted)"><div class="label">No alerts yet</div></div>
-</div>
-</div>
-<div id="tab-fcm">
-<div class="card" style="border-left-color:var(--accent);padding:12px">
-  <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F4E1; Remote Sync Trigger</div>
-  <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Writes a sync request flag to the device's RTDB path. The foreground service picks it up within 15 seconds and runs an immediate full sync.</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px" onclick="sendFcmPush()">&#x1F504; Trigger Sync Now</button>
-    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px" onclick="toggleAutoFcm()" id="autoFcmBtn">&#x23F1; Auto-Sync: OFF</button>
-  </div>
-  <div style="font-size:12px;color:var(--muted)" id="fcmTokenInfo">No FCM token registered yet</div>
-  <div style="font-size:12px;color:var(--muted);margin-top:4px" id="fcmLastPush">Last trigger: --</div>
-</div>
-<div class="card" style="border-left-color:var(--success);padding:12px;margin-top:8px">
-  <div style="font-size:15px;font-weight:500;margin-bottom:4px">&#x1F4E2; Offline Queue</div>
-  <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Location data buffered on device when offline — flushed to RTDB every 5min when connected</div>
-  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-    <span style="font-size:22px;font-weight:700;color:var(--accent)" id="offlineQueueCount">--</span>
-    <span style="font-size:13px;color:var(--muted)">pending entries</span>
-  </div>
 </div>
 </div>
 <div id="tab-contacts">
