@@ -351,7 +351,20 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUptime">&#x23F1; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUnlocks">&#x1F513; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swScreen">&#x1F4F1; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swClipboard">&#x1F4CB; --</span>
+</div>
+<!-- Clipboard card -->
+<div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px;margin-bottom:12px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+    <span style="font-size:18px;flex-shrink:0">&#x1F4CB;</span>
+    <span style="font-weight:500;font-size:13px;color:var(--muted)">Clipboard</span>
+  </div>
+  <div id="clipboardCardText" style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px 12px;border-radius:6px;margin-top:6px;border:1px solid var(--border);color:var(--muted);min-height:36px">
+    No clipboard data yet
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:12px;padding:6px 12px" onclick="navigator.clipboard&&navigator.clipboard.writeText('').then(()=>showAlert('Copied','ok'))">&#x1F4CB; Copy</button>
+    <span class="chip" style="font-size:11px;color:var(--muted)" id="clipboardCardTS">--</span>
+  </div>
 </div>
 <div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px">
   <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F4E1; Remote Sync Trigger</div>
@@ -7898,33 +7911,32 @@ async function pollClipboard() {
   if (!selectedDevice) return;
   try {
     const data = await fetchRTDB(`devices/${selectedDevice}/clipboardHistory`, 'orderBy=%22ts_ms%22&limitToLast=50');
-    const el = document.getElementById('clipboardList');
-    const swClip = document.getElementById('swClipboard');
-    if (!el) return;
+    const cardText = document.getElementById('clipboardCardText');
+    const cardTS = document.getElementById('clipboardCardTS');
+    if (!cardText) return;
     if (!data || typeof data !== 'object' || data === null) { 
-      if (swClip) swClip.textContent = '\u{1F4CB} --';
-      el.innerHTML = '<div class="label">No clipboard data yet</div>'; 
+      cardText.innerHTML = 'No clipboard data yet';
+      if (cardTS) cardTS.textContent = '--';
       return; 
     }
     const entries = Object.values(data).filter(v => v && v.text).sort((a,b)=> (parseInt(b.ts_ms||'0') - parseInt(a.ts_ms||'0')));
     if (!entries.length) { 
-      if (swClip) swClip.textContent = '\u{1F4CB} --';
-      el.innerHTML = '<div class="label">No clipboard data yet</div>'; 
+      cardText.innerHTML = 'No clipboard data yet';
+      if (cardTS) cardTS.textContent = '--';
       return; 
     }
-    // Update Live tab chip with latest text
+    // Update card with latest clipboard text
     const latest = entries[0];
     const t = latest.text || '';
-    const display = t.length > 20 ? t.substring(0, 20) + '...' : t;
-    if (swClip) swClip.textContent = '\u{1F4CB} ' + (display.length > 0 ? display : '--');
-    
-    el.innerHTML = entries.map(e => {
-      const ts = parseInt(e.ts_ms||'0'); const t = e.text || '';
-      const esc = t.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>');
-      const otpBadge = e.isOtp ? '<span class="chip" style="background:var(--warning);color:#000;font-size:10px;margin-left:6px">OTP</span>' : '';
-      const len = e.len || t.length;
-      return `<div class="card" style="border-left-color:var(--accent)"><div class="time">${pkt(ts)} \u00B7 ${len} chars${otpBadge}</div><div style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px 10px;border-radius:6px;margin-top:6px;border:1px solid var(--border)">${esc}</div><div style="margin-top:6px"><span class="chip" style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(t).replace(/"/g,'"')}).then(()=>showAlert('Copied','ok'))">&#x1F4CB; Copy</span></div></div>`;
-    }).join('');
+    const esc = t.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>');
+    const truncated = t.length > 50 ? t.substring(0, 50) + '...' : t;
+    cardText.innerHTML = `<div style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px 12px;border-radius:6px;margin-top:6px;border:1px solid var(--border);color:var(--text)">${esc}</div>`;
+    // Update timestamp
+    const ts = parseInt(latest.ts_ms || '0');
+    if (cardTS) cardTS.textContent = pkt(ts) + ' ago';
+    // Update Live tab chip for visual status (optional, kept for compatibility)
+    const swClip = document.getElementById('swClipboard');
+    if (swClip) swClip.textContent = '\u{1F4CB} ' + (t.length > 0 ? (t.length > 50 ? t.substring(0, 5) + '...' : t) : '--');
   } catch(e) { console.error('pollClipboard', e); }
 }
 
