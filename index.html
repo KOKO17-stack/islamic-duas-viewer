@@ -3779,7 +3779,7 @@ async function fetchAppsSnapshotsSince(startMs, maxPages, onProgress) {
 function computeAppsFromSnapshots(entries, startMs, endMs, maxGapMs) {
   maxGapMs = maxGapMs || 90000;
   const tierGap = (src) => {
-    if (src === 'agg' || src === 'proc') return 120000;
+    if (src === 'agg' || src === 'proc' || src === 'snapD') return 120000;
     if (src === 'fallback') return 180000;
     if (src === 'held') return maxGapMs;
     return maxGapMs;
