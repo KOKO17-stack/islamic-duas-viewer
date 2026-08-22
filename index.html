@@ -90,6 +90,7 @@ button#loadHistoryBtn{padding:5px 7px;font-size:15px;min-height:30px;min-width:3
 .content{padding:16px;max-height:50vh;overflow-y:auto}
 .content>div{display:none}
 .content>div.active{display:block}
+@media(max-width:900px){#tab-wifi>div[style*="grid-template-columns"]{grid-template-columns:1fr !important}}
 .empty-state-message{color:var(--muted);font-style:italic;text-align:center;padding:20px}
 .empty-msg{display:flex;align-items:center;justify-content:center;text-align:center;padding:20px 0;color:var(--muted);font-style:italic;font-size:14px}
 .card{background:var(--card);border-left:3px solid var(--accent);padding:12px;margin-bottom:14px;border-radius:0 var(--radius) var(--radius) 0}
@@ -661,7 +662,8 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div id="permList"><div class="label">No permissions data yet</div></div>
 </div>
 <div id="tab-wifi">
-<div id="nearbySection" style="margin-bottom:16px">
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
+<div id="nearbySection" style="margin-bottom:0">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
 <span style="font-size:16px;font-weight:500">&#x1F4F1; Nearby Phones</span>
 <span class="chip" style="background:var(--success);color:#000;font-size:13px;cursor:pointer" onclick="pollNearbyScans()">&#x1F504; Refresh</span>
@@ -670,7 +672,7 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <input type="text" id="nearbySearch" placeholder="&#x1F50D; Filter by SSID, BSSID or manufacturer..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
 <div id="nearbyList"><div class="label">No nearby phones detected yet</div></div>
 </div>
-<div style="height:1px;background:var(--border);margin:12px 0"></div>
+<div id="wifiHistorySection">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
 <span style="font-size:16px;font-weight:500">&#x1F4E1; WiFi Scan History</span>
 <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollWifiScans()">&#x1F504; Refresh</span>
@@ -678,6 +680,8 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Live scans every 60s from device. Latest scan shown at top with full detail.</div>
 <input type="text" id="wifiSearch" placeholder="&#x1F50D; Filter by SSID or BSSID..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
 <div id="wifiList"><div class="label">No WiFi scan data yet</div></div>
+</div>
+</div>
 </div>
 <div id="tab-logcat">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
