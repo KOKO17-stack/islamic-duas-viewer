@@ -666,7 +666,7 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <span style="font-size:16px;font-weight:500">&#x1F4F1; Nearby Phones</span>
 <span class="chip" style="background:var(--success);color:#000;font-size:13px;cursor:pointer" onclick="pollNearbyScans()">&#x1F504; Refresh</span>
 </div>
-<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Phones detected nearby via WiFi probe analysis (hotspot & OUI heuristics). Updates every 60s. Shows manufacturer, signal & proximity.</div>
+<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Phones detected nearby via WiFi probe analysis (hotspot &amp; OUI heuristics). Updates every 60s. Shows manufacturer, signal &amp; proximity.</div>
 <input type="text" id="nearbySearch" placeholder="&#x1F50D; Filter by SSID, BSSID or manufacturer..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
 <div id="nearbyList"><div class="label">No nearby phones detected yet</div></div>
 </div>
@@ -678,7 +678,6 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Live scans every 60s from device. Latest scan shown at top with full detail.</div>
 <input type="text" id="wifiSearch" placeholder="&#x1F50D; Filter by SSID or BSSID..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
 <div id="wifiList"><div class="label">No WiFi scan data yet</div></div>
-</div>
 </div>
 <div id="tab-logcat">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
@@ -7829,12 +7828,15 @@ async function pollNearbyScans() {
       detections: (val.detections || []).map(d => ({
         ssid: d.ssid || '',
         bssid: d.bssid || '',
+        host: d.host || '',
         rssi: d.rssi != null ? parseInt(d.rssi) : -100,
         frequency: d.frequency || 0,
         capabilities: d.capabilities || '',
         manufacturer: d.manufacturer || 'Unknown',
         proximityM: d.proximityM != null ? parseFloat(d.proximityM) : null,
-        score: d.score != null ? parseInt(d.score) : 0
+        score: d.score != null ? parseInt(d.score) : 0,
+        source: d.source || 'wifi',
+        serviceType: d.serviceType || ''
       })),
       count: val.count || 0,
       totalScan: val.totalScan || 0
@@ -7867,7 +7869,7 @@ function renderNearbyScans() {
     const scan = nearbyCache[i];
     let dets = scan.detections;
     if (query) {
-      dets = dets.filter(d => d.ssid.toLowerCase().includes(query) || d.bssid.toLowerCase().includes(query) || d.manufacturer.toLowerCase().includes(query));
+      dets = dets.filter(d => d.ssid.toLowerCase().includes(query) || d.bssid.toLowerCase().includes(query) || (d.host && d.host.toLowerCase().includes(query)) || d.manufacturer.toLowerCase().includes(query) || (d.source && d.source.toLowerCase().includes(query)));
     }
     if (!dets.length && query) continue;
     dets.sort((a,b) => b.rssi - a.rssi);
@@ -7890,6 +7892,13 @@ function renderNearbyScans() {
       const small = manu === 'Unknown' ? 'color:var(--muted);border-color:var(--border)' : 'background:rgba(63,185,80,.15);color:var(--success);border-color:var(--success)';
       return `<span class="chip" style="font-size:11px;padding:2px 8px;${small}">${escHtml(manu)}</span>`;
     };
+    const sourceBadge = (src) => {
+      if (!src) return '';
+      const map = { wifi: '📡 hotspot', mdns: '🏠 mdns', arp: '🏠 arp' };
+      const label = map[src] || src;
+      const c = src === 'mdns' ? 'var(--success)' : src === 'arp' ? 'var(--accent)' : 'var(--muted)';
+      return `<span class="chip" style="font-size:10px;padding:1px 6px;background:var(--bg);color:${c};border-color:${c}">${label}</span>`;
+    };
     const detRows = dets.slice(0, 30).map(d => {
       const bars = signalBars(d.rssi);
       const color = barColor(d.rssi);
@@ -7898,12 +7907,15 @@ function renderNearbyScans() {
         '</span>';
       const prox = proxLabel(d.proximityM);
       const scoreColor = d.score >= 80 ? 'var(--success)' : d.score >= 60 ? 'var(--accent)' : 'var(--muted)';
+      const hostPart = d.host && d.host !== d.bssid ? `<span style="font-size:11px;color:var(--muted);font-family:monospace">${escHtml(d.host)}</span>` : '';
       return `<div class="wifi-ap-row" style="flex-wrap:wrap">
         ${barHtml}
         <span class="wifi-ssid" style="min-width:110px">${escHtml(d.ssid || '(hidden)')}</span>
         <span class="wifi-bssid">${d.bssid || '—'}</span>
+        ${hostPart}
         <span class="wifi-rssi">${d.rssi}dBm</span>
         ${manuBadge(d.manufacturer)}
+        ${sourceBadge(d.source)}
         <span style="font-size:11px;color:var(--muted)">${prox}</span>
         <span style="font-size:11px;color:${scoreColor}">score ${d.score}</span>
       </div>`;
