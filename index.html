@@ -3726,7 +3726,7 @@ function pktHourOf(ts) {
 function appsSnapNorm(key, val) {
   const ts = parseInt(val.dashboardTsMs || key || '0', 10);
   if (!(ts > 0)) return null;
-  return { key: String(key), ts, appName: val.appName || val.packageName || '?', packageName: val.packageName || '' };
+  return { key: String(key), ts, appName: val.appName || val.packageName || '?', packageName: val.packageName || '', src: val.src || '' };
 }
 async function fetchAppsSnapshotsSince(startMs, maxPages, onProgress) {
   if (!selectedDevice) return false;
@@ -3778,6 +3778,12 @@ async function fetchAppsSnapshotsSince(startMs, maxPages, onProgress) {
 }
 function computeAppsFromSnapshots(entries, startMs, endMs, maxGapMs) {
   maxGapMs = maxGapMs || 90000;
+  const tierGap = (src) => {
+    if (src === 'agg') return 120000;
+    if (src === 'fallback') return 180000;
+    if (src === 'held') return maxGapMs;
+    return maxGapMs;
+  };
   const sorted = entries.filter(s => s.ts >= startMs && s.ts <= endMs).sort((a, b) => a.ts - b.ts);
   const appMap = new Map();
   const hourlyTotal = new Array(24).fill(0);
@@ -3786,7 +3792,9 @@ function computeAppsFromSnapshots(entries, startMs, endMs, maxGapMs) {
     const cur = sorted[i];
     if (i + 1 >= sorted.length) continue;
     const gap = sorted[i + 1].ts - cur.ts;
-    if (gap <= 0 || gap > maxGapMs) continue;
+    if (gap <= 0) continue;
+    const allowed = tierGap(cur.src);
+    if (gap > allowed) continue;
     totalMs += gap;
     hourlyTotal[pktHourOf(cur.ts)] += gap;
     let a = appMap.get(cur.packageName);
