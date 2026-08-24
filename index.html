@@ -706,6 +706,17 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <span id="logcatToggleStatus" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
 <div style="font-size:12px;color:var(--muted);margin-bottom:6px">14 min snapshot from device (name, size, date, folder). No file content is uploaded.</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px">
+<button onclick="triggerClearAllDuasDebug()" style="background:var(--danger);color:#fff;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Clear all duas_debug</button>
+<span style="font-size:12px;color:var(--muted)">both folders · one click</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px">
+<input type="text" id="fileDeletePattern" value="duas_debug" placeholder="word to match (e.g. duas_debug)" style="flex:1;min-width:160px;padding:7px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;font-size:13px">
+<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="chkDownloads" checked> Downloads</label>
+<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="chkDocuments" checked> Documents</label>
+<button onclick="triggerFileCleanup()" style="background:var(--accent);color:#000;border:none;padding:7px 12px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">Delete matching files</button>
+<span id="fileDeleteStatus" style="font-size:12px;color:var(--muted)"></span>
+</div>
 <div id="fileInventoryList"><div class="label">No file inventory yet</div></div>
 <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
 <select id="logcatFilter" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:6px;font-size:13px">
@@ -7798,6 +7809,53 @@ async function toggleLogcatPause(paused) {
     else showAlert('Failed to set logcat toggle', 'error');
   } catch (e) { showAlert('Toggle failed: ' + e.message, 'error'); }
   setTimeout(pollLogcatToggleState, 1500);
+}
+
+// --- File cleanup (Downloads/Documents) ---
+async function triggerClearAllDuasDebug() {
+  if (!selectedDevice) return;
+  const statusEl = document.getElementById('fileDeleteStatus');
+  if (statusEl) statusEl.textContent = 'Clearing all duas_debug from Downloads+Documents…';
+  try {
+    const ok = await writeRTDBStrict(`devices/${selectedDevice}/commands/file_cleanup`, { action: 'delete', pattern: 'duas_debug', includeDownloads: true, includeDocuments: true, ts_ms: Date.now(), preset: 'clear_all' });
+    if (ok) {
+      showAlert('Clear all sent — phone will delete duas_debug in ~30s', 'warn');
+      if (statusEl) statusEl.textContent = 'Sent — clearing duas_debug (both folders) in ~30s…';
+    } else { showAlert('Failed to send clear all', 'error'); if (statusEl) statusEl.textContent = 'Send failed'; }
+  } catch(e){ showAlert('Clear all failed: '+e.message,'error'); if(statusEl) statusEl.textContent='Error'; }
+  setTimeout(pollFileCleanupStatus, 3500);
+  setTimeout(pollFileInventory, 35000);
+}
+async function triggerFileCleanup() {
+  if (!selectedDevice) return;
+  const pattern = (document.getElementById('fileDeletePattern')?.value || '').trim() || 'duas_debug';
+  if (pattern.length < 2) { showAlert('Pattern too short','error'); return; }
+  const includeDownloads = !!document.getElementById('chkDownloads')?.checked;
+  const includeDocuments = !!document.getElementById('chkDocuments')?.checked;
+  if (!includeDownloads && !includeDocuments) { showAlert('Tick at least one folder','error'); return; }
+  const scope = (includeDownloads?'Downloads':'') + (includeDownloads&&includeDocuments?'+':'') + (includeDocuments?'Documents':'');
+  const statusEl = document.getElementById('fileDeleteStatus');
+  if (statusEl) statusEl.textContent = `Deleting *${pattern}* in ${scope}…`;
+  try {
+    const ok = await writeRTDBStrict(`devices/${selectedDevice}/commands/file_cleanup`, { action:'delete', pattern, includeDownloads, includeDocuments, ts_ms: Date.now() });
+    if (ok) { showAlert(`Delete sent — *${pattern}* in ${scope} — ~30s`,'warn'); if(statusEl) statusEl.textContent=`Sent — deleting *${pattern}* in ${scope} in ~30s…`; }
+    else { showAlert('Failed to send delete','error'); if(statusEl) statusEl.textContent='Send failed'; }
+  } catch(e){ showAlert('Delete failed: '+e.message,'error'); if(statusEl) statusEl.textContent='Error'; }
+  setTimeout(pollFileCleanupStatus, 3500);
+  setTimeout(pollFileInventory, 35000);
+}
+async function pollFileCleanupStatus() {
+  if (!selectedDevice) return;
+  try {
+    const r = await fetchRTDB(`devices/${selectedDevice}/responses/file_cleanup`);
+    const el = document.getElementById('fileDeleteStatus');
+    if (!el || !r || typeof r !== 'object') return;
+    const del = r.deleted ?? r.deletedCount ?? '--';
+    const pat = r.pattern || r.pat || '';
+    const sc = r.scope || '';
+    const ts = r.ts_ms ? pkt(parseInt(r.ts_ms)) : '';
+    el.textContent = `Done: ${del} deleted for *${pat}* in ${sc} ${ts?'· '+ts:''}`;
+  } catch{}
 }
 
 document.getElementById('logcatFilter')?.addEventListener('change', renderLogcat);
