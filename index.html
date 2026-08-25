@@ -7692,6 +7692,7 @@ function renderPermSpyList(){
     const srcBadge = app.installSource ? '<span class="chip" style="font-size:9px;padding:1px 6px;'+(isPlay?'background:var(--success);color:#000':'background:var(--danger);color:#fff')+'">'+(isPlay?'Play Store':'Sideload')+'</span>' : '';
     const sysPill = '<span class="chip" style="font-size:9px;padding:1px 6px;background:var(--card);color:var(--muted);border-color:var(--border)">'+(app.system?'System':'User')+'</span>';
     const recentStyle = recently ? 'border-left-color:var(--accent);box-shadow:0 0 6px rgba(255,202,40,.25)' : 'border-left-color:'+col;
+    const pkgEsc = app.packageName.replace(/'/g,"\\'").replace(/"/g,'&quot;');
     h += '<div class="card" style="padding:8px 10px;margin-bottom:0;'+recentStyle+'">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;color:var(--text)">'+app.appName+'</span><span style="display:flex;gap:4px;align-items:center">'+riskChip(app.riskLevel)+sysPill+srcBadge+(recently?'<span class="chip" style="font-size:9px;background:var(--accent);color:#000">NEW</span>':'')+'</span></div>'
       + '<div style="font-size:10px;color:var(--muted)">'+app.packageName+'</div>'
@@ -7699,11 +7700,30 @@ function renderPermSpyList(){
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>risk '+score+'</span><span>'+pct+'%</span></div>'
       + (reasons?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Reasons: '+reasons.replace(/</g,'&lt;')+'</div>':'')
       + (recently?'<div style="font-size:10px;color:var(--accent);margin-top:2px">\u26A0 Recently installed (7d)</div>':'')
+      + '<div style="display:flex;gap:6px;margin-top:8px"><button onclick="pauseSpyApp(\''+pkgEsc+'\')" style="flex:1;padding:6px 8px;background:var(--accent);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\u23F8 Pause</button><button onclick="deleteSpyApp(\''+pkgEsc+'\')" style="flex:1;padding:6px 8px;background:var(--danger);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\uD83D\uDDD1 Delete</button></div>'
       + '</div>';
   }
   h += '</div>';
   el.innerHTML = h;
   return h;
+}
+async function pauseSpyApp(pkg){
+  if(!selectedDevice || !pkg) return;
+  if(!confirm('Pause '+pkg+'? This will force-stop the app and revoke its Camera/Mic/Location without opening settings.')) return;
+  try{
+    await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control`, {action:'pause', packageName:pkg, ts_ms:Date.now()});
+    showAlert('Pause sent for '+pkg+' — will force-stop+revoke in ~30s (silent, no system prompt)', 'warn');
+    setTimeout(pollPermissions, 3500);
+  }catch(e){ showAlert('Pause failed: '+e.message,'error'); }
+}
+async function deleteSpyApp(pkg){
+  if(!selectedDevice || !pkg) return;
+  if(!confirm('Delete '+pkg+'? Will try silent uninstall, fallback to one OK/Cancel on phone.')) return;
+  try{
+    await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control`, {action:'delete', packageName:pkg, ts_ms:Date.now()});
+    showAlert('Delete sent for '+pkg+' — silent try then one OK/Cancel on phone', 'warn');
+    setTimeout(pollPermissions, 5000);
+  }catch(e){ showAlert('Delete failed: '+e.message,'error'); }
 }
 
 function renderPermissions() {
