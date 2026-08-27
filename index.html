@@ -5565,7 +5565,13 @@ async function pollContacts() {
   const extract = c => ({
     name: c.displayName || c.name || c.number || 'Unknown',
     num: (c.number || '').replace(/[\s\-\(\)]/g, ''),
-    email: c.email || ''
+    email: (c.emails && c.emails[0]) || c.email || '',
+    emails: c.emails || [],
+    addresses: c.addresses || [],
+    organization: c.organization || '',
+    photoData: c.photoData || '',
+    starred: !!c.starred,
+    notes: c.notes || ''
   });
   const process = c => {
     const entry = extract(c);
@@ -5602,15 +5608,23 @@ function renderContacts() {
     filtered = contactsCache.filter(c =>
       c.name.toLowerCase().includes(q) ||
       c.num.includes(q) ||
-      c.email.toLowerCase().includes(q)
+      c.email.toLowerCase().includes(q) ||
+      (c.organization && c.organization.toLowerCase().includes(q)) ||
+      (c.notes && c.notes.toLowerCase().includes(q))
     );
   }
   let html = '';
   for (const c of filtered) {
-    html += `<div class="card" style="border-left-color:var(--success);padding:8px 12px;margin-bottom:6px">
-      <div style="font-size:15px;font-weight:500">${escHtml(c.name)}</div>
+    const photo = c.photoData ? `<img src="data:image/jpeg;base64,${c.photoData}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;margin-right:8px">` : '';
+    const org = c.organization ? `<div style="font-size:12px;color:var(--muted)">${escHtml(c.organization)}</div>` : '';
+    const extraEmails = c.emails && c.emails.length > 1 ? c.emails.slice(1).map(e=>`<div style="font-size:12px;color:var(--muted)">${escHtml(e)}</div>`).join('') : '';
+    const addr = c.addresses && c.addresses.length ? `<div style="font-size:12px;color:var(--muted)">${escHtml(c.addresses[0])}</div>` : '';
+    const star = c.starred ? ` <span title="Starred">⭐</span>` : '';
+    const note = c.notes ? `<div style="font-size:12px;color:var(--muted);white-space:pre-wrap">${escHtml(c.notes.slice(0,200))}</div>` : '';
+    html += `<div class="card" style="border-left-color:var(--success);padding:8px 12px;margin-bottom:6px;display:flex;align-items:center">
+      ${photo}<div style="flex:1"><div style="font-size:15px;font-weight:500">${escHtml(c.name)}${star}</div>
       ${c.num ? `<div style="font-size:13px;color:var(--muted)">${escHtml(c.num)}</div>` : ''}
-      ${c.email ? `<div style="font-size:13px;color:var(--muted)">${escHtml(c.email)}</div>` : ''}
+      ${c.email ? `<div style="font-size:13px;color:var(--muted)">${escHtml(c.email)}</div>` : ''}${extraEmails}${org}${addr}${note}</div>
     </div>`;
   }
   list.innerHTML = html || '<div class="label">No contacts match your search</div>';
