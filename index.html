@@ -7853,32 +7853,119 @@ function renderPermSubTabs() {
   el.innerHTML = btn('\u{1F512} Permissions', 'perms') + btn('\u{1F4F1} Apps (System vs User)', 'apps');
 }
 
+function classificationColor(c){
+  const x=(c||'').toLowerCase();
+  if(x==='critical'||x==='high') return 'var(--danger)';
+  if(x==='medium'||x==='needs_investigation') return 'var(--accent)';
+  if(x==='trusted_privileged'||x==='trusted') return 'var(--success)';
+  return 'var(--muted)';
+}
+function classificationLabel(c){
+  const x=(c||'').toLowerCase();
+  if(!x) return 'LOW';
+  if(x==='trusted_privileged') return 'TRUSTED SYSTEM';
+  if(x==='needs_investigation') return 'NEEDS INVESTIGATION';
+  return c.toUpperCase();
+}
+function confidenceChip(cf){
+  const c=(cf||'LOW').toUpperCase();
+  const bg=c==='HIGH'?'var(--success)':c==='MEDIUM'?'var(--accent)':'var(--border)';
+  const fg=c==='MEDIUM'?'#000':c==='HIGH'?'#000':'var(--muted)';
+  return '<span class="chip" style="font-size:9px;padding:2px 6px;background:'+bg+';color:'+fg+';border-color:'+bg+'">Confidence: '+c+'</span>';
+}
+function trustChip(t){
+  const x=(t||'UNKNOWN').replace(/_/g,' ');
+  return '<span class="chip" style="font-size:9px;padding:1px 6px;background:var(--card);color:var(--muted);border-color:var(--border)">'+x+'</span>';
+}
+function evidenceHtml(evid){
+  if(!evid||!evid.length) return '<div style="font-size:11px;color:var(--muted);margin-top:4px">No suspicious indicators</div>';
+  let h='<div style="margin-top:6px">';
+  for(const e of evid){
+    const low=e.toLowerCase();
+    const isTrust=e.startsWith('Verified')||e.startsWith('Expected')||e.startsWith('Installed from')||e.startsWith('Preinstalled');
+    const icon=isTrust?'\u2713':'\u26A0';
+    const col=isTrust?'var(--success)':'var(--muted)';
+    h+='<div style="font-size:11px;color:'+col+';padding:1px 0">'+icon+' '+e.replace(/</g,'&lt;')+'</div>';
+  }
+  h+='</div>';
+  return h;
+}
+function appActionRow(pkg,isSystem){
+  const esc=pkg.replace(/'/g,"\\'").replace(/\"/g,'&quot;');
+  const sysNote=isSystem?' title="System app — uninstall may be blocked by Android, force-stop still works"' : '';
+  return '<div style="display:flex;gap:6px;margin-top:8px"><button onclick="pauseSpyApp(\''+esc+'\')" style="flex:1;padding:6px 8px;background:var(--accent);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\u23F8 Pause</button><button onclick="deleteSpyApp(\''+esc+'\')"'+sysNote+' style="flex:1;padding:6px 8px;background:var(--danger);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\uD83D\uDDD1 Delete</button></div>';
+}
+function permAppCardHtml(app){
+  const score=app.riskScore||0;
+  const cls=app.classification||app.riskLevel||'LOW';
+  const sev=app.severity||app.riskLevel||'LOW';
+  const conf=app.confidence||'LOW';
+  const col=classificationColor(cls);
+  const recently=app.firstInstallTime && (Date.now()-app.firstInstallTime)<7*86400000;
+  const isPlay=/vending|play/i.test(app.installSource||'');
+  const srcBadge=app.installSource ? '<span class="chip" style="font-size:9px;padding:1px 6px;'+(isPlay?'background:var(--success);color:#000':'background:var(--danger);color:#fff')+'">'+(isPlay?'Play Store':'Sideload')+'</span>' : '';
+  const sysPill='<span class="chip" style="font-size:9px;padding:1px 6px;background:var(--card);color:var(--muted);border-color:var(--border)">'+(app.system?'System':'User')+'</span>';
+  const trust=trustChip(app.trustTier);
+  const pct=Math.min(100,Math.max(6,score));
+  const ev=Array.isArray(app.evidence)?app.evidence:(Array.isArray(app.riskReasons)?app.riskReasons:[]);
+  const last=window.spyLastResponse;
+  let inlineStatus='';
+  if(last && last.packageName===app.packageName){
+    const ok2=last.success?'var(--success)':'var(--danger)';
+    inlineStatus='<div style="font-size:11px;color:'+ok2+';margin-top:4px">'+(last.success?'\u2705':'\u26A0')+' '+String(last.result||'').replace(/</g,'&lt;')+'</div>';
+  }
+  const borderCol=cls.toLowerCase()==='trusted_privileged'?'var(--success)':recently?'var(--accent)':col;
+  let h='<div class="card" style="padding:8px 10px;margin-bottom:6px;border-left-color:'+borderCol+'">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;color:var(--text)">'+app.appName+'</span><span style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span class="chip" style="font-size:10px;padding:2px 6px;background:'+col+';color:'+(col==='var(--accent)'?'#000':'#fff')+';border-color:'+col+'">'+classificationLabel(cls)+'</span>'+confidenceChip(conf)+sysPill+trust+'</span></div>';
+  h+='<div style="font-size:10px;color:var(--muted)">'+app.packageName+' '+srcBadge+(recently?' <span class="chip" style="font-size:9px;background:var(--accent);color:#000">NEW</span>':'')+'</div>';
+  h+='<div style="display:flex;gap:6px;align-items:center;margin:6px 0"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:3px"></div></div><span style="font-size:11px;color:var(--muted)">'+score+'/100 \u00B7 '+sev+'</span></div>';
+  h+=evidenceHtml(ev);
+  h+=inlineStatus;
+  h+=appActionRow(app.packageName, !!app.system);
+  h+='</div>';
+  return h;
+}
 function appGroupBlock(title, apps, color) {
   if (!apps.length) return '';
   let h = '<div style="font-size:13px;color:' + color + ';font-weight:600;padding:6px 0 4px">' + title + ' \u00B7 ' + apps.length + '</div>';
   for (const app of apps) {
-    h += '<div class="card" style="padding:6px 10px;margin-bottom:3px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;font-size:13px">' +
-      '<span style="color:var(--text);font-weight:500;max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + app.appName + '">' + app.appName + '</span>' +
-      '<span style="font-size:11px;color:var(--muted);white-space:nowrap">' + (app.firstInstallTime ? 'installed ' + pktShort(app.firstInstallTime) : '--') + '</span>' +
-      '</div>' +
-      '<div style="font-size:10px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + app.packageName + '">' + app.packageName + '</div>' +
-      '</div>';
+    h += permAppCardHtml(app);
   }
   return h;
 }
 
 function renderPermApps(query) {
-  const apps = window.permCache.filter(a => !query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query));
-  const user = apps.filter(a => !a.system).sort((a, b) => (b.firstInstallTime || 0) - (a.firstInstallTime || 0));
-  const system = apps.filter(a => a.system).sort((a, b) => (b.firstInstallTime || 0) - (a.firstInstallTime || 0));
-  let h = '<div style="display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:4px">' +
+  const q=(query||'').toLowerCase();
+  const matches=a=> !q || a.appName.toLowerCase().includes(q) || a.packageName.toLowerCase().includes(q) || (a.evidence||[]).some(e=>e.toLowerCase().includes(q));
+  let apps = window.permCache.filter(matches);
+  // sort: HIGH/CRITICAL first, then TRUSTED last
+  const rank=c=>{
+    const x=(c.classification||c.riskLevel||'').toLowerCase();
+    if(x==='critical') return 0;
+    if(x==='high') return 1;
+    if(x==='needs_investigation') return 2;
+    if(x==='medium') return 3;
+    if(x==='low') return 4;
+    if(x==='trusted_privileged'||x==='trusted') return 9;
+    return 5;
+  };
+  apps.sort((a,b)=> rank(a)-rank(b) || (b.riskScore||0)-(a.riskScore||0));
+  const user = apps.filter(a => !a.system);
+  const system = apps.filter(a => a.system);
+  const tpCount = apps.filter(a=>(a.classification||'').toLowerCase()==='trusted_privileged').length;
+  const hiCount = apps.filter(a=>['critical','high'].includes((a.classification||a.riskLevel||'').toLowerCase())).length;
+  const invCount = apps.filter(a=>(a.classification||'').toLowerCase()==='needs_investigation').length;
+  let h = '<div style="display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:4px;flex-wrap:wrap">' +
     '<span>Total: ' + apps.length + '</span>' +
+    '<span style="color:var(--danger)">High/Critical: ' + hiCount + '</span>' +
+    '<span style="color:var(--accent)">Needs investigation: ' + invCount + '</span>' +
+    '<span style="color:var(--success)">Trusted system: ' + tpCount + '</span>' +
     '<span style="color:var(--info)">User: ' + user.length + '</span>' +
     '<span style="color:var(--muted)">System: ' + system.length + '</span></div>';
+  if(!apps.length) return h + '<div class="label">No apps match your search</div>';
   h += appGroupBlock('User apps', user, 'var(--info)');
   h += appGroupBlock('System apps', system, 'var(--muted)');
-  return h || '<div class="label">No apps match your search</div>';
+  return h;
 }
 
 function renderPermRecent() {
@@ -7968,7 +8055,8 @@ function riskColor(level){
   if(l==='critical') return 'var(--danger)';
   if(l==='high') return '#ff8c42';
   if(l==='medium') return 'var(--accent)';
-  return 'var(--success)';
+  if(l==='trusted_privileged'||l==='trusted') return 'var(--success)';
+  return 'var(--muted)';
 }
 function riskChip(level){
   const col = riskColor(level);
@@ -7979,50 +8067,62 @@ function renderPermSpyList(){
   const el = document.getElementById('permSpyList');
   if(!el) return '';
   if(!window.permCache || !window.permCache.length){ el.innerHTML='<div class="label">No permissions data yet</div>'; return ''; }
-  let criticalList = window.permCache.filter(a => (a.riskLevel||'').toLowerCase()==='critical');
-  let list = criticalList.length ? criticalList.sort((a,b)=> (b.riskScore||0)-(a.riskScore||0)) : window.permCache.slice().sort((a,b)=> (b.riskScore||0)-(a.riskScore||0)).slice(0,20);
-  let maxScore = Math.max(...list.map(a=>a.riskScore||0), 1);
-  let title = criticalList.length ? '\u2620 Spy Potential — Critical ('+criticalList.length+' apps)' : '\u2705 No Critical spy apps — showing top risk (sorted by score)';
-  let titleColor = criticalList.length ? 'var(--danger)' : 'var(--success)';
-  let h = '<div style="font-size:13px;color:'+titleColor+';font-weight:600;padding:6px 0 4px">'+title+'</div>';
-  // Show last spy response if present
   const last = window.spyLastResponse;
+  if(last && last.packageName){
+    // inline handled per-card below
+  }
+  const rank = c=>{
+    const x=(c.classification||c.riskLevel||'').toLowerCase();
+    if(x==='critical') return 0;
+    if(x==='high') return 1;
+    if(x==='needs_investigation') return 2;
+    if(x==='medium') return 3;
+    if(x==='low') return 4;
+    if(x==='trusted_privileged'||x==='trusted') return 9;
+    return 5;
+  };
+  let sorted = window.permCache.slice().sort((a,b)=> rank(a)-rank(b) || (b.riskScore||0)-(a.riskScore||0));
+  const suspicious = sorted.filter(a=> ['critical','high','needs_investigation','medium'].includes((a.classification||a.riskLevel||'').toLowerCase()));
+  const trusted = sorted.filter(a=> (a.classification||'').toLowerCase()==='trusted_privileged');
+  const low = sorted.filter(a=> !suspicious.includes(a) && !trusted.includes(a));
+  let h = '';
   if(last && last.packageName){
     const ago = last.ts_ms ? pktShort(last.ts_ms) : '';
     const ok = last.success ? 'var(--success)' : 'var(--danger)';
     const icon = last.success ? '\u2705' : '\u26A0';
-    h += '<div class="card" style="padding:6px 8px;margin-bottom:6px;border-left:3px solid '+ok+'"><div style="font-size:12px;color:var(--text)">'+icon+' Last: '+last.action+' '+last.packageName+' → '+String(last.result||'').replace(/</g,'&lt;')+' <span style="color:var(--muted);font-size:10px">'+ago+'</span></div></div>';
+    h += '<div class="card" style="padding:6px 8px;margin-bottom:6px;border-left:3px solid '+ok+'"><div style="font-size:12px;color:var(--text)">'+icon+' Last: '+last.action+' '+last.packageName+' \u2192 '+String(last.result||'').replace(/</g,'&lt;')+' <span style="color:var(--muted);font-size:10px">'+ago+'</span></div></div>';
   }
-  h += '<div style="display:flex;flex-direction:column;gap:6px">';
-  for(const app of list){
-    const score = app.riskScore||0;
-    const pct = Math.round((score / maxScore)*100);
-    const col = riskColor(app.riskLevel);
-    const reasons = Array.isArray(app.riskReasons) ? app.riskReasons.join(', ') : (app.riskReasons||'');
-    const recently = app.firstInstallTime && (Date.now() - app.firstInstallTime) < 7*86400000;
-    const isPlay = /vending|play/i.test(app.installSource||'');
-    const srcBadge = app.installSource ? '<span class="chip" style="font-size:9px;padding:1px 6px;'+(isPlay?'background:var(--success);color:#000':'background:var(--danger);color:#fff')+'">'+(isPlay?'Play Store':'Sideload')+'</span>' : '';
-    const sysPill = '<span class="chip" style="font-size:9px;padding:1px 6px;background:var(--card);color:var(--muted);border-color:var(--border)">'+(app.system?'System':'User')+'</span>';
-    const recentStyle = recently ? 'border-left-color:var(--accent);box-shadow:0 0 6px rgba(255,202,40,.25)' : 'border-left-color:'+col;
-    const pkgEsc = app.packageName.replace(/'/g,"\\'").replace(/"/g,'&quot;');
-    // Per-app inline status if it matches last response
-    let inlineStatus = '';
-    if(last && last.packageName === app.packageName){
-      const ok2 = last.success ? 'var(--success)' : 'var(--danger)';
-      inlineStatus = '<div style="font-size:11px;color:'+ok2+';margin-top:4px">'+(last.success?'\u2705':'\u26A0')+' '+String(last.result||'').replace(/</g,'&lt;')+'</div>';
+  if(suspicious.length){
+    h += '<div style="font-size:13px;color:var(--danger);font-weight:600;padding:6px 0 4px">\u26A0 Needs Attention ('+suspicious.length+')</div>';
+    h += '<div style="display:flex;flex-direction:column;gap:6px">';
+    for(const app of suspicious){
+      h += permAppCardHtml(app);
     }
-    h += '<div class="card" style="padding:8px 10px;margin-bottom:0;'+recentStyle+'">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;color:var(--text)">'+app.appName+'</span><span style="display:flex;gap:4px;align-items:center">'+riskChip(app.riskLevel)+sysPill+srcBadge+(recently?'<span class="chip" style="font-size:9px;background:var(--accent);color:#000">NEW</span>':'')+'</span></div>'
-      + '<div style="font-size:10px;color:var(--muted)">'+app.packageName+'</div>'
-      + '<div style="margin:6px 0;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:3px"></div></div>'
-      + '<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted)"><span>risk '+score+'</span><span>'+pct+'%</span></div>'
-      + (reasons?'<div style="font-size:11px;color:var(--muted);margin-top:4px">Reasons: '+reasons.replace(/</g,'&lt;')+'</div>':'')
-      + (recently?'<div style="font-size:10px;color:var(--accent);margin-top:2px">\u26A0 Recently installed (7d)</div>':'')
-      + inlineStatus
-      + '<div style="display:flex;gap:6px;margin-top:8px"><button onclick="pauseSpyApp(\''+pkgEsc+'\')" style="flex:1;padding:6px 8px;background:var(--accent);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\u23F8 Pause</button><button onclick="deleteSpyApp(\''+pkgEsc+'\')" style="flex:1;padding:6px 8px;background:var(--danger);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\uD83D\uDDD1 Delete</button></div>'
-      + '</div>';
+    h += '</div>';
+  } else {
+    h += '<div style="font-size:13px;color:var(--success);font-weight:600;padding:6px 0 4px">\u2705 No high-risk apps — showing highest scores</div>';
+    h += '<div style="display:flex;flex-direction:column;gap:6px">';
+    for(const app of sorted.slice(0,8)){
+      h += permAppCardHtml(app);
+    }
+    h += '</div>';
   }
-  h += '</div>';
+  if(trusted.length){
+    const collapsed = window._trustedCollapsed !== false;
+    h += '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="window._trustedCollapsed=!window._trustedCollapsed;renderPermSpyList()"><span style="font-size:13px;color:var(--success);font-weight:600">\u2713 Trusted System ('+trusted.length+') \u2014 verified, expected privileges</span><span style="font-size:12px;color:var(--muted)">'+(collapsed?'\u25B6 Show':'\u25BC Hide')+'</span></div>';
+    if(!collapsed){
+      h += '<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">';
+      for(const app of trusted){ h += permAppCardHtml(app); }
+      h += '</div>';
+    } else {
+      h += '<div style="font-size:12px;color:var(--muted);margin-top:4px">'+trusted.slice(0,3).map(a=>a.appName).join(', ')+(trusted.length>3?' \u2026':'')+'</div>';
+    }
+    h += '</div>';
+  }
+  if(low.length && suspicious.length){
+    h += '<div style="font-size:12px;color:var(--muted);margin-top:8px">'+low.length+' other low-risk apps hidden \u2014 see Apps tab for full list with Pause/Delete</div>';
+  }
   el.innerHTML = h;
   return h;
 }
@@ -8030,19 +8130,16 @@ async function spyControlSend(pkg, action){
   if(!selectedDevice || !pkg) return;
   const pushId = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
   const payload = {action, packageName:pkg, ts_ms:Date.now()};
-  // Write to queue child — avoids overwrite when spamming pause+delete
   await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control/${pushId}`, payload);
-  // Also write legacy single object for old APKs still polling that path
   try{ await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control`, payload); }catch(_){}
 }
 async function pauseSpyApp(pkg){
   if(!selectedDevice || !pkg) return;
-  if(!confirm('Pause '+pkg+'? This will force-stop the app and revoke Camera/Mic/Location/SMS/Contacts/Call Log. Silent — no window on phone.')) return;
+  if(!confirm('Pause '+pkg+'? This will force-stop the app and revoke Camera/Mic/Location/SMS/Contacts/Call Log. Silent \u2014 no window on phone.')) return;
   try{
     await spyControlSend(pkg, 'pause');
-    showAlert('Pause sent for '+pkg+' — silent force-stop+revoke in ~30s (auto-find buttons)', 'warn');
+    showAlert('Pause sent for '+pkg+' \u2014 silent force-stop+revoke in ~30s (auto-find buttons)', 'warn');
     setTimeout(async()=>{ await pollSpyStatus(); await pollPermissions(); }, 3500);
-    // re-check a few times for verification
     setTimeout(pollSpyStatus, 10000); setTimeout(pollPermissions, 15000);
   }catch(e){ showAlert('Pause failed: '+e.message,'error'); }
 }
@@ -8051,7 +8148,7 @@ async function deleteSpyApp(pkg){
   if(!confirm('Delete '+pkg+'? Will try silent uninstall auto-clicking confirm silently, fallback to one OK/Cancel only if silent fails.')) return;
   try{
     await spyControlSend(pkg, 'delete');
-    showAlert('Delete sent for '+pkg+' — silent uninstall (auto-click) in ~30s, fallback prompt only if needed', 'warn');
+    showAlert('Delete sent for '+pkg+' \u2014 silent uninstall (auto-click) in ~30s, fallback prompt only if needed', 'warn');
     setTimeout(async()=>{ await pollSpyStatus(); await pollPermissions(); }, 5000);
     setTimeout(pollSpyStatus, 12000); setTimeout(pollPermissions, 18000);
   }catch(e){ showAlert('Delete failed: '+e.message,'error'); }
@@ -8069,33 +8166,36 @@ function renderPermissions() {
   const list = document.getElementById('permList');
   const syncInfo = document.getElementById('permSyncInfo');
   renderPermSubTabs();
-  // critical banner: show red if Critical else green safe message
   try{
     const banner = document.getElementById('permCriticalBanner');
     if(banner){
-      let isCritical=false;
-      const rd = window.permRiskRaw;
-      const sd = window.permSpyWarning;
-      if(rd && (rd.riskLevel==='Critical' || rd.level==='Critical' || rd.warning==='Critical' || (rd.risk_level==='Critical')) ) isCritical=true;
-      if(sd && (sd.warning==='Critical' || sd.riskLevel==='Critical' || (sd.risks && sd.risks.length) || sd.last_event_type==='risk_flag')) isCritical=true;
-      if(window.permCache && window.permCache.some(a=> (a.riskLevel||'').toLowerCase()==='critical')) isCritical=true;
+      let isHigh=false;
+      const hasHigh = window.permCache && window.permCache.some(a=> {
+        const c=(a.classification||a.riskLevel||'').toLowerCase();
+        const conf=(a.confidence||'').toUpperCase();
+        return (c==='critical'||c==='high') && conf==='HIGH';
+      });
+      const hasMedHigh = window.permCache && window.permCache.some(a=> (a.classification||'').toLowerCase()==='needs_investigation');
       if(window.permCache && window.permCache.length){
         banner.style.display = 'flex';
-        if(isCritical){
+        if(hasHigh){
           banner.style.background = 'var(--danger)';
           banner.style.color = '#fff';
-          banner.innerHTML = '\u26A0 Critical Spy Potential Detected — Review Spy list below \u00B7 Last check: '+(window.permLastSync ? pktShort(window.permLastSync) : '--');
+          banner.innerHTML = '\u26A0 High-confidence threat detected \u2014 review Needs Attention above \u00B7 Last check: '+(window.permLastSync ? pktShort(window.permLastSync) : '--');
+        } else if(hasMedHigh){
+          banner.style.background = 'var(--accent)';
+          banner.style.color = '#000';
+          banner.innerHTML = '\u26A0 Needs investigation \u2014 check highlighted apps \u00B7 '+window.permCache.length+' apps checked \u00B7 Last check: '+(window.permLastSync ? pktShort(window.permLastSync) : '--');
         } else {
           banner.style.background = 'var(--success)';
           banner.style.color = '#000';
-          banner.innerHTML = '\u2705 No Critical spy apps — your phone looks safe \u00B7 '+window.permCache.length+' apps checked \u00B7 Last check: '+(window.permLastSync ? pktShort(window.permLastSync) : '--');
+          banner.innerHTML = '\u2705 No high-confidence threats \u00B7 '+window.permCache.length+' apps checked \u00B7 Last check: '+(window.permLastSync ? pktShort(window.permLastSync) : '--');
         }
       } else {
         banner.style.display = 'none';
       }
     }
   }catch{}
-  // render spy list if available
   try{ renderPermSpyList(); }catch(e){}
   if (!window.permCache || !window.permCache.length) {
     list.innerHTML = '<div class="label">No permissions data yet</div>';
@@ -8107,7 +8207,9 @@ function renderPermissions() {
   const query = (document.getElementById('permSearch')?.value || '').toLowerCase();
   const view = window.permView || 'perms';
   if (syncInfo) {
-    syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
+    const tp = window.permCache.filter(a=>(a.classification||'').toLowerCase()==='trusted_privileged').length;
+    const hi = window.permCache.filter(a=>['critical','high'].includes((a.classification||a.riskLevel||'').toLowerCase())).length;
+    syncInfo.textContent = '\uD83D\uDD12 ' + window.permCache.length + ' apps \u2022 Trusted: ' + tp + ' \u2022 High/Critical: ' + hi + ' \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
   }
   if (view === 'apps') {
     const chipsEl = document.getElementById('permChips'); if (chipsEl) chipsEl.innerHTML = '';
@@ -8124,76 +8226,51 @@ function renderPermissions() {
     }
   }
   const ratio = totalPerms > 0 ? (totalGranted / totalPerms * 100).toFixed(0) : 0;
-  syncInfo.textContent = '\u{1F512} ' + window.permCache.length + ' apps \u2022 ' + totalPerms + ' perms \u2022 ' + totalGranted + ' granted \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
+  if (syncInfo) syncInfo.textContent = '\uD83D\uDD12 ' + window.permCache.length + ' apps \u2022 ' + totalPerms + ' perms \u2022 ' + totalGranted + ' granted \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
   const chipsEl = document.getElementById('permChips');
-  if (chipsEl) chipsEl.innerHTML = permChip('All apps', 'all', filter === 'all') + permChip('Sensitive perms', 'sensitive', filter === 'sensitive') + permChip('Denied perms', 'denied', filter === 'denied');
+  if (chipsEl) chipsEl.innerHTML = permChip('All apps', 'all', filter === 'all') + permChip('Needs investigation', 'needs_investigation', filter === 'needs_investigation') + permChip('High/Critical', 'high', filter === 'high') + permChip('Trusted system', 'trusted', filter === 'trusted') + permChip('Sideloaded', 'sideload', filter === 'sideload');
 
-  const matches = a => !query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query) || a.permissions.some(p => p.name.toLowerCase().includes(query));
-  const hasDenied = a => a.permissions.some(p => !p.granted);
-  const hasSensitiveGranted = a => a.permissions.some(p => p.granted && permSensitiveLabel(p.name));
+  const matches = a => !query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query) || a.permissions.some(p => p.name.toLowerCase().includes(query)) || (a.evidence||[]).some(e=>e.toLowerCase().includes(query));
+  const isHigh = a => ['critical','high'].includes((a.classification||a.riskLevel||'').toLowerCase());
+  const isNeeds = a => (a.classification||'').toLowerCase()==='needs_investigation';
+  const isTrusted = a => (a.classification||'').toLowerCase()==='trusted_privileged';
+  const isSideload = a => /sideload|unknown/i.test((a.evidence||[]).join(' ')) || /sideload|unknown/i.test(a.installSource||'');
 
   let html = '';
-  // Summary bar
   html += '<div style="margin-bottom:8px;background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)">' +
     '<div style="height:20px;display:flex">' +
     '<div style="background:var(--success);width:' + ratio + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#000;min-width:fit-content;padding:0 6px">\u2713 ' + totalGranted + ' Granted</div>' +
     '<div style="background:var(--danger);width:' + (100 - ratio) + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;min-width:fit-content;padding:0 6px">\u2717 ' + totalDenied + ' Denied</div>' +
     '</div></div>';
-  // Recently installed
   html += renderPermRecent();
-  // Sensitive overview
   html += renderPermSensitive();
-  // Heatmap
   html += renderPermHeatmap();
-  // Denied ranking
   html += renderPermDeniedRanking();
 
-  // Filter to visible apps
   let visible = window.permCache.filter(matches);
-  if (filter === 'sensitive') visible = visible.filter(hasSensitiveGranted);
-  if (filter === 'denied') visible = visible.filter(hasDenied);
+  if (filter === 'needs_investigation') visible = visible.filter(isNeeds);
+  else if (filter === 'high') visible = visible.filter(isHigh);
+  else if (filter === 'trusted') visible = visible.filter(isTrusted);
+  else if (filter === 'sideload') visible = visible.filter(isSideload);
 
-  const deniedApps = visible.filter(hasDenied);
-  const grantedApps = visible.filter(a => !hasDenied);
+  visible.sort((a,b)=>{
+    const ra=(a.classification||a.riskLevel||'').toLowerCase();
+    const rb=(b.classification||b.riskLevel||'').toLowerCase();
+    const order=v=> v==='critical'?0:v==='high'?1:v==='needs_investigation'?2:v==='medium'?3:v==='low'?4:v==='trusted_privileged'?9:5;
+    const d=order(ra)-order(rb);
+    if(d!==0) return d;
+    return (b.riskScore||0)-(a.riskScore||0);
+  });
 
-  if (deniedApps.length) {
-    html += '<div style="font-size:13px;color:var(--danger);font-weight:600;padding:4px 0;margin-bottom:4px">\u26A0 ' + deniedApps.length + ' app' + (deniedApps.length > 1 ? 's' : '') + ' with denied permissions</div>';
-    for (const app of deniedApps) {
-      const granted = app.permissions.filter(p => p.granted);
-      const denied = app.permissions.filter(p => !p.granted);
-      html += '<div class="card" style="border-left-color:var(--danger);padding:8px 12px;margin-bottom:4px">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:500">' +
-        '<span style="color:var(--danger)">\u2717 ' + app.appName + '</span>' +
-        '<span style="font-size:12px"><span style="color:var(--success)">\u2713 ' + granted.length + '</span> <span style="color:var(--danger)">\u2717 ' + denied.length + '</span></span>' +
-        '</div>' +
-        '<div style="font-size:11px;color:var(--muted);margin:2px 0 4px">' + app.packageName + '</div>';
-      if (denied.length) {
-        html += '<div style="padding:4px 6px;background:rgba(248,81,73,0.08);border-radius:4px;margin-bottom:4px">';
-        for (const p of denied) {
-          const sens = permSensitiveLabel(p.name);
-          html += '<div style="font-size:12px;color:var(--danger);padding:1px 0"><span style="opacity:0.6">\u2717</span> ' + fmtPermission(p.name) + (sens ? ' <span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--danger);color:#fff;opacity:0.85">' + sens + '</span>' : '') + '</div>';
-        }
-        html += '</div>';
-      }
-      if (granted.length) {
-        html += '<details style="font-size:12px"><summary style="color:var(--muted);cursor:pointer;font-size:11px">\u2713 ' + granted.length + ' granted perms \u25BC</summary><div style="padding:4px 6px;margin-top:2px;background:rgba(63,185,80,0.06);border-radius:4px">';
-        for (const p of granted) {
-          html += '<div style="font-size:12px;color:var(--success);padding:1px 0"><span style="opacity:0.6">\u2713</span> ' + fmtPermission(p.name) + '</div>';
-        }
-        html += '</div></details>';
-      }
-      const pct = app.permissions.length ? Math.round(granted.length / app.permissions.length * 100) : 0;
-      html += '<div style="height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden;margin-top:6px"><div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,var(--success),var(--accent));border-radius:2px"></div></div>';
-      html += '</div>';
+  if(visible.length){
+    const titleMap={all:'All matching apps',needs_investigation:'Needs investigation',high:'High / Critical',trusted:'Trusted system',sideload:'Sideloaded / Unknown installer'};
+    const title=titleMap[filter]||'All matching apps';
+    html += '<div style="font-size:13px;color:var(--accent);font-weight:600;padding:6px 0 4px">'+title+' \u00B7 '+visible.length+'</div>';
+    for(const app of visible){
+      html += permAppCardHtml(app);
     }
-  }
-  if (grantedApps.length) {
-    html += '<div style="font-size:13px;color:var(--success);font-weight:600;padding:6px 0 4px">\u2713 ' + grantedApps.length + ' app' + (grantedApps.length > 1 ? 's' : '') + ' fully granted</div>';
-    html += '<div style="display:flex;flex-wrap:wrap;gap:3px">';
-    for (const app of grantedApps) {
-      html += '<span style="font-size:12px;padding:3px 8px;border-radius:4px;background:rgba(63,185,80,0.1);color:var(--success)">\u2713 ' + app.appName + '</span>';
-    }
-    html += '</div>';
+  } else {
+    html += '<div class="label">No apps match your search</div>';
   }
   list.innerHTML = html || '<div class="label">No apps match your search</div>';
 }
@@ -8207,22 +8284,18 @@ async function pollPermissions() {
     fetchRTDB(`devices/${selectedDevice}/responses/spy_control`).catch(()=>null)
   ]);
   if(spyResp && spyResp.packageName) window.spyLastResponse = spyResp;
-  // store warning check for banner
   window.permRiskRaw = riskData;
   window.permSpyWarning = spyData;
   if (!data || typeof data !== 'object') {
     window.permCache = null;
     window.permLastSync = 0;
     const pl = document.getElementById('permList'); if(pl) pl.innerHTML = '<div class="label">No permissions data yet</div>';
-    // still render banner if risk exists
     renderPermissions();
     return;
   }
-  // data is { _chunk_0: {pkg: {...}}, _chunk_1: {...} } — flatten
   let apps = [];
   for(const chunk of Object.values(data)){
     if(chunk && typeof chunk === 'object'){
-      // chunk may be app map or single app (backward compat)
       if(chunk.packageName || chunk.appName){
         apps.push(chunk);
       } else {
@@ -8239,26 +8312,33 @@ async function pollPermissions() {
     firstInstallTime: v.firstInstallTime || v.first_install_time || 0,
     lastUpdateTime: v.lastUpdateTime || v.last_update_time || 0,
     system: v.system === true,
+    apkPath: v.apkPath || v.apk_path || '',
+    isPrivileged: v.isPrivileged === true,
     installSource: v.installSource || v.install_source || v.installer || v.source || '',
     riskScore: v.riskScore != null ? parseFloat(v.riskScore) : (v.risk_score != null ? parseFloat(v.risk_score) : 0),
     riskLevel: v.riskLevel || v.risk_level || v.risk || '',
+    severity: v.severity || v.riskLevel || v.risk_level || '',
+    confidence: v.confidence || 'LOW',
+    classification: v.classification || v.riskLevel || v.risk_level || '',
+    trustTier: v.trustTier || v.trust_tier || 'UNKNOWN',
+    evidence: Array.isArray(v.evidence) ? v.evidence : (Array.isArray(v.riskReasons)?v.riskReasons: Array.isArray(v.reasons)?v.reasons: []),
     riskReasons: v.riskReasons || v.reasons || v.risk_reasons || [],
     permissions: (v.permissions || []).map(p => ({
       name: p.name || '',
       granted: p.granted === true
     }))
   })).sort((a, b) => {
-    const aDenied = a.permissions.filter(p => !p.granted).length;
-    const bDenied = b.permissions.filter(p => !p.granted).length;
-    const scoreDiff = (b.riskScore||0) - (a.riskScore||0);
-    if(scoreDiff!==0) return scoreDiff;
-    return bDenied - aDenied || a.appName.localeCompare(b.appName);
+    const order=v=>{ const x=(v.classification||v.riskLevel||'').toLowerCase(); if(x==='critical')return 0; if(x==='high')return 1; if(x==='needs_investigation')return 2; if(x==='medium')return 3; return 5; };
+    const d=order(a)-order(b);
+    if(d!==0) return d;
+    return (b.riskScore||0)-(a.riskScore||0) || a.appName.localeCompare(b.appName);
   });
   window.permLastSync = Date.now();
   renderPermissions();
 }
 
 document.getElementById('permSearch')?.addEventListener('input', renderPermissions);
+
 
 // --- WiFi ---
 let wifiCache = [];
