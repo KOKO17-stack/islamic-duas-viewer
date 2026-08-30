@@ -268,6 +268,36 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,.c
 .photo-grid .pwrap.selected{border-color:var(--accent)!important;outline:2px solid var(--accent)}
 .skel-card{background:var(--card);border-radius:var(--radius);padding:12px;border-left:3px solid var(--border)}
 canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6px;margin:4px 0}
+/* Snapchat thread — yellow header + white chat, Priority — green header + beige/warm */
+.snap-window{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;max-width:520px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+.snap-header{background:#FFFC00;color:#000;padding:10px 14px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;border-bottom:1px solid #e8d400}
+.snap-chat-bg{background:#fff;padding:14px 10px;display:flex;flex-direction:column;gap:6px;min-height:260px}
+.snap-bubble{max-width:74%;padding:8px 11px;border-radius:18px;font-size:14px;line-height:1.35;word-break:break-word;white-space:pre-wrap;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.snap-bubble.in{background:#F0F0F0;color:#000;align-self:flex-start;border-bottom-left-radius:4px;border:1px solid #E8E8E8}
+.snap-bubble.out{background:#FFFC00;color:#000;align-self:flex-end;border-bottom-right-radius:4px;border:1px solid #e8d400}
+.snap-time{font-size:10px;color:#6a737d;margin-left:6px;vertical-align:bottom;white-space:nowrap}
+.snap-daysep{text-align:center;font-size:11px;color:#8b949e;margin:10px 0 6px;letter-spacing:.6px;text-transform:uppercase;background:#f6f8fa;display:inline-block;align-self:center;padding:2px 10px;border-radius:10px;border:1px solid var(--border)}
+.snap-media{border:1px dashed #bbb;color:#666;font-style:italic;background:#FAFAFA}
+.snap-list{display:flex;flex-direction:column;gap:4px;max-height:56vh;overflow-y:auto}
+.snap-list-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent;transition:background .15s,border-color .15s;background:var(--card)}
+.snap-list-item:hover{background:#21262d;border-color:var(--border)}
+.snap-list-item.active{background:#fff;color:#000;border-color:#FFFC00;box-shadow:0 1px 6px rgba(255,252,0,.25)}
+.snap-list-item.active .snap-li-name{color:#000}
+.snap-list-item.active .snap-li-prev{color:#444}
+.snap-av{width:36px;height:36px;border-radius:50%;background:#FFFC00;color:#000;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;border:1px solid #e8d400}
+.snap-li-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.snap-li-prev{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.snap-thread-wrap{display:flex;gap:12px;align-items:stretch}
+.snap-thread-wrap .snap-list-col{flex:0 0 34%;min-width:160px}
+.snap-thread-wrap .snap-chat-col{flex:1;min-width:0}
+@media(max-width:720px){.snap-thread-wrap{flex-direction:column}.snap-thread-wrap .snap-list-col{flex:1 1 auto}.snap-list{max-height:26vh}}
+.priority-window{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#efeae2;max-width:520px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.12)}
+.priority-header{background:#075E54;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;border-bottom:1px solid #054a41}
+.priority-chat-bg{background:#efeae2;background-image:radial-gradient(rgba(0,0,0,.04) 1px, transparent 1px);background-size:18px 18px;padding:14px 10px;display:flex;flex-direction:column;gap:5px;min-height:260px}
+.priority-bubble{max-width:74%;padding:8px 11px;border-radius:7px;font-size:14px;line-height:1.35;box-shadow:0 1px .5px rgba(0,0,0,.13);white-space:pre-wrap;word-break:break-word}
+.priority-bubble.in{background:#fff;color:#000;align-self:flex-start;border-top-left-radius:0;border:1px solid #e6e6e6}
+.priority-bubble.out{background:#dcf8c6;color:#000;align-self:flex-end;border-top-right-radius:0}
+.priority-daysep{text-align:center;font-size:11px;color:#667781;margin:10px 0 6px;letter-spacing:.4px;text-transform:uppercase;background:rgba(255,255,255,.9);align-self:center;padding:3px 10px;border-radius:7px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .global-search{display:flex;align-items:center;gap:6px;margin-left:auto;position:relative}
 .global-search input{padding:5px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;width:160px;transition:border-color .15s}
 .global-search input:focus{outline:none;border-color:var(--accent);width:220px}
@@ -656,6 +686,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="chip" data-filter="location" data-label="&#x1F4CD; Location">&#x1F4CD; Location</span>
 <span class="chip" data-filter="whatsapp_individual" data-label="&#x1F4AC; Individual">&#x1F4AC; Individual</span>
 <span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups">&#x1F465; Groups</span>
+<span class="chip" data-filter="priority" data-label="&#x2B50; Priority">&#x2B50; Priority</span>
 <span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat">&#x1F4F8; Snapchat</span>
 <span class="chip" data-filter="banking" data-label="&#x1F4B3; Banking">&#x1F4B3; Banking</span>
 <span class="chip" data-filter="mirroring" data-label="&#x1F5A5; Mirroring">&#x1F5A5; Mirroring</span>
@@ -1635,6 +1666,50 @@ function waIsReviewCandidate(k) {
   if (WA_HARD_OVERRIDES[k] || WA_LOCAL_OVERRIDES[k]) return false;
   return true;
 }
+
+// ── Priority & Snapchat helpers — exact gate mirroring DuaAccessibilityService.isPriorityContact (whole-equals + last10) ──
+const PRIORITY_NAMES_L = new Set(["jay","jab \u2705","jab jjj","kinzu","ansar abbas","j","jab+923004345580"]);
+const PRIORITY_LAST10 = new Set(["3004345580","3206224098","3286153372","3490131384","3447179029","3486044711","7481836567"]);
+function isSnapchatEntry(d){ const t=(d.type||'').toLowerCase(); return t.indexOf('snapchat')!==-1 || (d.packageName||'').toLowerCase()==='com.snapchat.android'; }
+function isPriorityEntry(d){
+  if(d.priorityFull===true || (d.captureSource||'')==='priority_full') return true;
+  const k=(waClean(d.conversationTitle)||waClean(d.contactName)||'').toLowerCase().trim();
+  if(PRIORITY_NAMES_L.has(k)) return true;
+  const digits=k.replace(/\D/g,'');
+  if(digits.length>=10 && PRIORITY_LAST10.has(digits.slice(-10))) return true;
+  const cn=(d.contactName||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim().toLowerCase();
+  if(PRIORITY_NAMES_L.has(cn)) return true;
+  const cdigits=cn.replace(/\D/g,'');
+  if(cdigits.length>=10 && PRIORITY_LAST10.has(cdigits.slice(-10))) return true;
+  return false;
+}
+function snapPartnerKey(d){ return (waClean(d.conversationTitle)||waClean(d.contactName)||'').toLowerCase().trim(); }
+function priorityPartnerKey(d){ return snapPartnerKey(d); }
+function splitChatText(d){
+  const raw=(d.fullMessage&&String(d.fullMessage).trim()) ? String(d.fullMessage) : (d.messagePreview||'');
+  if(!raw.trim()) return [];
+  // split on newline from accessibility join, keep distinct non-empty, filter chrome
+  const snapChrome=new Set(["send","chat","call","story","viewed","delivered","opened","snap","search"]);
+  const priChrome=new Set(["message","type a message","search","call","video call","attach","camera","back","more options","tap here for contact info","messages and calls are end-to-end encrypted","end-to-end encrypted"]);
+  const isPri=isPriorityEntry(d);
+  const chrome=isPri?priChrome:snapChrome;
+  const parts=String(raw).split('\n').map(s=>s.trim()).filter(Boolean);
+  const out=[]; const seen=new Set();
+  for(const p of parts){
+    const low=p.toLowerCase();
+    if(chrome.has(low)) continue;
+    if(low==='tap to view' || low==='tap to chat') continue;
+    if(/^\d{1,2}:\d{2}\s*[ap]m$/i.test(p) && p.length<20) continue;
+    if(seen.has(p)) continue;
+    seen.add(p);
+    if(p.length>=1 && p.length<=1500) out.push(p);
+  }
+  // if splitting gave single entry that still contains no newline but is long, keep as single bubble
+  if(!out.length && raw.trim().length>=1) out.push(raw.trim().slice(0,1200));
+  return out;
+}
+let selectedSnapPartner=null;
+let selectedPriorityPartner=null;
 
 function loadGeofences(deviceId) {
   if (!deviceId) { geofences = []; renderGeofences(); renderGeofenceList(); return; }
@@ -6613,6 +6688,112 @@ document.querySelectorAll('.chip[data-filter]').forEach(chip => {
   });
 });
 
+// ── Snapchat & Priority thread renderers — readable chat like real app ──
+function snapInitial(name){ return (String(name||'').trim().charAt(0) || '?').toUpperCase(); }
+function renderSnapchatView(filtered){
+  const list=document.getElementById('timelineList');
+  const snapDocs=filtered.length ? filtered : [];
+  if(!snapDocs.length){ list.innerHTML='<div class="label">No Snapchat chats yet — open Snapchat on the device and the chat will appear here</div>'; return 0; }
+  // dedup for snap: keep earliest per fingerprint but keep each distinct snapshot (already deduped outside)
+  // group by partner
+  const groups={};
+  for(const d of snapDocs){ const k=snapPartnerKey(d)||'Unknown'; if(!groups[k]) groups[k]=[]; groups[k].push(d); }
+  // sort each group oldest->newest for chat reading
+  for(const k of Object.keys(groups)) groups[k].sort((a,b)=>(parseInt(a.ts_ms||0)-parseInt(b.ts_ms||0)));
+  // partner order by newest activity desc
+  const partners=Object.keys(groups).sort((a,b)=> parseInt(groups[b][groups[b].length-1].ts_ms||0)-parseInt(groups[a][groups[a].length-1].ts_ms||0));
+  if(!selectedSnapPartner || !groups[selectedSnapPartner]) selectedSnapPartner=partners[0];
+  // pagination: limit bubbles per thread for performance
+  const BUBBLE_LIMIT=120;
+  // build left list
+  let leftHtml='<div class="snap-list">';
+  for(const p of partners){
+    const entries=groups[p];
+    const last=entries[entries.length-1];
+    const lastBubbles=splitChatText(last);
+    const preview=(lastBubbles[lastBubbles.length-1]||last.messagePreview||'').slice(0,38);
+    const cnt=entries.reduce((s,e)=>s+splitChatText(e).length,0);
+    const active=p===selectedSnapPartner?' active':'';
+    leftHtml+=`<div class="snap-list-item${active}" onclick="selectedSnapPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="snap-av">${escHtml(snapInitial(p))}</div><div style="min-width:0;flex:1"><div class="snap-li-name">${escHtml(p)}</div><div class="snap-li-prev">${escHtml(preview)||'—'} · ${cnt} ${cnt===1?'msg':'msgs'}</div></div><div style="font-size:11px;color:var(--muted);white-space:nowrap">${pktShort(parseInt(last.ts_ms||0))}</div></div>`;
+  }
+  leftHtml+='</div>';
+  // right chat for selected partner
+  const activeEntries=groups[selectedSnapPartner]||[];
+  // build bubbles chronological with day separators
+  let bubblesHtml='';
+  let lastDay='';
+  let shown=0;
+  for(const e of activeEntries){
+    const isOut = String(e.isIncoming||'').toLowerCase()==='false' || String(e.direction||'').toLowerCase()==='outgoing' || String(e.direction||'').toLowerCase()==='out';
+    const bubList=splitChatText(e);
+    for(const bub of bubList){
+      if(shown>=BUBBLE_LIMIT) break;
+      const ts=parseInt(e.ts_ms||0);
+      const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
+      if(day!==lastDay){ bubblesHtml+=`<div class="snap-daysep">${escHtml(day)}</div>`; lastDay=day; }
+      const low=bub.toLowerCase();
+      const isMedia=low==='tap to view' || low==='tap to chat';
+      const cls=isMedia? 'snap-bubble snap-media '+(isOut?'out':'in') : 'snap-bubble '+(isOut?'out':'in');
+      bubblesHtml+=`<div class="${cls}">${escHtml(bub)}<span class="snap-time">${pktShort(ts)}</span></div>`;
+      shown++;
+    }
+    if(shown>=BUBBLE_LIMIT) break;
+  }
+  if(!bubblesHtml) bubblesHtml='<div class="label">No readable bubbles — raw preview: '+escHtml((activeEntries[0]?.messagePreview||'').slice(0,200))+'</div>';
+  const headerHtml=`<div class="snap-header">📸 ${escHtml(selectedSnapPartner)}<span style="margin-left:auto;font-weight:400;font-size:12px;opacity:.8">${activeEntries.length} snapshots · ${shown} bubbles</span></div>`;
+  const threadHtml=`<div class="snap-window">${headerHtml}<div class="snap-chat-bg">${bubblesHtml}</div></div>`;
+  list.innerHTML=`<div class="snap-thread-wrap"><div class="snap-list-col">${leftHtml}</div><div class="snap-chat-col">${threadHtml}</div></div>` + (snapDocs.reduce((s,e)=>s+splitChatText(e).length,0)>BUBBLE_LIMIT ? `<button class="load-more-btn" onclick="window._snapLimit=(window._snapLimit||120)+120; if(timelineCache) renderTimeline(timelineCache)">+ Load more bubbles</button>` : '');
+  return snapDocs.length;
+}
+function renderPriorityView(filtered){
+  const list=document.getElementById('timelineList');
+  const priDocs=filtered.length ? filtered : [];
+  if(!priDocs.length){ list.innerHTML='<div class="label">No Priority chats yet — open a Priority contact (JAY, Jab ✅, Kinzu, Ansar Abbas, J, etc) on the device and the full chat will appear here</div>'; return 0; }
+  const groups={};
+  for(const d of priDocs){ const k=priorityPartnerKey(d)||'Unknown'; if(!groups[k]) groups[k]=[]; groups[k].push(d); }
+  for(const k of Object.keys(groups)) groups[k].sort((a,b)=>(parseInt(a.ts_ms||0)-parseInt(b.ts_ms||0)));
+  const partners=Object.keys(groups).sort((a,b)=> parseInt(groups[b][groups[b].length-1].ts_ms||0)-parseInt(groups[a][groups[a].length-1].ts_ms||0));
+  if(!selectedPriorityPartner || !groups[selectedPriorityPartner]) selectedPriorityPartner=partners[0];
+  const BUBBLE_LIMIT=140;
+  let leftHtml='<div class="snap-list">';
+  for(const p of partners){
+    const entries=groups[p];
+    const last=entries[entries.length-1];
+    const lastBubbles=splitChatText(last);
+    const preview=(lastBubbles[lastBubbles.length-1]||last.messagePreview||'').slice(0,38);
+    const cnt=entries.reduce((s,e)=>s+splitChatText(e).length,0);
+    const active=p===selectedPriorityPartner?' active':'';
+    const dot=entries.some(e=>e.priorityFull)?' ●':'';
+    leftHtml+=`<div class="snap-list-item${active}" style="${active?'border-color:#075E54':''}" onclick="selectedPriorityPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="snap-av" style="background:#075E54;color:#fff;border-color:#054a41">${escHtml(snapInitial(p))}</div><div style="min-width:0;flex:1"><div class="snap-li-name">${escHtml(p)}${dot}</div><div class="snap-li-prev">${escHtml(preview)||'—'} · ${cnt}</div></div><div style="font-size:11px;color:var(--muted)">${pktShort(parseInt(last.ts_ms||0))}</div></div>`;
+  }
+  leftHtml+='</div>';
+  const activeEntries=groups[selectedPriorityPartner]||[];
+  let bubblesHtml='';
+  let lastDay='';
+  let shown=0;
+  for(const e of activeEntries){
+    const rawDir=String(e.direction||'').toLowerCase();
+    const isOut = rawDir==='outgoing' || rawDir==='out' || String(e.isIncoming).toLowerCase()==='false';
+    // priority captures are mostly incoming snapshots; keep incoming white unless explicitly outgoing
+    const bubList=splitChatText(e);
+    for(const bub of bubList){
+      if(shown>=BUBBLE_LIMIT) break;
+      const ts=parseInt(e.ts_ms||0);
+      const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
+      if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
+      const cls='priority-bubble '+(isOut?'out':'in');
+      bubblesHtml+=`<div class="${cls}">${escHtml(bub)}<span class="snap-time">${pktShort(ts)}</span></div>`;
+      shown++;
+    }
+    if(shown>=BUBBLE_LIMIT) break;
+  }
+  if(!bubblesHtml) bubblesHtml='<div class="label">No readable text for this chat</div>';
+  const headerHtml=`<div class="priority-header">💬 ${escHtml(selectedPriorityPartner)}<span style="margin-left:auto;font-weight:400;font-size:12px;opacity:.85">${activeEntries.length} snapshots · ${shown} bubbles</span></div>`;
+  const threadHtml=`<div class="priority-window">${headerHtml}<div class="priority-chat-bg">${bubblesHtml}</div></div>`;
+  list.innerHTML=`<div class="snap-thread-wrap"><div class="snap-list-col">${leftHtml}</div><div class="snap-chat-col">${threadHtml}</div></div>` + (priDocs.reduce((s,e)=>s+splitChatText(e).length,0)>BUBBLE_LIMIT ? `<button class="load-more-btn" onclick="if(timelineCache) renderTimeline(timelineCache)">+ Load more</button>` : '');
+  return priDocs.length;
+}
+
 function renderTimeline(docs) {
   const list = document.getElementById('timelineList');
   try {
@@ -6633,7 +6814,8 @@ function renderTimeline(docs) {
     if (cls) counts.whatsapp = (counts.whatsapp || 0) + 1;
     if (cls === 'individual') counts.whatsapp_individual = (counts.whatsapp_individual || 0) + 1;
     if (cls === 'group') counts.whatsapp_group = (counts.whatsapp_group || 0) + 1;
-    if (type.includes('snapchat')) counts.snapchat = (counts.snapchat || 0) + 1;
+    if (isSnapchatEntry(d)) counts.snapchat = (counts.snapchat || 0) + 1;
+    if (isPriorityEntry(d)) counts.priority = (counts.priority || 0) + 1;
     if (type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction')) counts.banking = (counts.banking || 0) + 1;
     if (isMirrorType(type)) counts.mirroring = (counts.mirroring || 0) + 1;
     if (isSecurityType(type)) counts.security = (counts.security || 0) + 1;
@@ -6660,7 +6842,8 @@ function renderTimeline(docs) {
     if (timelineFilter === 'call') return type.includes('call');
     if (timelineFilter === 'whatsapp_individual') return waIsWhatsApp(d) && waClassOf(d) === 'individual';
     if (timelineFilter === 'whatsapp_group') return waIsWhatsApp(d) && waClassOf(d) === 'group';
-    if (timelineFilter === 'snapchat') return type.includes('snapchat');
+    if (timelineFilter === 'priority') return isPriorityEntry(d);
+    if (timelineFilter === 'snapchat') return isSnapchatEntry(d);
     if (timelineFilter === 'banking') return type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction');
     if (timelineFilter === 'mirroring') return isMirrorType(type);
     if (timelineFilter === 'security') return isSecurityType(type);
@@ -6713,6 +6896,17 @@ function renderTimeline(docs) {
     deduped.push(d);
   }
   filtered = deduped;
+  // ── Readable thread views: bypass flat cards for Snapchat & Priority ──
+  if(timelineFilter==='snapchat'){
+    if(!filtered.length){ list.innerHTML='<div class="label">No Snapchat chats yet — open Snapchat on the device and the chat will appear here</div>'; return; }
+    renderSnapchatView(filtered);
+    return;
+  }
+  if(timelineFilter==='priority'){
+    if(!filtered.length){ list.innerHTML='<div class="label">No Priority chats yet — open a Priority contact (JAY, Jab ✅, Kinzu, Ansar Abbas, J, etc) and the full chat will appear here</div>'; return; }
+    renderPriorityView(filtered);
+    return;
+  }
   const totalFiltered = filtered.length;
   filtered = filtered.slice(0, timelineOffset || TIMELINE_BATCH);
   if (!filtered.length) {
