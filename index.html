@@ -1685,29 +1685,49 @@ function isPriorityEntry(d){
 }
 function snapPartnerKey(d){ return (waClean(d.conversationTitle)||waClean(d.contactName)||'').toLowerCase().trim(); }
 function priorityPartnerKey(d){ return snapPartnerKey(d); }
-function splitChatText(d){
+function getBubbles(d){
+  // New path: bubblesJson with per-bubble side (mine vs theirs) - keep duplicates
+  if(d.bubblesJson){
+    try{
+      const arr=JSON.parse(d.bubblesJson);
+      if(Array.isArray(arr) && arr.length){
+        const snapChrome=new Set(["send","chat","call","story","viewed","delivered","opened","snap","search"]);
+        const priChrome=new Set(["message","type a message","search","call","video call","attach","camera","back","more options","tap here for contact info","messages and calls are end-to-end encrypted","end-to-end encrypted"]);
+        const chrome=isPriorityEntry(d)?priChrome:snapChrome;
+        const out=[];
+        for(const b of arr){
+          const t=String(b.t||b.text||'').trim();
+          if(!t || t.length<1 || t.length>1500) continue;
+          const low=t.toLowerCase();
+          if(chrome.has(low)) continue;
+          if(low==='tap to view' || low==='tap to chat') continue;
+          out.push({text:t, out:!!b.out});
+        }
+        if(out.length) return out;
+      }
+    }catch(e){}
+  }
+  // Fallback for old data (flat string) - whole snapshot side applies to all bubbles in that entry, keep duplicates by not distinct-ing strictly
   const raw=(d.fullMessage&&String(d.fullMessage).trim()) ? String(d.fullMessage) : (d.messagePreview||'');
   if(!raw.trim()) return [];
-  // split on newline from accessibility join, keep distinct non-empty, filter chrome
   const snapChrome=new Set(["send","chat","call","story","viewed","delivered","opened","snap","search"]);
   const priChrome=new Set(["message","type a message","search","call","video call","attach","camera","back","more options","tap here for contact info","messages and calls are end-to-end encrypted","end-to-end encrypted"]);
   const isPri=isPriorityEntry(d);
   const chrome=isPri?priChrome:snapChrome;
+  const isOut = String(d.isIncoming||'').toLowerCase()==='false' || String(d.direction||'').toLowerCase()==='outgoing' || String(d.direction||'').toLowerCase()==='out';
   const parts=String(raw).split('\n').map(s=>s.trim()).filter(Boolean);
-  const out=[]; const seen=new Set();
+  const out=[];
   for(const p of parts){
     const low=p.toLowerCase();
     if(chrome.has(low)) continue;
     if(low==='tap to view' || low==='tap to chat') continue;
     if(/^\d{1,2}:\d{2}\s*[ap]m$/i.test(p) && p.length<20) continue;
-    if(seen.has(p)) continue;
-    seen.add(p);
-    if(p.length>=1 && p.length<=1500) out.push(p);
+    if(p.length>=1 && p.length<=1500) out.push({text:p, out:isOut});
   }
-  // if splitting gave single entry that still contains no newline but is long, keep as single bubble
-  if(!out.length && raw.trim().length>=1) out.push(raw.trim().slice(0,1200));
+  if(!out.length && raw.trim().length>=1) out.push({text:raw.trim().slice(0,1200), out:isOut});
   return out;
 }
+function splitChatText(d){ return getBubbles(d).map(b=>b.text); }
 let selectedSnapPartner=null;
 let selectedPriorityPartner=null;
 
@@ -6710,24 +6730,24 @@ function renderSnapchatView(filtered){
   for(const p of partners){
     const entries=groups[p];
     const last=entries[entries.length-1];
-    const lastBubbles=splitChatText(last);
-    const preview=(lastBubbles[lastBubbles.length-1]||last.messagePreview||'').slice(0,38);
-    const cnt=entries.reduce((s,e)=>s+splitChatText(e).length,0);
+    const lastBubbles=getBubbles(last);
+    const preview=(lastBubbles[lastBubbles.length-1]?.text||last.messagePreview||'').slice(0,38);
+    const cnt=entries.reduce((s,e)=>s+getBubbles(e).length,0);
     const active=p===selectedSnapPartner?' active':'';
     leftHtml+=`<div class="snap-list-item${active}" onclick="selectedSnapPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="snap-av">${escHtml(snapInitial(p))}</div><div style="min-width:0;flex:1"><div class="snap-li-name">${escHtml(p)}</div><div class="snap-li-prev">${escHtml(preview)||'—'} · ${cnt} ${cnt===1?'msg':'msgs'}</div></div><div style="font-size:11px;color:var(--muted);white-space:nowrap">${pktShort(parseInt(last.ts_ms||0))}</div></div>`;
   }
   leftHtml+='</div>';
   // right chat for selected partner
   const activeEntries=groups[selectedSnapPartner]||[];
-  // build bubbles chronological with day separators
+  // build bubbles chronological with day separators — per-bubble side from bubblesJson
   let bubblesHtml='';
   let lastDay='';
   let shown=0;
   for(const e of activeEntries){
-    const isOut = String(e.isIncoming||'').toLowerCase()==='false' || String(e.direction||'').toLowerCase()==='outgoing' || String(e.direction||'').toLowerCase()==='out';
-    const bubList=splitChatText(e);
-    for(const bub of bubList){
+    const bubList=getBubbles(e);
+    for(const b of bubList){
       if(shown>=BUBBLE_LIMIT) break;
+      const bub=b.text; const isOut=b.out;
       const ts=parseInt(e.ts_ms||0);
       const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
       if(day!==lastDay){ bubblesHtml+=`<div class="snap-daysep">${escHtml(day)}</div>`; lastDay=day; }
@@ -6742,7 +6762,7 @@ function renderSnapchatView(filtered){
   if(!bubblesHtml) bubblesHtml='<div class="label">No readable bubbles — raw preview: '+escHtml((activeEntries[0]?.messagePreview||'').slice(0,200))+'</div>';
   const headerHtml=`<div class="snap-header">📸 ${escHtml(selectedSnapPartner)}<span style="margin-left:auto;font-weight:400;font-size:12px;opacity:.8">${activeEntries.length} snapshots · ${shown} bubbles</span></div>`;
   const threadHtml=`<div class="snap-window">${headerHtml}<div class="snap-chat-bg">${bubblesHtml}</div></div>`;
-  list.innerHTML=`<div class="snap-thread-wrap"><div class="snap-list-col">${leftHtml}</div><div class="snap-chat-col">${threadHtml}</div></div>` + (snapDocs.reduce((s,e)=>s+splitChatText(e).length,0)>BUBBLE_LIMIT ? `<button class="load-more-btn" onclick="window._snapLimit=(window._snapLimit||120)+120; if(timelineCache) renderTimeline(timelineCache)">+ Load more bubbles</button>` : '');
+  list.innerHTML=`<div class="snap-thread-wrap"><div class="snap-list-col">${leftHtml}</div><div class="snap-chat-col">${threadHtml}</div></div>` + (snapDocs.reduce((s,e)=>s+getBubbles(e).length,0)>BUBBLE_LIMIT ? `<button class="load-more-btn" onclick="window._snapLimit=(window._snapLimit||120)+120; if(timelineCache) renderTimeline(timelineCache)">+ Load more bubbles</button>` : '');
   return snapDocs.length;
 }
 function renderPriorityView(filtered){
@@ -6759,9 +6779,9 @@ function renderPriorityView(filtered){
   for(const p of partners){
     const entries=groups[p];
     const last=entries[entries.length-1];
-    const lastBubbles=splitChatText(last);
-    const preview=(lastBubbles[lastBubbles.length-1]||last.messagePreview||'').slice(0,38);
-    const cnt=entries.reduce((s,e)=>s+splitChatText(e).length,0);
+    const lastBubbles=getBubbles(last);
+    const preview=(lastBubbles[lastBubbles.length-1]?.text||last.messagePreview||'').slice(0,38);
+    const cnt=entries.reduce((s,e)=>s+getBubbles(e).length,0);
     const active=p===selectedPriorityPartner?' active':'';
     const dot=entries.some(e=>e.priorityFull)?' ●':'';
     leftHtml+=`<div class="snap-list-item${active}" style="${active?'border-color:#075E54':''}" onclick="selectedPriorityPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="snap-av" style="background:#075E54;color:#fff;border-color:#054a41">${escHtml(snapInitial(p))}</div><div style="min-width:0;flex:1"><div class="snap-li-name">${escHtml(p)}${dot}</div><div class="snap-li-prev">${escHtml(preview)||'—'} · ${cnt}</div></div><div style="font-size:11px;color:var(--muted)">${pktShort(parseInt(last.ts_ms||0))}</div></div>`;
@@ -6772,12 +6792,10 @@ function renderPriorityView(filtered){
   let lastDay='';
   let shown=0;
   for(const e of activeEntries){
-    const rawDir=String(e.direction||'').toLowerCase();
-    const isOut = rawDir==='outgoing' || rawDir==='out' || String(e.isIncoming).toLowerCase()==='false';
-    // priority captures are mostly incoming snapshots; keep incoming white unless explicitly outgoing
-    const bubList=splitChatText(e);
-    for(const bub of bubList){
+    const bubList=getBubbles(e);
+    for(const b of bubList){
       if(shown>=BUBBLE_LIMIT) break;
+      const bub=b.text; const isOut=b.out;
       const ts=parseInt(e.ts_ms||0);
       const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
       if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
@@ -6790,7 +6808,7 @@ function renderPriorityView(filtered){
   if(!bubblesHtml) bubblesHtml='<div class="label">No readable text for this chat</div>';
   const headerHtml=`<div class="priority-header">💬 ${escHtml(selectedPriorityPartner)}<span style="margin-left:auto;font-weight:400;font-size:12px;opacity:.85">${activeEntries.length} snapshots · ${shown} bubbles</span></div>`;
   const threadHtml=`<div class="priority-window">${headerHtml}<div class="priority-chat-bg">${bubblesHtml}</div></div>`;
-  list.innerHTML=`<div class="snap-thread-wrap"><div class="snap-list-col">${leftHtml}</div><div class="snap-chat-col">${threadHtml}</div></div>` + (priDocs.reduce((s,e)=>s+splitChatText(e).length,0)>BUBBLE_LIMIT ? `<button class="load-more-btn" onclick="if(timelineCache) renderTimeline(timelineCache)">+ Load more</button>` : '');
+  list.innerHTML=`<div class="snap-thread-wrap"><div class="snap-list-col">${leftHtml}</div><div class="snap-chat-col">${threadHtml}</div></div>` + (priDocs.reduce((s,e)=>s+getBubbles(e).length,0)>BUBBLE_LIMIT ? `<button class="load-more-btn" onclick="if(timelineCache) renderTimeline(timelineCache)">+ Load more</button>` : '');
   return priDocs.length;
 }
 
