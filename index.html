@@ -663,6 +663,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="chip" data-filter="general" data-label="&#x1F514; General">&#x1F514; General</span>
 <span class="chip" data-filter="browser" data-label="&#x1F310; Browser">&#x1F310; Browser</span>
 <span class="chip" data-filter="ai" data-label="&#x1F916; AI Chats">&#x1F916; AI Chats</span>
+<span class="chip" data-filter="feedback" data-label="&#x2B50; Feedback">&#x2B50; Feedback</span>
 </div>
 <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <select id="timelinePeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
@@ -6639,6 +6640,7 @@ function renderTimeline(docs) {
     if (type.includes('general')) counts.general = (counts.general || 0) + 1;
     if (type.includes('browser')) counts.browser = (counts.browser || 0) + 1;
     if (type.includes('ai') || type.includes('chatgpt') || type.includes('claude') || type.includes('copilot')) counts.ai = (counts.ai || 0) + 1;
+    if (type.includes('feedback') || type.includes('user_feedback')) counts.feedback = (counts.feedback || 0) + 1;
   }
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     const f = chip.dataset.filter;
@@ -6647,7 +6649,7 @@ function renderTimeline(docs) {
   // Search filter
   const tlSearch = (document.getElementById('timelineSearch')?.value || '').toLowerCase().trim();
   if (tlSearch) docs = docs.filter(d => {
-    const searchText = ((d.type || '') + ' ' + (d.contactName || '') + ' ' + (d.contact || '') + ' ' + (d.messagePreview || '') + ' ' + (d.duration || '') + ' ' + (d.direction || '')).toLowerCase();
+    const searchText = ((d.type || '') + ' ' + (d.contactName || '') + ' ' + (d.contact || '') + ' ' + (d.messagePreview || '') + ' ' + (d.feedback_text || d.feedbackText || '') + ' ' + (d.duration || '') + ' ' + (d.direction || '')).toLowerCase();
     return searchText.includes(tlSearch);
   });
   // Type filter
@@ -6665,6 +6667,7 @@ function renderTimeline(docs) {
     if (timelineFilter === 'general') return type.includes('general');
     if (timelineFilter === 'browser') return type.includes('browser') || type.includes('url') || type.includes('chrome') || type.includes('search');
     if (timelineFilter === 'ai') return type.includes('ai') || type.includes('chatgpt') || type.includes('claude') || type.includes('copilot') || type.includes('perplexity') || type.includes('bard');
+    if (timelineFilter === 'feedback') return type.includes('feedback') || type.includes('user_feedback');
     return true;
   });
   // Dedup BEFORE pagination so identical re-posted messages collapse into ONE row
@@ -6695,6 +6698,9 @@ function renderTimeline(docs) {
   }
   const deduped = [];
   for (const d of filtered) {
+    const tLow = (d.type || '').toLowerCase();
+    const isFeedbackEntry = tLow.includes('feedback') || tLow.includes('user_feedback');
+    if (isFeedbackEntry) { deduped.push(d); continue; }
     if (isMsg(d)) {
       const fp = msgFp(d);
       if (parseInt(d.ts_ms || '0') !== firstTsOf.get(fp)) continue;
@@ -6710,6 +6716,7 @@ function renderTimeline(docs) {
   const totalFiltered = filtered.length;
   filtered = filtered.slice(0, timelineOffset || TIMELINE_BATCH);
   if (!filtered.length) {
+    if (timelineFilter === 'feedback') { list.innerHTML = '<div class="label">No feedback yet — user suggestions will appear here</div>'; return; }
     if (timelineFilter === 'ai') { list.innerHTML = '<div class="label">No AI chats yet — data appears here when ChatGPT/Claude is used on device</div>'; return; }
     if (timelineFilter === 'browser') { list.innerHTML = '<div class="label">No browser history yet — URLs appear here when Chrome/Brave is used</div>'; return; }
     list.innerHTML = '<div class="label">No entries</div>'; return;
@@ -6730,7 +6737,8 @@ function renderTimeline(docs) {
     const banks = entries.filter(e => (e.type || '').includes('banking') || (e.type || '').includes('financial') || (e.type || '').includes('otp') || (e.type || '').includes('payment') || (e.type || '').includes('transaction')).length;
     const mirr = entries.filter(e => isMirrorType((e.type || '').toLowerCase())).length;
     const sec = entries.filter(e => isSecurityType((e.type || '').toLowerCase())).length;
-    const summary = [locs ? `${locs}\u{1F4CD}` : '', calls ? `${calls}\u{1F4DE}` : '', msgs ? `${msgs}\u{1F4AC}` : '', snaps ? `${snaps}\u{1F4F8}` : '', banks ? `${banks}\u{1F4B3}` : '', mirr ? `${mirr}\u{1F5A5}` : '', sec ? `${sec}\u{1F6E1}` : ''].filter(Boolean).join(' ');
+    const fbs = entries.filter(e => (e.type || '').toLowerCase().includes('feedback')).length;
+    const summary = [locs ? `${locs}\u{1F4CD}` : '', calls ? `${calls}\u{1F4DE}` : '', msgs ? `${msgs}\u{1F4AC}` : '', snaps ? `${snaps}\u{1F4F8}` : '', banks ? `${banks}\u{1F4B3}` : '', mirr ? `${mirr}\u{1F5A5}` : '', sec ? `${sec}\u{1F6E1}` : '', fbs ? `${fbs}\u2B50` : ''].filter(Boolean).join(' ');
     html += `<div class="tl-group"><div class="tl-day">${day}</div><div class="tl-summary">${summary}</div>`;
     for (const d of entries) {
       const type = d.type || '';
@@ -6739,12 +6747,15 @@ function renderTimeline(docs) {
       const isUsbDbg = type.includes('usb_debug');
       const isAdbWifi = type.includes('adb_wifi');
       const isSec = isSecurityType(type);
-       const icon = isMirror ? (isUsbDbg || isAdbWifi ? '\u{1F50C}' : '\u{1F5A5}') : isSec ? '\u{1F6E1}' : type.includes('general') ? '\u{1F514}' : type.includes('browser') ? '\u{1F310}' : type.includes('ai') || type.includes('chatgpt') || type.includes('claude') ? '\u{1F916}' : type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
+       const isFeedback = type.toLowerCase().includes('feedback');
+       const icon = isFeedback ? '\u2B50' : isMirror ? (isUsbDbg || isAdbWifi ? '\u{1F50C}' : '\u{1F5A5}') : isSec ? '\u{1F6E1}' : type.includes('general') ? '\u{1F514}' : type.includes('browser') ? '\u{1F310}' : type.includes('ai') || type.includes('chatgpt') || type.includes('claude') ? '\u{1F916}' : type.includes('snapchat') ? '\u{1F4F8}' : type.includes('whatsapp') ? '\u{1F4AC}' : type.includes('call') ? '\u{1F4DE}' : type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction') ? '\u{1F4B3}' : '\u{1F4CD}';
         let contact = d.contactName || d.contact || '';
+        if (isFeedback) contact = 'Feedback' + (d.app_version ? ' \u00B7 v' + d.app_version : '');
         if (type.toLowerCase().includes('general') && d.appName) contact = d.appName + (contact ? ' \u00B7 ' + contact : '');
         if (type.includes('browser') && !contact) contact = d.browserUrl || d.url || d.browserTitle || d.title || contact;
         if ((type.includes('ai') || type.includes('chatgpt') || type.includes('claude')) && !contact) contact = (d.aiSnippet || d.aiVisible || d.packageName || '').substring(0,80);
-       const msg = d.messagePreview || d.browserTitle || d.title || d.aiFullText || d.aiSnippet || '';
+       const fbText = d.feedback_text || d.feedbackText || '';
+       const msg = fbText || d.messagePreview || d.browserTitle || d.title || d.aiFullText || d.aiSnippet || '';
        const dur = d.duration || '';
        const dir = d.direction || '';
       let mirrorText = '';
