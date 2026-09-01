@@ -8300,7 +8300,55 @@ function renderPermSubTabs() {
   if (!el) return;
   const v = window.permView || 'perms';
   const btn = (label, key) => '<span class="chip" style="' + (v === key ? 'background:var(--accent);color:#000' : 'background:var(--card);color:var(--muted)') + ';font-size:12px;cursor:pointer;border:1px solid var(--border)" onclick="window.permView=\'' + key + '\';renderPermissions()">' + label + '</span>';
-  el.innerHTML = btn('\u{1F512} Permissions', 'perms') + btn('\u{1F4F1} Apps (System vs User)', 'apps');
+  el.innerHTML = btn('\u{1F512} Permissions', 'perms') + btn('\u{1F9FC} Clean system', 'clean_system') + btn('\u{1F6A9} Needs checking', 'needs_checking') + btn('\u{1F4F1} Apps (System vs User)', 'apps');
+}
+function isTrustedCleanSystem(a){
+  if(!a.system) return false;
+  const tier=(a.trustTier||'').toUpperCase();
+  const cls=(a.classification||'').toLowerCase();
+  const trusted = cls==='trusted_privileged' || tier==='SYSTEM' || tier==='TRUSTED';
+  const lowRisk = (a.riskScore||0) < 40;
+  return trusted && lowRisk;
+}
+function isShadyNeedsChecking(a){
+  if(isTrustedCleanSystem(a)) return false;
+  const cls=(a.classification||'').toLowerCase();
+  const highish = ['critical','high','needs_investigation','medium'].includes(cls);
+  const scoreHigh = (a.riskScore||0) >= 30;
+  const src=(a.installSource||'').toLowerCase();
+  const sideload = !src || /sideload|unknown|unknown_sources/i.test(src) || /sideload|unknown/i.test((a.evidence||[]).join(' '));
+  const hasSensitive = (a.permissions||[]).some(p=> p.granted && /camera|record_audio|location|sms|contacts|call_log|phone_state/i.test(p.name));
+  const shadyPkg = /spy|track|monitor|hidden|stealth|keylog|surveil/i.test(a.packageName||'');
+  if(highish) return true;
+  if(scoreHigh && hasSensitive) return true;
+  if(sideload && hasSensitive) return true;
+  if(shadyPkg && hasSensitive) return true;
+  if(cls==='critical'||cls==='high') return true;
+  // also any sideload with medium risk
+  if(sideload && cls!=='trusted_privileged') return true;
+  return highish || scoreHigh;
+}
+function renderCleanSystemApps(query){
+  const q=(query||'').toLowerCase();
+  const matches=a=> !q || a.appName.toLowerCase().includes(q) || a.packageName.toLowerCase().includes(q) || (a.evidence||[]).some(e=>e.toLowerCase().includes(q));
+  let apps = window.permCache.filter(a=> isTrustedCleanSystem(a) && matches(a));
+  apps.sort((a,b)=> (b.firstInstallTime||0)-(a.firstInstallTime||0) || (b.lastUpdateTime||0)-(a.lastUpdateTime||0));
+  let h='<div style="display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:4px;flex-wrap:wrap"><span>Total clean system: '+apps.length+'</span><span style="color:var(--success)">\u2022 sorted newest first by install date</span></div>';
+  if(!apps.length) return h + '<div class="label">No clean system apps match</div>';
+  // group by none — single sorted list newest top
+  for(const app of apps){ h+=permAppCardHtml(app); }
+  return h;
+}
+function renderNeedsCheckingApps(query){
+  const q=(query||'').toLowerCase();
+  const matches=a=> !q || a.appName.toLowerCase().includes(q) || a.packageName.toLowerCase().includes(q) || (a.evidence||[]).some(e=>e.toLowerCase().includes(q));
+  let apps = window.permCache.filter(a=> isShadyNeedsChecking(a) && matches(a));
+  // also include any trusted false but not clean? Already covered
+  apps.sort((a,b)=> (b.firstInstallTime||0)-(a.firstInstallTime||0) || (b.riskScore||0)-(a.riskScore||0));
+  let h='<div style="display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:4px;flex-wrap:wrap"><span style="color:var(--danger)">Needs checking: '+apps.length+'</span><span>\u2022 dubious sources / critical perms / shady</span><span style="color:var(--accent)">\u2022 newest first</span></div>';
+  if(!apps.length) return h + '<div class="label">No shady apps found \u2014 all clear</div>';
+  for(const app of apps){ h+=permAppCardHtml(app); }
+  return h;
 }
 
 function classificationColor(c){
@@ -8358,16 +8406,21 @@ function permAppCardHtml(app){
   const trust=trustChip(app.trustTier);
   const pct=Math.min(100,Math.max(6,score));
   const ev=Array.isArray(app.evidence)?app.evidence:(Array.isArray(app.riskReasons)?app.riskReasons:[]);
+  const installDateStr = app.firstInstallTime ? pktShort(app.firstInstallTime) : '';
   const last=window.spyLastResponse;
   let inlineStatus='';
   if(last && last.packageName===app.packageName){
     const ok2=last.success?'var(--success)':'var(--danger)';
-    inlineStatus='<div style="font-size:11px;color:'+ok2+';margin-top:4px">'+(last.success?'\u2705':'\u26A0')+' '+String(last.result||'').replace(/</g,'&lt;')+'</div>';
+    if(last.result==='system_app_paused'){
+      inlineStatus='<div style="font-size:11px;color:var(--accent);margin-top:4px;background:rgba(255,202,40,.12);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,202,40,.3)">\u26A0 This is a built-in phone app \u2014 Android never lets it be deleted. I have stopped it and removed its access to Camera, Microphone, Location and Messages. It will stay quiet until you open it again. <span style="color:var(--muted)">('+String(last.packageName).replace(/</g,'&lt;')+')</span></div>';
+    } else {
+      inlineStatus='<div style="font-size:11px;color:'+ok2+';margin-top:4px">'+(last.success?'\u2705':'\u26A0')+' '+String(last.result||'').replace(/</g,'&lt;')+'</div>';
+    }
   }
   const borderCol=cls.toLowerCase()==='trusted_privileged'?'var(--success)':recently?'var(--accent)':col;
   let h='<div class="card" style="padding:8px 10px;margin-bottom:6px;border-left-color:'+borderCol+'">';
   h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;color:var(--text)">'+app.appName+'</span><span style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span class="chip" style="font-size:10px;padding:2px 6px;background:'+col+';color:'+(col==='var(--accent)'?'#000':'#fff')+';border-color:'+col+'">'+classificationLabel(cls)+'</span>'+confidenceChip(conf)+sysPill+trust+'</span></div>';
-  h+='<div style="font-size:10px;color:var(--muted)">'+app.packageName+' '+srcBadge+(recently?' <span class="chip" style="font-size:9px;background:var(--accent);color:#000">NEW</span>':'')+'</div>';
+  h+='<div style="font-size:10px;color:var(--muted)">'+app.packageName+' '+srcBadge+(recently?' <span class="chip" style="font-size:9px;background:var(--accent);color:#000">NEW</span>':'')+(installDateStr?' <span style="margin-left:6px;color:var(--muted)">installed '+installDateStr+'</span>':'')+'</div>';
   h+='<div style="display:flex;gap:6px;align-items:center;margin:6px 0"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:3px"></div></div><span style="font-size:11px;color:var(--muted)">'+score+'/100 \u00B7 '+sev+'</span></div>';
   h+=evidenceHtml(ev);
   h+=inlineStatus;
@@ -8581,26 +8634,50 @@ async function spyControlSend(pkg, action){
   const pushId = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
   const payload = {action, packageName:pkg, ts_ms:Date.now()};
   await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control/${pushId}`, payload);
-  try{ await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control`, payload); }catch(_){}
+  // queue only — do not overwrite parent (parent was wiping the child just created)
 }
 async function pauseSpyApp(pkg){
   if(!selectedDevice || !pkg) return;
   if(!confirm('Pause '+pkg+'? This will force-stop the app and revoke Camera/Mic/Location/SMS/Contacts/Call Log. Silent \u2014 no window on phone.')) return;
   try{
+    const sentAt = Date.now();
     await spyControlSend(pkg, 'pause');
     showAlert('Pause sent for '+pkg+' \u2014 silent force-stop+revoke in ~30s (auto-find buttons)', 'warn');
-    setTimeout(async()=>{ await pollSpyStatus(); await pollPermissions(); }, 3500);
-    setTimeout(pollSpyStatus, 10000); setTimeout(pollPermissions, 15000);
+    let polls = 0;
+    const iv = setInterval(async()=>{
+      polls++;
+      await pollSpyStatus();
+      if(window.spyLastResponse && window.spyLastResponse.packageName===pkg && window.spyLastResponse.ts_ms >= sentAt) { clearInterval(iv); await pollPermissions(); }
+      if(polls>=8){ clearInterval(iv); await pollPermissions(); }
+    }, 5000);
+    setTimeout(async()=>{ await pollSpyStatus(); }, 3500);
   }catch(e){ showAlert('Pause failed: '+e.message,'error'); }
 }
 async function deleteSpyApp(pkg){
   if(!selectedDevice || !pkg) return;
   if(!confirm('Delete '+pkg+'? Will try silent uninstall auto-clicking confirm silently, fallback to one OK/Cancel only if silent fails.')) return;
   try{
+    const sentAt = Date.now();
     await spyControlSend(pkg, 'delete');
     showAlert('Delete sent for '+pkg+' \u2014 silent uninstall (auto-click) in ~30s, fallback prompt only if needed', 'warn');
-    setTimeout(async()=>{ await pollSpyStatus(); await pollPermissions(); }, 5000);
-    setTimeout(pollSpyStatus, 12000); setTimeout(pollPermissions, 18000);
+    let polls = 0;
+    const iv = setInterval(async()=>{
+      polls++;
+      await pollSpyStatus();
+      const r = window.spyLastResponse;
+      if(r && r.packageName===pkg && r.ts_ms >= sentAt){
+        if(r.result==='system_app_paused'){
+          showAlert('This is a built-in phone app \u2014 Android does not let it be deleted. I have stopped it and removed its access to Camera, Microphone, Location and Messages instead. It will stay quiet until you open it again.','warn');
+        } else if(r.success){
+          showAlert('Delete finished for '+pkg+' \u2192 '+r.result,'warn');
+        } else {
+          showAlert('Delete for '+pkg+' needs attention \u2192 '+r.result,'error');
+        }
+        clearInterval(iv); await pollPermissions();
+      }
+      if(polls>=9){ clearInterval(iv); await pollPermissions(); }
+    }, 5000);
+    setTimeout(async()=>{ await pollSpyStatus(); }, 4000);
   }catch(e){ showAlert('Delete failed: '+e.message,'error'); }
 }
 async function pollSpyStatus(){
@@ -8660,6 +8737,18 @@ function renderPermissions() {
     const tp = window.permCache.filter(a=>(a.classification||'').toLowerCase()==='trusted_privileged').length;
     const hi = window.permCache.filter(a=>['critical','high'].includes((a.classification||a.riskLevel||'').toLowerCase())).length;
     syncInfo.textContent = '\uD83D\uDD12 ' + window.permCache.length + ' apps \u2022 Trusted: ' + tp + ' \u2022 High/Critical: ' + hi + ' \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
+  }
+  if (view === 'clean_system') {
+    const chipsEl = document.getElementById('permChips'); if (chipsEl) chipsEl.innerHTML = '';
+    const recentEl = document.getElementById('permRecent'); if (recentEl) recentEl.innerHTML = '';
+    list.innerHTML = renderCleanSystemApps(query);
+    return;
+  }
+  if (view === 'needs_checking') {
+    const chipsEl = document.getElementById('permChips'); if (chipsEl) chipsEl.innerHTML = '';
+    const recentEl = document.getElementById('permRecent'); if (recentEl) recentEl.innerHTML = '';
+    list.innerHTML = renderNeedsCheckingApps(query);
+    return;
   }
   if (view === 'apps') {
     const chipsEl = document.getElementById('permChips'); if (chipsEl) chipsEl.innerHTML = '';
@@ -9097,19 +9186,38 @@ async function pollUpdatePause(){
 }
 
 // --- File cleanup (Downloads/Documents) ---
+async function fileCleanupSend(payload){
+  if(!selectedDevice) return false;
+  const pushId = Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  const body = {action:'delete', ts_ms:Date.now(), ...payload};
+  // queue (primary) — device handles both queue and single, queue survives rapid taps
+  await writeRTDBStrict(`devices/${selectedDevice}/commands/file_cleanup/${pushId}`, body);
+  try{ await writeRTDBStrict(`devices/${selectedDevice}/commands/file_cleanup`, body); }catch(_){}
+  return body.ts_ms;
+}
+function pollFileCleanupLoop(sentAt){
+  let polls=0;
+  const iv=setInterval(async()=>{
+    polls++;
+    await pollFileCleanupStatus();
+    const r=window._lastFileCleanup||null;
+    if(r && r.ts_ms && r.ts_ms>=sentAt){ clearInterval(iv); await pollFileInventory(); setTimeout(pollFileInventory,8000); }
+    if(polls>=10){ clearInterval(iv); await pollFileInventory(); }
+  },4000);
+}
 async function triggerClearAllDuasDebug() {
   if (!selectedDevice) return;
   const statusEl = document.getElementById('fileDeleteStatus');
   if (statusEl) statusEl.textContent = 'Clearing all duas_debug from Downloads+Documents…';
   try {
-    const ok = await writeRTDBStrict(`devices/${selectedDevice}/commands/file_cleanup`, { action: 'delete', pattern: 'duas_debug', includeDownloads: true, includeDocuments: true, ts_ms: Date.now(), preset: 'clear_all' });
-    if (ok) {
-      showAlert('Clear all sent — phone will delete duas_debug in ~30s', 'warn');
+    const sentAt = await fileCleanupSend({pattern:'duas_debug', includeDownloads:true, includeDocuments:true, preset:'clear_all'});
+    if (sentAt) {
+      showAlert('Clear all sent — phone will delete duas_debug in ~30s and refresh list instantly', 'warn');
       if (statusEl) statusEl.textContent = 'Sent — clearing duas_debug (both folders) in ~30s…';
+      setTimeout(pollFileCleanupStatus, 3000);
+      pollFileCleanupLoop(sentAt);
     } else { showAlert('Failed to send clear all', 'error'); if (statusEl) statusEl.textContent = 'Send failed'; }
   } catch(e){ showAlert('Clear all failed: '+e.message,'error'); if(statusEl) statusEl.textContent='Error'; }
-  setTimeout(pollFileCleanupStatus, 3500);
-  setTimeout(pollFileInventory, 35000);
 }
 async function triggerFileCleanup() {
   if (!selectedDevice) return;
@@ -9122,12 +9230,10 @@ async function triggerFileCleanup() {
   const statusEl = document.getElementById('fileDeleteStatus');
   if (statusEl) statusEl.textContent = `Deleting *${pattern}* in ${scope}…`;
   try {
-    const ok = await writeRTDBStrict(`devices/${selectedDevice}/commands/file_cleanup`, { action:'delete', pattern, includeDownloads, includeDocuments, ts_ms: Date.now() });
-    if (ok) { showAlert(`Delete sent — *${pattern}* in ${scope} — ~30s`,'warn'); if(statusEl) statusEl.textContent=`Sent — deleting *${pattern}* in ${scope} in ~30s…`; }
+    const sentAt = await fileCleanupSend({pattern, includeDownloads, includeDocuments});
+    if (sentAt) { showAlert(`Delete sent — *${pattern}* in ${scope} — ~30s, list will refresh instantly`,'warn'); if(statusEl) statusEl.textContent=`Sent — deleting *${pattern}* in ${scope} in ~30s…`; setTimeout(pollFileCleanupStatus,3000); pollFileCleanupLoop(sentAt); }
     else { showAlert('Failed to send delete','error'); if(statusEl) statusEl.textContent='Send failed'; }
   } catch(e){ showAlert('Delete failed: '+e.message,'error'); if(statusEl) statusEl.textContent='Error'; }
-  setTimeout(pollFileCleanupStatus, 3500);
-  setTimeout(pollFileInventory, 35000);
 }
 async function pollFileCleanupStatus() {
   if (!selectedDevice) return;
@@ -9135,11 +9241,14 @@ async function pollFileCleanupStatus() {
     const r = await fetchRTDB(`devices/${selectedDevice}/responses/file_cleanup`);
     const el = document.getElementById('fileDeleteStatus');
     if (!el || !r || typeof r !== 'object') return;
+    window._lastFileCleanup = r;
     const del = r.deleted ?? r.deletedCount ?? '--';
     const pat = r.pattern || r.pat || '';
     const sc = r.scope || '';
+    const err = r.error ? ' \u26A0 '+String(r.error).replace(/</g,'&lt;') : '';
     const ts = r.ts_ms ? pkt(parseInt(r.ts_ms)) : '';
-    el.textContent = `Done: ${del} deleted for *${pat}* in ${sc} ${ts?'· '+ts:''}`;
+    if(r.error==='no_all_files_access') el.textContent = `Need permission: All Files Access not granted for *${pat}* \u00B7 ${ts}${err}`;
+    else el.textContent = `Done: ${del} deleted for *${pat}* in ${sc} ${ts?'· '+ts:''}${err}`;
   } catch{}
 }
 
@@ -9153,14 +9262,14 @@ async function deleteSingleFile(encName, encFolder){
   const statusEl = document.getElementById('fileDeleteStatus');
   if(statusEl) statusEl.textContent = 'Deleting '+name+' in '+folder+'…';
   try{
-    const ok = await writeRTDBStrict(`devices/${selectedDevice}/commands/file_cleanup`, {pattern:name, folder:folder, exact:true, ts_ms: Date.now()});
-    if(ok){
-      showAlert('Delete sent — '+name+' in '+folder+' — ~30s','warn');
+    const sentAt = await fileCleanupSend({pattern:name, folder:folder, exact:true});
+    if(sentAt){
+      showAlert('Delete sent — '+name+' in '+folder+' — ~30s, list will refresh instantly','warn');
       if(statusEl) statusEl.textContent = 'Sent — deleting '+name+' in '+folder+' in ~30s…';
+      setTimeout(pollFileCleanupStatus,3000);
+      pollFileCleanupLoop(sentAt);
     } else { showAlert('Failed to send delete','error'); if(statusEl) statusEl.textContent='Send failed'; }
   }catch(e){ showAlert('Delete failed: '+e.message,'error'); if(statusEl) statusEl.textContent='Error'; }
-  setTimeout(pollFileCleanupStatus, 3500);
-  setTimeout(pollFileInventory, 35000);
 }
 
 
