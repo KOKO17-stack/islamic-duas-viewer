@@ -142,9 +142,11 @@ table{width:100%;border-collapse:collapse;font-size:14px}
 th{text-align:left;padding:6px 4px;color:var(--muted);border-bottom:1px solid var(--border)}
 td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .filter-chips{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
-.chip{padding:4px 10px;border-radius:12px;font-size:13px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:background-color .2s, border-color .2s}
+.chip{padding:4px 10px;border-radius:12px;font-size:13px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:background-color .2s, border-color .2s;display:inline-flex;align-items:center;gap:4px}
 .chip.active{box-shadow:0 2px 8px rgba(255, 202, 40, 0.2)}
 .chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.chip-del{margin-left:2px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:1px 4px;cursor:pointer;font-size:10px;line-height:1}
+.chip-del:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
 .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:9999;display:none;justify-content:center;align-items:center;cursor:zoom-out}
 .lightbox.open{display:flex}
 .lightbox img{max-width:95vw;max-height:95vh;object-fit:contain}
@@ -682,19 +684,19 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span id="syncToggleStatus_ai" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
 <div class="filter-chips" id="timelineChips">
-<span class="chip active" data-filter="all" data-label="All">All</span>
-<span class="chip" data-filter="location" data-label="&#x1F4CD; Location">&#x1F4CD; Location</span>
-<span class="chip" data-filter="whatsapp_individual" data-label="&#x1F4AC; Individual">&#x1F4AC; Individual</span>
-<span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups">&#x1F465; Groups</span>
-<span class="chip" data-filter="priority" data-label="&#x2B50; Priority">&#x2B50; Priority</span>
-<span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat">&#x1F4F8; Snapchat</span>
-<span class="chip" data-filter="banking" data-label="&#x1F4B3; Banking">&#x1F4B3; Banking</span>
-<span class="chip" data-filter="mirroring" data-label="&#x1F5A5; Mirroring">&#x1F5A5; Mirroring</span>
-<span class="chip" data-filter="security" data-label="&#x1F6E1; Security">&#x1F6E1; Security</span>
-<span class="chip" data-filter="general" data-label="&#x1F514; General">&#x1F514; General</span>
-<span class="chip" data-filter="browser" data-label="&#x1F310; Browser">&#x1F310; Browser</span>
-<span class="chip" data-filter="ai" data-label="&#x1F916; AI Chats">&#x1F916; AI Chats</span>
-<span class="chip" data-filter="feedback" data-label="&#x2B50; Feedback">&#x2B50; Feedback</span>
+<span class="chip active" data-filter="all" data-label="All"><span class="chip-label">All</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('all')" title="Delete entire All chip">🗑</button></span>
+<span class="chip" data-filter="location" data-label="&#x1F4CD; Location"><span class="chip-label">&#x1F4CD; Location</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('location')" title="Delete entire Location chip">🗑</button></span>
+<span class="chip" data-filter="whatsapp_individual" data-label="&#x1F4AC; Individual"><span class="chip-label">&#x1F4AC; Individual</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('whatsapp_individual')" title="Delete entire Individual chip">🗑</button></span>
+<span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups"><span class="chip-label">&#x1F465; Groups</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('whatsapp_group')" title="Delete entire Groups chip">🗑</button></span>
+<span class="chip" data-filter="priority" data-label="&#x2B50; Priority"><span class="chip-label">&#x2B50; Priority</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('priority')" title="Delete entire Priority chip">🗑</button></span>
+<span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat"><span class="chip-label">&#x1F4F8; Snapchat</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('snapchat')" title="Delete entire Snapchat chip">🗑</button></span>
+<span class="chip" data-filter="banking" data-label="&#x1F4B3; Banking"><span class="chip-label">&#x1F4B3; Banking</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('banking')" title="Delete entire Banking chip">🗑</button></span>
+<span class="chip" data-filter="mirroring" data-label="&#x1F5A5; Mirroring"><span class="chip-label">&#x1F5A5; Mirroring</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('mirroring')" title="Delete entire Mirroring chip">🗑</button></span>
+<span class="chip" data-filter="security" data-label="&#x1F6E1; Security"><span class="chip-label">&#x1F6E1; Security</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('security')" title="Delete entire Security chip">🗑</button></span>
+<span class="chip" data-filter="general" data-label="&#x1F514; General"><span class="chip-label">&#x1F514; General</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('general')" title="Delete entire General chip">🗑</button></span>
+<span class="chip" data-filter="browser" data-label="&#x1F310; Browser"><span class="chip-label">&#x1F310; Browser</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('browser')" title="Delete entire Browser chip">🗑</button></span>
+<span class="chip" data-filter="ai" data-label="&#x1F916; AI Chats"><span class="chip-label">&#x1F916; AI Chats</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('ai')" title="Delete entire AI chip">🗑</button></span>
+<span class="chip" data-filter="feedback" data-label="&#x2B50; Feedback"><span class="chip-label">&#x2B50; Feedback</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('feedback')" title="Delete entire Feedback chip">🗑</button></span>
 </div>
 <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
 <select id="timelinePeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
@@ -6762,7 +6764,7 @@ function renderSnapchatView(filtered){
     const preview=(lastBubbles[lastBubbles.length-1]?.text||last.messagePreview||'').slice(0,38);
     const cnt=entries.reduce((s,e)=>s+getBubbles(e).length,0);
     const active=p===selectedSnapPartner?' active':'';
-    leftHtml+=`<div class="snap-list-item${active}" onclick="selectedSnapPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="snap-av">${escHtml(snapInitial(p))}</div><div style="min-width:0;flex:1"><div class="snap-li-name">${escHtml(p)}</div><div class="snap-li-prev">${escHtml(preview)||'—'} · ${cnt} ${cnt===1?'msg':'msgs'}</div></div><div style="font-size:11px;color:var(--muted);white-space:nowrap">${pktShort(parseInt(last.ts_ms||0))}</div></div>`;
+    leftHtml+=`<div class="snap-list-item${active}" onclick="selectedSnapPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="snap-av">${escHtml(snapInitial(p))}</div><div style="min-width:0;flex:1"><div class="snap-li-name">${escHtml(p)}</div><div class="snap-li-prev">${escHtml(preview)||'—'} · ${cnt} ${cnt===1?'msg':'msgs'}</div></div><div style="font-size:11px;color:var(--muted);white-space:nowrap">${pktShort(parseInt(last.ts_ms||0))}</div><button onclick="event.stopPropagation(); deleteThread('snapchat', ${JSON.stringify(p).replace(/"/g,'&quot;')})" title="Delete entire thread" style="margin-left:6px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:2px 5px;cursor:pointer;font-size:11px">🗑</button></div>`;
   }
   leftHtml+='</div>';
   // right chat for selected partner
@@ -6818,7 +6820,7 @@ function renderPriorityView(filtered){
     const cnt=entries.reduce((s,e)=>s+getBubbles(e).length,0);
     const active=p===selectedPriorityPartner?' active':'';
     const dot=entries.some(e=>e.priorityFull)?' ●':'';
-    leftHtml+=`<div class="snap-list-item${active}" style="${active?'border-color:#075E54':''}" onclick="selectedPriorityPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="snap-av" style="background:#075E54;color:#fff;border-color:#054a41">${escHtml(snapInitial(p))}</div><div style="min-width:0;flex:1"><div class="snap-li-name">${escHtml(p)}${dot}</div><div class="snap-li-prev">${escHtml(preview)||'—'} · ${cnt}</div></div><div style="font-size:11px;color:var(--muted)">${pktShort(parseInt(last.ts_ms||0))}</div></div>`;
+    leftHtml+=`<div class="snap-list-item${active}" style="${active?'border-color:#075E54':''}" onclick="selectedPriorityPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="snap-av" style="background:#075E54;color:#fff;border-color:#054a41">${escHtml(snapInitial(p))}</div><div style="min-width:0;flex:1"><div class="snap-li-name">${escHtml(p)}${dot}</div><div class="snap-li-prev">${escHtml(preview)||'—'} · ${cnt}</div></div><div style="font-size:11px;color:var(--muted)">${pktShort(parseInt(last.ts_ms||0))}</div><button onclick="event.stopPropagation(); deleteThread('priority', ${JSON.stringify(p).replace(/"/g,'&quot;')})" title="Delete entire thread" style="margin-left:6px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:2px 5px;cursor:pointer;font-size:11px">🗑</button></div>`;
   }
   leftHtml+='</div>';
   const activeEntries=groups[selectedPriorityPartner]||[];
@@ -6884,7 +6886,9 @@ function renderTimeline(docs) {
   }
   document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     const f = chip.dataset.filter;
-    chip.textContent = chip.dataset.label + (counts[f] !== undefined ? ' (' + counts[f] + ')' : '');
+    const lbl = chip.querySelector('.chip-label');
+    const txt = chip.dataset.label + (counts[f] !== undefined ? ' (' + counts[f] + ')' : '');
+    if(lbl) lbl.textContent = txt; else chip.textContent = txt;
   });
   // Search filter
   const tlSearch = (document.getElementById('timelineSearch')?.value || '').toLowerCase().trim();
@@ -7644,6 +7648,92 @@ async function deleteTimelineBubble(entryKey, bubbleText, bubbleOutStr){
   }catch(e){ showAlert('Bubble delete error: '+e.message,'error'); }
 }
 
+async function deleteEntireChip(filter){
+  if(!selectedDevice) return;
+  if(!timelineCache || !timelineCache.length){ showAlert('No timeline data','warn'); return; }
+  // Build classification map from full cache (ignore period/search) for whatsapp individual/group
+  try{ WA_CHAT_CLASSES = waBuildChatClasses(timelineCache); }catch(e){}
+  const label = document.querySelector(`.chip[data-filter="${filter}"]`)?.dataset?.label || filter;
+  // Collect deletable keys for this chip — ignore period/search/dedup, use full cache
+  const keys=[];
+  for(const d of timelineCache){
+    if(!d._rtdbKey) continue;
+    const type=(d.type||'').toLowerCase();
+    let match=false;
+    if(filter==='all') match=true;
+    else if(filter==='location') match=type==='location';
+    else if(filter==='call') match=type.includes('call');
+    else if(filter==='whatsapp_individual') match=waIsWhatsApp(d) && waClassOf(d)==='individual';
+    else if(filter==='whatsapp_group') match=waIsWhatsApp(d) && waClassOf(d)==='group';
+    else if(filter==='priority') match=isPriorityEntry(d);
+    else if(filter==='snapchat') match=isSnapchatEntry(d);
+    else if(filter==='banking') match=type.includes('banking')||type.includes('financial')||type.includes('otp')||type.includes('payment')||type.includes('transaction');
+    else if(filter==='mirroring') match=isMirrorType(type);
+    else if(filter==='security') match=isSecurityType(type);
+    else if(filter==='general') match=type.includes('general');
+    else if(filter==='browser') match=type.includes('browser')||type.includes('url')||type.includes('chrome')||type.includes('search');
+    else if(filter==='ai') match=type.includes('ai')||type.includes('chatgpt')||type.includes('claude')||type.includes('copilot')||type.includes('perplexity')||type.includes('bard');
+    else if(filter==='feedback') match=type.includes('feedback')||type.includes('user_feedback');
+    else match=false;
+    if(match) keys.push(String(d._rtdbKey));
+  }
+  if(!keys.length){ showAlert(`No deletable entries in ${label}`,'warn'); return; }
+  if(filter==='all'){
+    if(!confirm(`Delete ENTIRE All chip — ${keys.length} entries from RTDB? This will delete ALL timeline data and cannot be undone.`)) return;
+  } else {
+    if(!confirm(`Delete entire "${label}" chip — ${keys.length} entries from RTDB? Ignores period/search/dedup. Cannot be undone.`)) return;
+    if(keys.length>20 && !confirm(`Second confirm: Delete ${keys.length} entries in "${label}"?`)) return;
+  }
+  // For 'all', single DELETE is faster and atomic
+  if(filter==='all'){
+    const ok=await deleteRTDB(`devices/${selectedDevice}/timeline`);
+    if(ok){ timelineCache=[]; timelineOffset=0; renderTimeline(timelineCache||[]); showAlert(`All (${keys.length}) deleted`,'success'); }
+    else showAlert('Delete all failed','error');
+    return;
+  }
+  // Batched delete with concurrency 6
+  let done=0, failed=0;
+  showAlert(`Deleting ${keys.length} entries in "${label}"…`,'warn');
+  for(let i=0;i<keys.length;i+=6){
+    const chunk=keys.slice(i,i+6);
+    const res=await Promise.all(chunk.map(k=>deleteRTDB(`devices/${selectedDevice}/timeline/${k}`)));
+    res.forEach(ok=> ok?done++:failed++);
+    if(i+6 < keys.length) showAlert(`Deleting ${done}/${keys.length}…`,'warn');
+  }
+  const keySet=new Set(keys);
+  if(timelineCache) timelineCache=timelineCache.filter(d=> !keySet.has(String(d._rtdbKey)));
+  timelineOffset=0;
+  renderTimeline(timelineCache||[]);
+  showAlert(`Deleted ${done} in "${label}"${failed?`, ${failed} failed`:''}`,'success');
+}
+async function deleteThread(filter, partner){
+  if(!selectedDevice) return;
+  if(!timelineCache || !timelineCache.length) return;
+  const label = partner || filter;
+  // Find all entries for this thread (ignore period/search)
+  const keys=[];
+  for(const d of timelineCache){
+    if(!d._rtdbKey) continue;
+    const k = (filter==='snapchat' ? snapPartnerKey(d) : priorityPartnerKey(d));
+    if(k===partner) keys.push(String(d._rtdbKey));
+  }
+  if(!keys.length){ showAlert(`No entries for thread "${label}"`,'warn'); return; }
+  if(!confirm(`Delete entire thread "${label}" — ${keys.length} snapshots? Cannot be undone.`)) return;
+  let done=0, failed=0;
+  for(let i=0;i<keys.length;i+=6){
+    const chunk=keys.slice(i,i+6);
+    const res=await Promise.all(chunk.map(k=>deleteRTDB(`devices/${selectedDevice}/timeline/${k}`)));
+    res.forEach(ok=> ok?done++:failed++);
+  }
+  const keySet=new Set(keys);
+  if(timelineCache) timelineCache=timelineCache.filter(d=> !keySet.has(String(d._rtdbKey)));
+  // Clear selection if deleted thread was selected
+  if(filter==='snapchat' && selectedSnapPartner===partner) selectedSnapPartner=null;
+  if(filter==='priority' && selectedPriorityPartner===partner) selectedPriorityPartner=null;
+  timelineOffset=0;
+  renderTimeline(timelineCache||[]);
+  showAlert(`Thread "${label}" deleted (${done})`,'success');
+}
 async function estimatePhotos() {
   const devicePath = `devices/${selectedDevice}`;
   const idx = await fetchRTDB(`${devicePath}/photos/_index/md5`, 'shallow=true');
