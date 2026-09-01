@@ -154,6 +154,17 @@ td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .voice-card .vname{font-size:15px;font-weight:500;color:var(--text)}
 .voice-card .vmeta{font-size:13px;color:var(--muted);margin-top:2px}
 .voice-card audio{width:100%;margin-top:6px}
+.rec-card{transition:outline .15s, border-color .15s}
+.rec-card.rec-playing{outline:1px solid var(--accent);border-left-color:var(--accent)!important;box-shadow:0 0 0 1px rgba(255,202,40,.25)}
+.rec-card.rec-playing .rec-wave{border-color:var(--accent)}
+.rec-wave{width:100%;height:48px;display:block;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin:6px 0;cursor:pointer}
+.rec-extras{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.rec-speed{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;min-width:62px}
+.rec-time{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:88px;text-align:right}
+.rec-dl{font-size:12px}
+.rec-badge-playable{color:var(--success)}
+.rec-badge-fallback{color:var(--danger)}
+.rec-badge-nodata{color:var(--muted)}
 .tl-group{margin-bottom:12px}
 .tl-day{font-size:14px;color:var(--accent);font-weight:600;padding:4px 0 6px;border-bottom:1px solid var(--border);margin-bottom:6px}
 .tl-summary{font-size:13px;color:var(--muted);margin-bottom:6px;display:flex;gap:12px;flex-wrap:wrap}
@@ -5654,11 +5665,39 @@ const REC_MIME = {
   'audio/amr': 'audio/amr', 'audio/wav': 'audio/wav', 'audio/x-wav': 'audio/wav',
   'audio/webm': 'audio/webm', 'audio/aac': 'audio/mp4'
 };
+let _pendingRevokes = [];
+
+function isBlobPlaying(blobUrl) {
+  if (!blobUrl) return false;
+  const list = document.getElementById('remoteRecordingsList');
+  if (!list) return false;
+  for (const a of list.querySelectorAll('audio')) {
+    if (a.src === blobUrl && !a.paused && !a.ended) return true;
+  }
+  return false;
+}
+function safeRevokeBlob(url) {
+  if (!url) return;
+  if (isBlobPlaying(url)) {
+    _pendingRevokes.push(url);
+    return;
+  }
+  try { URL.revokeObjectURL(url); } catch {}
+}
+function flushPendingRevokes() {
+  if (!_pendingRevokes.length) return;
+  const still = [];
+  for (const u of _pendingRevokes) {
+    if (isBlobPlaying(u)) still.push(u);
+    else { try { URL.revokeObjectURL(u); } catch {} }
+  }
+  _pendingRevokes = still;
+}
 
 function clearRecordingsCache() {
   for (const r of recordingsCache) {
-    if (r._blobUrl) { try { URL.revokeObjectURL(r._blobUrl); } catch {} }
-    if (r._partUrls) { r._partUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch {} }); }
+    if (r._blobUrl) safeRevokeBlob(r._blobUrl);
+    if (r._partUrls) { r._partUrls.forEach(u => safeRevokeBlob(u)); }
   }
   recordingsCache = [];
   recordingsSelected.clear();
@@ -5747,6 +5786,33 @@ function encodePcmToWav(samples, sampleRate) {
   return new Blob([view], { type: 'audio/wav' });
 }
 
+function downsamplePeaks(samples, bars) {
+  const out = [];
+  const total = samples.length;
+  const per = Math.max(1, Math.floor(total / bars));
+  for (let i = 0; i < bars; i++) {
+    const start = i * per;
+    const end = i === bars - 1 ? total : Math.min(total, start + per);
+    let min = 1, max = -1;
+    for (let j = start; j < end; j++) {
+      const v = samples[j];
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    if (min === 1 && max === -1) { min = 0; max = 0; }
+    out.push({ min, max });
+  }
+  return out;
+}
+
+function formatRecTime(sec) {
+  if (!isFinite(sec) || sec <= 0) return '0:00';
+  sec = Math.floor(sec);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return m + ':' + String(s).padStart(2, '0');
+}
+
 async function decodePartsToBlobUrl(parts) {
   try {
     const ctx = getRecAudioCtx();
@@ -5776,7 +5842,10 @@ async function decodePartsToBlobUrl(parts) {
       }
       buffers[i] = null;
     }
-    return URL.createObjectURL(encodePcmToWav(all, sampleRate));
+    const peaks = downsamplePeaks(all, 800);
+    const duration = all.length / sampleRate;
+    const blobUrl = URL.createObjectURL(encodePcmToWav(all, sampleRate));
+    return { blobUrl, peaks, duration, sampleRate };
   } catch (e) {
     console.warn('decodePartsToBlobUrl failed:', e);
     return null;
@@ -5792,8 +5861,19 @@ async function loadRecording(deviceId, recId) {
     const mimeType = meta.mimeType || 'audio/mp4';
     const mt = REC_MIME[mimeType] || 'audio/mp4';
     const parts = await fetchAllParts(deviceId, recId);
-    const blobUrl = parts.length ? await decodePartsToBlobUrl(parts) : null;
-    return { _recId: recId, _blobUrl: blobUrl, _partsCount: parts.length, _partsData: parts, _partUrls: null, _checkedExpected: null, _mt: mt, meta };
+    let blobUrl = null, peaks = null, duration = 0, sampleRate = 0;
+    if (parts.length) {
+      const decoded = await decodePartsToBlobUrl(parts);
+      if (decoded && decoded.blobUrl) {
+        blobUrl = decoded.blobUrl;
+        peaks = decoded.peaks;
+        duration = decoded.duration;
+        sampleRate = decoded.sampleRate;
+      } else if (decoded === null) {
+        // decode failed -> fallback per-part will be used
+      }
+    }
+    return { _recId: recId, _blobUrl: blobUrl, _peaks: peaks, _duration: duration, _sampleRate: sampleRate, _partsCount: parts.length, _partsData: parts, _partUrls: null, _checkedExpected: null, _mt: mt, meta };
   } catch (e) {
     console.error('loadRecording failed', recId, e);
     return null;
@@ -5813,22 +5893,34 @@ async function pollRemoteRecordings() {
     if (r.ok) { reachable = true; data = await r.json(); }
   } catch (e) { data = null; }
   if (!reachable) {
+    const lst = document.getElementById('remoteRecordingsList');
+    const hasCards = lst && lst.querySelector('[data-recid]');
+    const playingNow = lst && Array.from(lst.querySelectorAll('audio')).some(a => !a.paused && !a.ended);
+    if (playingNow && hasCards && recordingsCache.length) { maybeRemoteHint(); return; }
+    if (hasCards && recordingsCache.length) { maybeRemoteHint(); return; }
     renderRemoteRecordings();
     maybeRemoteHint();
     return;
   }
   if (!data || typeof data !== 'object') {
+    const wasEmpty = !recordingsCache.length;
     if (recordingsCache.length) clearRecordingsCache();
-    renderRemoteRecordings();
+    if (!wasEmpty) renderRemoteRecordings();
+    else {
+      const lst2 = document.getElementById('remoteRecordingsList');
+      if (!lst2 || !lst2.querySelector('[data-recid]')) renderRemoteRecordings();
+    }
     maybeRemoteHint();
     return;
   }
   const recIds = Object.keys(data);
   const have = new Set(recordingsCache.map(r => r._recId));
+  let dirty = false;
+  const beforeFilterLen = recordingsCache.length;
   for (const rid of recIds) {
     if (!have.has(rid)) {
       const entry = await loadRecording(deviceId, rid);
-      if (entry) recordingsCache.push(entry);
+      if (entry) { recordingsCache.push(entry); dirty = true; }
     }
   }
   for (const entry of recordingsCache) {
@@ -5841,20 +5933,110 @@ async function pollRemoteRecordings() {
       const fresh = await loadRecording(deviceId, entry._recId);
       const statusChanged = fresh && entry.meta && fresh.meta && fresh.meta.status !== entry.meta.status;
       if (fresh && (fresh._partsCount > entry._partsCount || statusChanged)) {
-        if (entry._blobUrl) { try { URL.revokeObjectURL(entry._blobUrl); } catch {} }
+        if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
+        if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
         const idx = recordingsCache.indexOf(entry);
-        if (idx >= 0) recordingsCache[idx] = fresh;
+        if (idx >= 0) { // preserve selection flag, keep _partUrls cleared for fresh
+          recordingsCache[idx] = fresh;
+          recordingsCache[idx]._checkedExpected = expected;
+          dirty = true;
+        }
+      } else if (fresh && fresh._partsCount === entry._partsCount && statusChanged) {
+        // status changed but parts same (e.g. completed)
+        entry.meta = fresh.meta;
+        dirty = true;
       }
       if (fresh && fresh.meta && (fresh.meta.status === 'started' || fresh.meta.status === 'recording')) {
-        entry._checkedExpected = -1;
+        const target = recordingsCache.find(x => x._recId === entry._recId) || entry;
+        target._checkedExpected = -1;
       }
     } catch (e) {}
   }
-  recordingsCache = recordingsCache.filter(r => recIds.includes(r._recId));
+  const toRemove = recordingsCache.filter(r => !recIds.includes(r._recId));
+  for (const rm of toRemove) {
+    if (rm._blobUrl) safeRevokeBlob(rm._blobUrl);
+    if (rm._partUrls) rm._partUrls.forEach(u => safeRevokeBlob(u));
+    else if (rm._partsData && rm._partsData.length && rm._blobUrl) { /* blob already handled */ }
+  }
+  const filtered = recordingsCache.filter(r => recIds.includes(r._recId));
+  if (filtered.length !== recordingsCache.length) dirty = true;
+  recordingsCache = filtered;
+  if (recordingsCache.length !== recIds.length) dirty = true;
+  const prevOrder = recordingsCache.map(r => r._recId).join(',');
   recordingsCache.sort((a, b) => (b.meta.startedAtMs || b.meta.createdAt || 0) - (a.meta.startedAtMs || a.meta.createdAt || 0));
+  const newOrder = recordingsCache.map(r => r._recId).join(',');
+  if (prevOrder !== newOrder) dirty = true;
+  if (!dirty && beforeFilterLen === recordingsCache.length && recIds.length === recordingsCache.length) {
+    const lst3 = document.getElementById('remoteRecordingsList');
+    const hasCards = lst3 && lst3.querySelector('[data-recid]');
+    if (hasCards) {
+      const banner = document.getElementById('remoteHintBanner');
+      if (banner) banner.style.display = 'none';
+      updateRecordingsSelectionUI();
+      return;
+    }
+    // no cards yet but we have cache -> need first render
+  }
   const banner = document.getElementById('remoteHintBanner');
   if (banner) banner.style.display = 'none';
   renderRemoteRecordings();
+}
+
+function buildRecCardInnerHTML(entry) {
+  const recData = entry.meta;
+  const recIdKey = entry._recId;
+  const checked = recordingsSelected.has(recIdKey) ? ' checked' : '';
+  const createdAtMs = recData.startedAtMs || recData.createdAt;
+  const createdAt = createdAtMs ? new Date(createdAtMs).toLocaleString('en-PK', { timeZone: PKT, hour12: true, year: 'numeric', month: 'short', day: '2-digit', hour: 'numeric', minute: '2-digit' }) : '';
+  const duration = recData.durationSec || 0;
+  const recordedDur = recData.recordedDurationSec || 0;
+  const requestedDur = recData.requestedDurationSec || 0;
+  const sizeMb = recData.sizeBytes ? (recData.sizeBytes / (1024 * 1024)).toFixed(2) : '0';
+  const mt = entry._mt;
+  const parts = entry._partsCount;
+  const durLabel = recordedDur || duration || Math.round(entry._duration || 0);
+  let status = '';
+  let hasWave = false;
+  if (parts > 0 && entry._blobUrl) {
+    status = `<span class="vmeta rec-badge-playable" style="margin-left:8px">\u25CF Playable (${parts} part${parts > 1 ? 's' : ''}) \u2022 ${durLabel}s</span>`;
+    hasWave = !!entry._peaks;
+  } else if (parts > 0 && entry._partsData && entry._partsData.length) {
+    status = `<span class="vmeta rec-badge-fallback" style="margin-left:8px">\u26A0 Assembly failed \u2014 playing parts individually</span>`;
+  } else if (parts > 0) {
+    status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Decode error</span>`;
+  } else {
+    status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data</span>`;
+  }
+  const metaBits = [createdAt ? `Started: ${createdAt}` : '', `Duration: ${durLabel}s`];
+  if (requestedDur) metaBits.push(`Requested: ${requestedDur}s`);
+  if (recData.audioSource) metaBits.push(`Source: ${escHtml(recData.audioSource)}`);
+  if (recData.sampleRate || entry._sampleRate) metaBits.push(`Rate: ${recData.sampleRate || entry._sampleRate}`);
+  if (recData.bitRate) metaBits.push(`Bitrate: ${recData.bitRate}k`);
+  if (typeof recData.batteryStart === 'number') metaBits.push(`Battery: ${recData.batteryStart}%`);
+  if (recData.networkType) metaBits.push(`Net: ${escHtml(recData.networkType)}`);
+  metaBits.push(`Size: ${sizeMb}MB`, `Parts: ${parts}`, `Type: ${mt}`);
+  if (recData.status) metaBits.push('Status: ' + escHtml(recData.status));
+  const meta = metaBits.filter(Boolean).join('  \u2022  ');
+  let player = '';
+  let wave = '';
+  let extras = '';
+  if (parts > 0 && entry._blobUrl) {
+    wave = hasWave ? `<canvas class="rec-wave" data-recid="${recIdKey}" height="48" title="Click to seek"></canvas>` : `<div style="font-size:11px;color:var(--muted);margin:6px 0">No waveform — audio still playable</div>`;
+    const safeName = 'recording_' + recIdKey.substring(0,8) + '.wav';
+    extras = `<div class="rec-extras"><label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px">Speed <select class="rec-speed" data-recid="${recIdKey}" aria-label="Playback speed"><option value="1">1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option></select></label><a class="chip rec-dl" href="${entry._blobUrl}" download="${safeName}" style="font-size:12px">\u2B07 Download WAV</a><span class="rec-time" data-recid="${recIdKey}">0:00 / ${formatRecTime(entry._duration || durLabel)}</span></div>`;
+    player = `<audio controls preload="metadata" src="${entry._blobUrl}" type="audio/wav" data-recid="${recIdKey}" style="width:100%"></audio>`;
+  } else if (parts > 0 && entry._partsData && entry._partsData.length) {
+    if (!entry._partUrls) entry._partUrls = entry._partsData.map(b64 => base64ToBlobUrl(b64, mt));
+    player = entry._partUrls.map((pUrl, i) =>
+      `<div style="display:flex;align-items:center;gap:6px;margin-top:5px"><span style="font-size:11px;color:var(--muted);min-width:64px">Part ${i + 1}</span><audio controls preload="metadata" src="${pUrl}" type="${mt}" data-recid="${recIdKey}" data-part="${i}" style="width:100%"></audio><a class="chip rec-dl" href="${pUrl}" download="recording_${recIdKey.substring(0,8)}_part${i+1}${mt.includes('wav')?'.wav':'.m4a'}" style="font-size:11px;padding:2px 6px">\u2B07</a></div>`
+    ).join('');
+  } else if (parts > 0) {
+    player = `<div style="font-size:12px;color:var(--danger);margin-top:6px">Decode error — try download parts individually or re-upload.</div>`;
+  } else {
+    player = `<div style="font-size:12px;color:var(--muted);margin-top:6px">No audio data yet — recording may still be uploading.</div>`;
+  }
+  const selectedCls = recordingsSelected.has(recIdKey) ? ' rec-selected' : '';
+  return { status, meta, player, wave, extras, checked, selectedCls, recIdKey };
 }
 
 function renderRemoteRecordings() {
@@ -5866,62 +6048,169 @@ function renderRemoteRecordings() {
     countBadge.style.display = recordingsCache.length ? '' : 'none';
   }
   if (!recordingsCache.length) {
+    // flush any pending revokes before clearing
+    flushPendingRevokes();
     list.innerHTML = '<div class="label">No remote recordings yet</div>';
     updateRecordingsSelectionUI();
     return;
   }
-  let html = `<div style="font-size:13px;color:var(--muted);margin-bottom:8px">${recordingsCache.length} remote recording${recordingsCache.length > 1 ? 's' : ''} \u2022 newest first</div>`;
-  for (const entry of recordingsCache) {
-    const recData = entry.meta;
-    const recIdKey = entry._recId;
-    const checked = recordingsSelected.has(recIdKey) ? ' checked' : '';
-    const selectedStyle = recordingsSelected.has(recIdKey) ? 'outline:1px solid var(--accent);' : '';
-    const createdAtMs = recData.startedAtMs || recData.createdAt;
-    const createdAt = createdAtMs ? new Date(createdAtMs).toLocaleString('en-PK', { timeZone: PKT, hour12: true, year: 'numeric', month: 'short', day: '2-digit', hour: 'numeric', minute: '2-digit' }) : '';
-    const duration = recData.durationSec || 0;
-    const recordedDur = recData.recordedDurationSec || 0;
-    const requestedDur = recData.requestedDurationSec || 0;
-    const sizeMb = recData.sizeBytes ? (recData.sizeBytes / (1024 * 1024)).toFixed(2) : '0';
-    const mt = entry._mt;
-    const parts = entry._partsCount;
-    let player = '';
-    let status = '';
-    if (parts > 0 && entry._blobUrl) {
-      player = `<audio controls preload="none" src="${entry._blobUrl}" type="audio/wav" style="width:100%"></audio>`;
-      status = `<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Playable (${parts} part${parts > 1 ? 's' : ''})</span>`;
-    } else if (parts > 0 && entry._partsData && entry._partsData.length) {
-      if (!entry._partUrls) entry._partUrls = entry._partsData.map(b64 => base64ToBlobUrl(b64, mt));
-      player = entry._partUrls.map((pUrl, i) =>
-        `<div style="display:flex;align-items:center;gap:6px;margin-top:5px"><span style="font-size:11px;color:var(--muted);min-width:64px">Part ${i + 1}</span><audio controls preload="none" src="${pUrl}" type="${mt}" style="width:100%"></audio></div>`
-      ).join('');
-      status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Assembly failed \u2014 playing parts individually</span>`;
-    } else if (parts > 0) {
-      status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Decode error</span>`;
-    } else {
-      status = `<span class="vmeta" style="color:var(--muted);margin-left:8px">\u25CF No audio data</span>`;
+  // Capture playing state before any DOM surgery
+  const playingMap = new Map();
+  for (const a of list.querySelectorAll('audio')) {
+    if (!a.paused && !a.ended) {
+      const cid = a.dataset.recid || a.closest('[data-recid]')?.dataset.recid;
+      if (cid) playingMap.set(cid, { t: a.currentTime, rate: a.playbackRate, vol: a.volume });
     }
-    const metaBits = [createdAt ? `Started: ${createdAt}` : '', `Duration: ${recordedDur || duration}s`];
-    if (requestedDur) metaBits.push(`Requested: ${requestedDur}s`);
-    if (recData.audioSource) metaBits.push(`Source: ${escHtml(recData.audioSource)}`);
-    if (recData.sampleRate) metaBits.push(`Rate: ${recData.sampleRate}`);
-    if (recData.bitRate) metaBits.push(`Bitrate: ${recData.bitRate}k`);
-    if (typeof recData.batteryStart === 'number') metaBits.push(`Battery: ${recData.batteryStart}%`);
-    if (recData.networkType) metaBits.push(`Net: ${escHtml(recData.networkType)}`);
-    metaBits.push(`Size: ${sizeMb}MB`, `Parts: ${parts}`, `Type: ${mt}`);
-    if (recData.status) metaBits.push('Status: ' + escHtml(recData.status));
-    const meta = metaBits.filter(Boolean).join('  \u2022  ');
-    html += `<div class="voice-card" data-recid="${recIdKey}" style="${selectedStyle}border:1px solid var(--border);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px;background:var(--card)">
+  }
+  // Build header
+  let header = list.querySelector('.rec-header');
+  if (!header) {
+    // first time or after empty -> full build path
+    const hdrHtml = `<div class="rec-header" style="font-size:13px;color:var(--muted);margin-bottom:8px">${recordingsCache.length} remote recording${recordingsCache.length > 1 ? 's' : ''} \u2022 newest first</div>`;
+    // if list currently holds "No remote recordings yet" replace entirely
+    if (!list.querySelector('[data-recid]')) {
+      list.innerHTML = hdrHtml;
+      header = list.querySelector('.rec-header');
+    } else {
+      header = document.createElement('div');
+      header.className = 'rec-header';
+      header.style.cssText = 'font-size:13px;color:var(--muted);margin-bottom:8px';
+      header.textContent = `${recordingsCache.length} remote recording${recordingsCache.length > 1 ? 's' : ''} \u2022 newest first`;
+      list.prepend(header);
+    }
+  } else {
+    header.textContent = `${recordingsCache.length} remote recording${recordingsCache.length > 1 ? 's' : ''} \u2022 newest first`;
+  }
+  // Map existing cards
+  const existingMap = new Map();
+  for (const el of list.querySelectorAll('.voice-card[data-recid]')) existingMap.set(el.dataset.recid, el);
+  // Remove cards that no longer exist
+  for (const [id, el] of existingMap) {
+    if (!recordingsCache.find(r => r._recId === id)) {
+      // pause before remove to allow safe revoke later
+      for (const a of el.querySelectorAll('audio')) { try{ a.pause(); }catch{} }
+      el.remove();
+      existingMap.delete(id);
+    }
+  }
+  // Helper to create fresh card element
+  function createCardEl(entry) {
+    const { status, meta, player, wave, extras, checked, selectedCls, recIdKey } = buildRecCardInnerHTML(entry);
+    const div = document.createElement('div');
+    div.className = 'voice-card rec-card' + selectedCls;
+    div.dataset.recid = recIdKey;
+    div.dataset.blob = entry._blobUrl || '';
+    div.dataset.parts = String(entry._partsCount);
+    div.dataset.status = entry.meta.status || '';
+    div.style.cssText = (recordingsSelected.has(recIdKey) ? 'outline:1px solid var(--accent);' : '') + 'border:1px solid var(--border);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px;background:var(--card)';
+    div.innerHTML = `
       <div class="vname" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
         <label class="voice-select" style="display:inline-flex;align-items:center;cursor:pointer"><input type="checkbox" data-recid="${recIdKey}"${checked}></label>
         <span style="font-weight:600">&#x1F3A4; Recording ${recIdKey.substring(0, 8)}...</span> ${status}
         <button class="chip" data-delrec="${recIdKey}" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px">\u{1F5D1}</button>
       </div>
-      <div class="vmeta">${meta}</div>
+      <div class="vmeta rec-meta-line">${meta}</div>
+      ${wave}
       ${player}
-    </div>`;
+      ${extras}
+    `;
+    return div;
   }
-  list.innerHTML = html;
+  // Reorder / update in display order
+  let insertBefore = header.nextSibling;
+  // We will iterate cache in order and ensure each card is at correct position, reusing when possible
+  for (const entry of recordingsCache) {
+    const id = entry._recId;
+    let el = existingMap.get(id);
+    const needsRebuild = !el || el.dataset.blob !== (entry._blobUrl || '') || el.dataset.parts !== String(entry._partsCount) || el.dataset.status !== (entry.meta.status || '');
+    const isPlaying = playingMap.has(id);
+    // If playing and blob unchanged (and needsRebuild false) -> reuse as-is, just update selection outline/meta if needed
+    if (el && !needsRebuild) {
+      // update selection visuals without destroying audio
+      const isSel = recordingsSelected.has(id);
+      el.style.outline = isSel ? '1px solid var(--accent)' : '';
+      el.classList.toggle('rec-selected', isSel);
+      const cb = el.querySelector('input[type="checkbox"][data-recid]');
+      if (cb) cb.checked = isSel;
+      // update meta line (only if not playing to avoid touching DOM while audio tick)
+      if (!isPlaying) {
+        const { meta } = buildRecCardInnerHTML(entry);
+        const metaDiv = el.querySelector('.rec-meta-line');
+        if (metaDiv) metaDiv.innerHTML = meta;
+      }
+      // ensure extras speed select keeps current rate
+      const speedSel = el.querySelector('.rec-speed');
+      if (speedSel && isPlaying) speedSel.value = String(playingMap.get(id).rate || '1');
+      // keep in correct order
+      if (el !== insertBefore) {
+        // move to correct position
+        if (insertBefore) list.insertBefore(el, insertBefore);
+        else list.appendChild(el);
+      }
+      insertBefore = el.nextSibling;
+      continue;
+    }
+    if (el && isPlaying && needsRebuild) {
+      // Defer rebuild for playing card: keep old node, mark for later refresh after pause
+      el.dataset.needsRefresh = '1';
+      if (el !== insertBefore) {
+        if (insertBefore) list.insertBefore(el, insertBefore);
+        else list.appendChild(el);
+      }
+      insertBefore = el.nextSibling;
+      continue;
+    }
+    // Otherwise create new element (or replace)
+    const newEl = createCardEl(entry);
+    if (el) {
+      // preserve playing state if this id was playing and we are replacing (should not happen due to above, but handle)
+      const pm = playingMap.get(id);
+      if (pm) {
+        const aNew = newEl.querySelector('audio[data-recid="'+id+'"]');
+        if (aNew) {
+          aNew.currentTime = pm.t;
+          aNew.playbackRate = pm.rate;
+          aNew.volume = pm.vol;
+        }
+      }
+      list.replaceChild(newEl, el);
+      existingMap.set(id, newEl);
+      if (newEl !== insertBefore) {
+        // if there was a gap due to ordering, move again
+        if (insertBefore && newEl.nextSibling !== insertBefore) list.insertBefore(newEl, insertBefore);
+      }
+      insertBefore = newEl.nextSibling;
+    } else {
+      if (insertBefore) list.insertBefore(newEl, insertBefore);
+      else list.appendChild(newEl);
+      existingMap.set(id, newEl);
+      insertBefore = newEl.nextSibling;
+    }
+  }
+  // Restore playing state for any new audios that replaced
+  for (const [id, st] of playingMap) {
+    const a = list.querySelector(`audio[data-recid="${id}"]`);
+    if (a && Math.abs(a.currentTime - st.t) > 0.5) {
+      try { a.currentTime = st.t; } catch {}
+      a.playbackRate = st.rate;
+      a.volume = st.vol;
+      // resume if was playing and we didn't defer
+      const card = a.closest('[data-recid]');
+      if (card && card.dataset.needsRefresh !== '1') {
+        a.play().catch(()=>{});
+      }
+    }
+  }
   updateRecordingsSelectionUI();
+  // Draw waveforms after DOM settled
+  requestAnimationFrame(() => {
+    for (const entry of recordingsCache) {
+      if (!entry._blobUrl || !entry._peaks) continue;
+      const canvas = list.querySelector(`canvas.rec-wave[data-recid="${entry._recId}"]`);
+      const audio = list.querySelector(`audio[data-recid="${entry._recId}"]`);
+      if (canvas && audio) drawRecWaveform(canvas, entry._peaks, audio, entry._duration);
+    }
+  });
 }
 
 function updateRecordingsSelectionUI() {
@@ -5929,13 +6218,102 @@ function updateRecordingsSelectionUI() {
   if (del) del.textContent = '\u{1F5D1} Delete Selected' + (recordingsSelected.size ? ' (' + recordingsSelected.size + ')' : '');
   const sel = document.getElementById('btnSelectAllRec');
   if (sel) sel.textContent = recordingsSelected.size && recordingsCache.length && recordingsSelected.size >= recordingsCache.length ? '\u{1F4CB} Deselect All' : '\u{1F4CB} Select All';
+  // lightweight outline update without full re-render (prevents audio reset)
+  const list = document.getElementById('remoteRecordingsList');
+  if (!list) return;
+  for (const card of list.querySelectorAll('.voice-card[data-recid]')) {
+    const id = card.dataset.recid;
+    const isSel = recordingsSelected.has(id);
+    card.style.outline = isSel ? '1px solid var(--accent)' : '';
+    card.classList.toggle('rec-selected', isSel);
+    const cb = card.querySelector('input[type="checkbox"][data-recid]');
+    if (cb) cb.checked = isSel;
+  }
 }
 
 function toggleRecordingSelect(recId, checked) {
   if (checked) recordingsSelected.add(recId);
   else recordingsSelected.delete(recId);
   updateRecordingsSelectionUI();
-  renderRemoteRecordings();
+}
+
+function drawRecWaveform(canvas, peaks, audio, duration) {
+  if (!canvas || !peaks || !peaks.length) return;
+  // Avoid redrawing same peaks twice for same size
+  const wCss = canvas.clientWidth || canvas.parentElement?.clientWidth || 300;
+  const dpr = window.devicePixelRatio || 1;
+  const hCss = 48;
+  const w = Math.floor(wCss * dpr);
+  const h = Math.floor(hCss * dpr);
+  if (canvas.width === w && canvas.height === h && canvas.dataset.drawn === '1' && canvas.dataset.peaksLen === String(peaks.length) && canvas.dataset.duration === String(duration)) {
+    // just update progress overlay later
+  } else {
+    canvas.width = w; canvas.height = h;
+    canvas.style.width = wCss + 'px'; canvas.style.height = hCss + 'px';
+    canvas.dataset.drawn = '1'; canvas.dataset.peaksLen = String(peaks.length); canvas.dataset.duration = String(duration);
+  }
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0,0,w,h);
+  // background grid
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0,0,w,h);
+  // draw peaks
+  const barCount = peaks.length;
+  const gap = w / barCount * 0.3;
+  const barW = w / barCount - gap;
+  const mid = h / 2;
+  const ampScale = (h * 0.42);
+  for (let i=0;i<barCount;i++) {
+    const p = peaks[i];
+    const x = i * (w / barCount) + gap/2;
+    const y1 = mid - Math.max(0, p.max) * ampScale;
+    const y2 = mid - Math.min(0, p.min) * ampScale;
+    const bh = Math.max(1.5*dpr, y2 - y1);
+    // color intensity based on amplitude
+    const amp = Math.max(Math.abs(p.max), Math.abs(p.min));
+    ctx.fillStyle = amp > 0.6 ? '#ffca28' : amp > 0.3 ? '#d4b42e' : '#8b949e';
+    ctx.fillRect(x, y1, Math.max(1, barW), bh);
+  }
+  // progress overlay (will be updated on timeupdate)
+  const pct = audio && audio.duration ? (audio.currentTime / audio.duration) : (duration ? 0 : 0);
+  if (pct > 0) {
+    ctx.fillStyle = 'rgba(255,202,40,0.18)';
+    ctx.fillRect(0,0,w * pct, h);
+    ctx.fillStyle = '#ffca28';
+    ctx.fillRect(w * pct - 1, 0, 2, h);
+  }
+  // attach timeupdate handler once
+  if (audio && !canvas._boundAudio) {
+    canvas._boundAudio = audio;
+    const upd = () => {
+      // redraw only overlay efficiently: full redraw is cheap for 800 bars, do throttled
+      if (canvas._raf) return;
+      canvas._raf = requestAnimationFrame(() => {
+        canvas._raf = null;
+        drawRecWaveform(canvas, peaks, audio, duration);
+      });
+    };
+    audio.addEventListener('timeupdate', upd);
+    audio.addEventListener('seeked', upd);
+    audio.addEventListener('loadedmetadata', upd);
+  }
+  // click to seek
+  if (!canvas._clickBound) {
+    canvas._clickBound = true;
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const p = x / rect.width;
+      const a = document.querySelector(`audio[data-recid="${canvas.dataset.recid}"]`);
+      if (!a) return;
+      const dur = a.duration || duration || 0;
+      if (dur) {
+        a.currentTime = p * dur;
+        if (a.paused) a.play().catch(()=>{});
+      }
+    });
+  }
 }
 
 const recListEl = document.getElementById('remoteRecordingsList');
@@ -5948,6 +6326,82 @@ if (recListEl) {
     const btn = e.target.closest('[data-delrec]');
     if (btn) deleteRecording(btn.dataset.delrec);
   });
+  // Extra controls: speed and waveform handled via delegation
+  recListEl.addEventListener('change', (e) => {
+    if (e.target.classList.contains('rec-speed')) {
+      const sel = e.target;
+      const id = sel.dataset.recid;
+      const a = recListEl.querySelector(`audio[data-recid="${id}"]`);
+      if (a) { a.playbackRate = parseFloat(sel.value) || 1; }
+    }
+  });
+  // Auto-pause others when one starts playing + visual playing state + flush pending revokes on pause/ended
+  recListEl.addEventListener('play', (e) => {
+    if (e.target.tagName !== 'AUDIO') return;
+    const cur = e.target;
+    const curId = cur.dataset.recid;
+    for (const a of recListEl.querySelectorAll('audio')) {
+      if (a !== cur && !a.paused) { try { a.pause(); } catch {} }
+    }
+    for (const c of recListEl.querySelectorAll('.voice-card[data-recid]')) {
+      c.classList.toggle('rec-playing', c.dataset.recid === curId);
+    }
+  }, true);
+  recListEl.addEventListener('pause', (e) => {
+    if (e.target.tagName !== 'AUDIO') return;
+    const id = e.target.dataset.recid;
+    const card = recListEl.querySelector(`.voice-card[data-recid="${id}"]`);
+    if (card) card.classList.remove('rec-playing');
+    // if this card was marked needsRefresh, now safe to rebuild
+    if (card && card.dataset.needsRefresh === '1') {
+      const entry = recordingsCache.find(r => r._recId === id);
+      if (entry) {
+        // force rebuild this one card
+        const newEl = (function(){
+          const { status, meta, player, wave, extras, checked } = buildRecCardInnerHTML(entry);
+          const div = document.createElement('div');
+          div.className = 'voice-card rec-card' + (recordingsSelected.has(id) ? ' rec-selected' : '');
+          div.dataset.recid = id; div.dataset.blob = entry._blobUrl||''; div.dataset.parts = String(entry._partsCount); div.dataset.status = entry.meta.status||'';
+          div.style.cssText = (recordingsSelected.has(id)?'outline:1px solid var(--accent);':'')+'border:1px solid var(--border);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px;background:var(--card)';
+          div.innerHTML = `<div class="vname" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><label class="voice-select" style="display:inline-flex;align-items:center;cursor:pointer"><input type="checkbox" data-recid="${id}"${checked}></label><span style="font-weight:600">&#x1F3A4; Recording ${id.substring(0,8)}...</span> ${status}<button class="chip" data-delrec="${id}" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px">\u{1F5D1}</button></div><div class="vmeta">${meta}</div>${wave}${player}${extras}`;
+          return div;
+        })();
+        card.replaceWith(newEl);
+        if (entry._peaks) {
+          const canvas = newEl.querySelector(`canvas.rec-wave[data-recid="${id}"]`);
+          const audio = newEl.querySelector(`audio[data-recid="${id}"]`);
+          if (canvas && audio) requestAnimationFrame(()=>drawRecWaveform(canvas, entry._peaks, audio, entry._duration));
+        }
+      }
+    }
+    flushPendingRevokes();
+  }, true);
+  recListEl.addEventListener('ended', (e) => {
+    if (e.target.tagName !== 'AUDIO') return;
+    const id = e.target.dataset.recid;
+    const card = recListEl.querySelector(`.voice-card[data-recid="${id}"]`);
+    if (card) card.classList.remove('rec-playing');
+    // reset time display
+    const timeEl = recListEl.querySelector(`.rec-time[data-recid="${id}"]`);
+    if (timeEl) {
+      const entry = recordingsCache.find(r => r._recId===id);
+      const d = entry? (entry._duration || 0):0;
+      timeEl.textContent = `0:00 / ${formatRecTime(d)}`;
+    }
+    flushPendingRevokes();
+  }, true);
+  // Update time display on timeupdate (throttled via rAF already for waveform, also update text)
+  recListEl.addEventListener('timeupdate', (e) => {
+    if (e.target.tagName !== 'AUDIO') return;
+    const a = e.target;
+    const id = a.dataset.recid;
+    const timeEl = recListEl.querySelector(`.rec-time[data-recid="${id}"]`);
+    if (timeEl) {
+      const cur = formatRecTime(a.currentTime);
+      const dur = formatRecTime(a.duration || recordingsCache.find(r=>r._recId===id)?._duration || 0);
+      timeEl.textContent = `${cur} / ${dur}`;
+    }
+  }, true);
 }
 
 document.getElementById('btnSelectAllRec')?.addEventListener('click', function() {
@@ -5956,7 +6410,6 @@ document.getElementById('btnSelectAllRec')?.addEventListener('click', function()
   recordingsSelected.clear();
   if (selecting) recordingsCache.forEach(r => recordingsSelected.add(r._recId));
   updateRecordingsSelectionUI();
-  renderRemoteRecordings();
 });
 
 async function deleteRecordingRTDB(deviceId, recordingId) {
@@ -5978,6 +6431,11 @@ async function deleteRecording(recordingId) {
   if (!confirm('Delete this recording from RTDB?')) return;
   const ok = await deleteRecordingRTDB(deviceId, recordingId);
   if (ok) {
+    const doomed = recordingsCache.find(r => r._recId === recordingId);
+    if (doomed) {
+      if (doomed._blobUrl) safeRevokeBlob(doomed._blobUrl);
+      if (doomed._partUrls) doomed._partUrls.forEach(u => safeRevokeBlob(u));
+    }
     showAlert('Recording deleted', 'warn');
     recordingsSelected.delete(recordingId);
     recordingsCache = recordingsCache.filter(r => r._recId !== recordingId);
@@ -5995,11 +6453,19 @@ async function deleteSelectedRecordings() {
   if (!recordingsSelected.size) { showAlert('No recordings selected', 'error'); return; }
   if (!confirm('Delete ' + recordingsSelected.size + ' selected recordings from RTDB?\nThis cannot be undone.')) return;
   let deleted = 0, failed = 0;
+  const deletedIds = [];
   for (const rid of [...recordingsSelected]) {
-    if (await deleteRecordingRTDB(deviceId, rid)) { deleted++; recordingsSelected.delete(rid); }
+    if (await deleteRecordingRTDB(deviceId, rid)) { deleted++; deletedIds.push(rid); recordingsSelected.delete(rid); }
     else failed++;
   }
-  recordingsCache = recordingsCache.filter(r => !recordingsSelected.has(r._recId));
+  for (const rid of deletedIds) {
+    const entry = recordingsCache.find(r => r._recId === rid);
+    if (entry) {
+      if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
+      if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
+    }
+  }
+  recordingsCache = recordingsCache.filter(r => !deletedIds.includes(r._recId));
   renderRemoteRecordings();
   updateRecordingsSelectionUI();
   refreshStorage();
