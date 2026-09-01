@@ -348,6 +348,56 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 .perm-section-title{font-size:12px;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:6px;padding:8px 0 4px}
 .perm-divider{height:1px;background:var(--border);margin:6px 0}
 .perm-skel{height:78px;background:linear-gradient(90deg,var(--card) 25%,var(--border) 50%,var(--card) 75%);background-size:200px 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius);border-left:3px solid var(--border)}
+/* === Storage redesign === */
+.storage-hero{display:grid;gap:6px;margin-bottom:10px}
+.storage-hero-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px}
+.storage-stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 11px;cursor:pointer;transition:.15s}
+.storage-stat:hover{border-color:var(--accent);box-shadow:0 2px 10px rgba(255,202,40,.12)}
+.storage-stat.active{border-color:var(--accent);box-shadow:0 2px 10px rgba(255,202,40,.18)}
+.storage-stat b{font-size:18px;font-weight:700;display:block;line-height:1}
+.storage-stat span{font-size:11px;color:var(--muted);letter-spacing:.2px}
+.storage-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.storage-search-wrap{position:relative;display:flex;gap:6px;align-items:center;flex:1;min-width:180px}
+.storage-search-wrap input{flex:1;padding:10px 36px 10px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;font-size:13px;transition:.15s}
+.storage-search-wrap input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,202,40,.12)}
+.storage-search-wrap .clear{position:absolute;right:78px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;display:none;align-items:center;justify-content:center;font-size:14px}
+.storage-search-wrap.has-val .clear{display:flex}
+.storage-pill-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:4px 0 8px}
+.storage-pill{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:.15s;user-select:none;display:inline-flex;align-items:center;gap:6px}
+.storage-pill.on{background:var(--accent);color:#000;border-color:var(--accent);box-shadow:0 2px 8px rgba(255,202,40,.25)}
+.storage-pill .cnt{font-size:10px;font-weight:700;padding:2px 6px;border-radius:999px;background:rgba(255,255,255,.12);min-width:18px;text-align:center}
+.storage-pill.on .cnt{background:rgba(0,0,0,.12);color:#000}
+.storage-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(172px,1fr));gap:8px;margin-bottom:12px}
+.storage-card{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0;padding:10px 11px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+.storage-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.18);border-left-color:var(--accent)}
+.storage-card.sel{border-left-color:var(--accent);box-shadow:0 2px 10px rgba(255,202,40,.18);outline:1px solid rgba(255,202,40,.2)}
+.storage-card.danger{border-left-color:var(--danger)}
+.storage-card-head{display:flex;gap:8px;align-items:center}
+.storage-card-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;background:var(--bg);border:1px solid var(--border)}
+.storage-card-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.storage-card-sub{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.storage-bar{height:6px;background:var(--border);border-radius:999px;overflow:hidden;margin:8px 0 4px}
+.storage-bar>div{height:100%;border-radius:999px;min-width:4px;transition:width .3s;background:linear-gradient(90deg,var(--accent),#ff8c42)}
+.storage-card-meta{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);gap:6px}
+.storage-card-meta b{color:var(--text);font-size:11px}
+.storage-section{margin-bottom:10px}
+.storage-section-title{font-size:12px;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:6px;padding:8px 0 4px;color:var(--muted);cursor:pointer;user-select:none}
+.storage-section-title .tog{margin-left:auto;font-size:11px;color:var(--muted);border:1px solid var(--border);padding:2px 8px;border-radius:999px;background:var(--bg)}
+.storage-actions-grid{display:grid;gap:6px}
+.storage-action-card{display:flex;gap:10px;align-items:center;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0;transition:.15s}
+.storage-action-card:hover{box-shadow:0 2px 10px rgba(0,0,0,.14)}
+.storage-action-card.danger{border-left-color:var(--danger)}
+.storage-action-card.selected{border-color:var(--accent);box-shadow:0 2px 10px rgba(255,202,40,.18)}
+.storage-action-main{flex:1;min-width:0}
+.storage-action-title{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.storage-action-desc{font-size:11px;color:var(--muted);margin-top:2px}
+.storage-action-count{font-size:10px;padding:2px 7px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--muted)}
+.storage-action-btn{flex-shrink:0;padding:7px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid transparent;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.storage-action-btn.run{background:var(--accent);color:#000;border-color:var(--accent)}
+.storage-action-btn.del{background:var(--danger);color:#fff;border-color:var(--danger)}
+.storage-action-btn:disabled{opacity:.45;cursor:not-allowed}
+.storage-danger-box{border:1px dashed var(--danger);background:rgba(248,81,73,.06);border-radius:10px;padding:10px 12px}
+@media(max-width:560px){.storage-grid{grid-template-columns:repeat(2,1fr)}.storage-controls{flex-direction:column;align-items:stretch}.storage-search-wrap{min-width:0}}
 </style>
 </head>
 <body>
@@ -956,14 +1006,74 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </label>
 <span id="syncToggleStatus_all_storage" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-  <span style="font-size:16px;font-weight:500">&#x1F4E6; Storage & Cleanup</span>
-  <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="refreshStorage()">&#x1F504; Refresh</span>
+<!-- Storage Hero -->
+<div id="storageHero" class="storage-hero" style="display:none">
+  <div class="storage-hero-row" id="storageHeroRow"></div>
+  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
+    <span id="storageHeroMeta" style="font-size:11px;color:var(--muted)"></span>
+    <span id="storageScanStatus" style="font-size:11px;color:var(--accent);display:none"></span>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <button class="chip" style="background:var(--card);color:var(--muted);border-color:var(--border);font-size:11px" onclick="exportStorageCSV()" title="Export storage overview as CSV">⤓ Export CSV</button>
+      <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:12px" onclick="refreshStorage()">↻ Refresh</button>
+    </span>
+  </div>
 </div>
-<div id="storageOverview" style="margin-bottom:14px"></div>
-<div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px">
-  <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F9F9; Cleanup Actions</div>
-  <div id="cleanupActions" style="display:flex;flex-direction:column;gap:6px"></div>
+<!-- Storage Controls -->
+<div class="storage-controls" id="storageControls" style="display:none">
+  <div class="storage-search-wrap" id="storageSearchWrap"><input type="text" id="storageSearch" placeholder="🔍 Search category…" oninput="this.parentElement.classList.toggle('has-val', this.value.length>0); renderStorageFiltered()"><button class="clear" onclick="document.getElementById('storageSearch').value='';this.parentElement.classList.remove('has-val');renderStorageFiltered()" title="Clear">✕</button></div>
+  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+    <select id="storageSort" onchange="renderStorageFiltered()" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:8px 10px;border-radius:10px;font-size:12px;min-width:138px">
+      <option value="bytes">Largest first</option>
+      <option value="count">Most entries</option>
+      <option value="name">Name A→Z</option>
+    </select>
+    <select id="storageView" onchange="storageView=this.value;localStorage.setItem('storageView',storageView);renderStorageFiltered()" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:8px 10px;border-radius:10px;font-size:12px">
+      <option value="grid">▦ Grid</option>
+      <option value="table">☰ Table</option>
+    </select>
+  </div>
+</div>
+<div class="storage-pill-bar" id="storagePills" style="display:none"></div>
+<div id="storageStatusBanner" style="display:none;margin:8px 0;padding:8px 12px;background:rgba(255,202,40,.10);border:1px solid rgba(255,202,40,.25);border-radius:8px;font-size:12px;color:var(--accent)"></div>
+<!-- Overview: Grid + Table -->
+<div id="storageGrid" class="storage-grid" style="display:none"></div>
+<div id="storageTableWrap" style="display:none;margin-bottom:12px"></div>
+<!-- Largest Items -->
+<div id="storageLargestWrap" style="display:none;margin-bottom:12px"></div>
+<!-- Cleanup grouped -->
+<div id="storageCleanup" style="display:none">
+  <div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px">
+    <span style="font-size:15px;font-weight:600">🧹 Cleanup Actions</span>
+    <span id="storageCleanupMeta" style="font-size:11px;color:var(--muted)"></span>
+    <label style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" id="storageBulkToggle" onchange="toggleStorageBulk(this.checked)"> Bulk select</label>
+  </div>
+  <div id="storageBulkBar" style="display:none;position:sticky;top:0;z-index:2;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--accent);border-radius:8px;align-items:center;gap:8px;flex-wrap:wrap">
+    <span id="storageBulkCount" style="font-size:13px;font-weight:600;color:var(--accent)">0 selected</span>
+    <span id="storageBulkEst" style="font-size:11px;color:var(--muted)"></span>
+    <span style="margin-left:auto;display:flex;gap:6px">
+      <button class="chip" style="background:var(--danger);color:#fff;border-color:var(--danger);font-size:12px" onclick="execBulkCleanup()">⚠ Delete Selected</button>
+      <button class="chip" style="background:var(--card);color:var(--muted);font-size:12px" onclick="clearStorageBulk()">Clear</button>
+    </span>
+  </div>
+  <div id="storageSectionQuick" class="storage-section"></div>
+  <div id="storageSectionSafe" class="storage-section"></div>
+  <div id="storageSectionByCat" class="storage-section"></div>
+  <div id="storageSectionDanger" class="storage-section"></div>
+</div>
+<!-- Hidden legacy hooks for compat (refreshStorage writes here via new renderers, keep DOM) -->
+<div id="storageOverview" style="display:none"></div>
+<div id="cleanupActions" style="display:none"></div>
+<!-- Dry-run modal -->
+<div id="storageDryRunModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:9999;align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;max-width:520px;width:100%;padding:18px">
+    <div style="font-size:15px;font-weight:700;margin-bottom:6px" id="storageDryRunTitle">Confirm delete?</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px" id="storageDryRunBody"></div>
+    <div id="storageDryRunList" style="max-height:32vh;overflow:auto;margin-bottom:12px;display:flex;flex-direction:column;gap:4px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="chip" style="background:var(--card);color:var(--muted);font-size:13px" onclick="closeStorageDryRun()">Cancel</button>
+      <button class="chip" id="storageDryRunConfirm" style="background:var(--danger);color:#fff;border-color:var(--danger);font-size:13px">Delete</button>
+    </div>
+  </div>
 </div>
 </div>
 <div id="tab-permissions">
@@ -7863,10 +7973,128 @@ async function estimateNodeSize(path, sampleSize = 3) {
   return { count, bytes: Math.round(count * avgBytes) };
 }
 
+// --- Storage state & helpers ---
+let storageCats=[], storageFilter='all', storageSearch='', storageSort='bytes', storageView=localStorage.getItem('storageView')||'grid', storageBulk=new Set(), storageLastScan=0, storageLastRefresh=0;
+function showStorageBanner(msg, type='warn'){ const el=document.getElementById('storageStatusBanner'); if(!el) return; el.textContent=msg; el.style.display=msg?'block':'none'; el.style.borderColor=type==='error'?'var(--danger)':type==='success'?'var(--success)':'rgba(255,202,40,.25)'; el.style.color=type==='error'?'var(--danger)':type==='success'?'var(--success)':'var(--accent)'; }
+function hideStorageBanner(){ const el=document.getElementById('storageStatusBanner'); if(el) el.style.display='none'; }
+function storageSetScanStatus(txt){ const el=document.getElementById('storageScanStatus'); if(!el) return; el.textContent=txt||''; el.style.display=txt?'inline':'none'; }
+function exportStorageCSV(){
+  if(!storageCats.length){ showAlert('No storage data to export','warn'); return; }
+  let csv='Category,Entries,EstBytes,EstSize\n';
+  for(const c of storageCats) csv+=`${csvEsc(c.name)},${c.count},${c.bytes},"${formatBytes(c.bytes)}"\n`;
+  csv+=`Total,${storageCats.reduce((s,c)=>s+c.count,0)},${storageCats.reduce((s,c)=>s+c.bytes,0)},"${formatBytes(storageCats.reduce((s,c)=>s+c.bytes,0))}"\n`;
+  const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`storage_${selectedDevice||'device'}_${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url); showAlert('Storage CSV exported','success');
+}
+function toggleStorageBulk(on){
+  const bar=document.getElementById('storageBulkBar');
+  if(on){ bar.style.display='flex'; document.querySelectorAll('.storage-action-card').forEach(el=>el.querySelector('.storage-chk')&&(el.querySelector('.storage-chk').style.display='inline-flex')); }
+  else { bar.style.display='none'; storageBulk.clear(); document.querySelectorAll('.storage-action-card .storage-chk').forEach(ch=>{ch.checked=false; ch.style.display='none';}); document.querySelectorAll('.storage-action-card').forEach(el=>el.classList.remove('selected')); updateStorageBulkBar(); }
+}
+function clearStorageBulk(){ storageBulk.clear(); document.querySelectorAll('.storage-action-card .storage-chk').forEach(ch=>ch.checked=false); document.querySelectorAll('.storage-action-card').forEach(el=>el.classList.remove('selected')); updateStorageBulkBar(); }
+function updateStorageBulkBar(){
+  const cnt=storageBulk.size;
+  const el=document.getElementById('storageBulkCount');
+  const est=document.getElementById('storageBulkEst');
+  if(el) el.textContent=cnt?`${cnt} selected`:'0 selected';
+  if(est){
+    if(!cnt) est.textContent='';
+    else {
+      let estBytes=0, estEntries=0;
+      for(const key of storageBulk){ const [act,pathKey]=key.split('|'); const cat=storageCats.find(c=>c.path===pathKey); if(cat){ estEntries+=cat.count; estBytes+=cat.bytes; } }
+      est.textContent=estEntries?`~ ${estEntries} entries · ${formatBytes(estBytes)}`:'';
+    }
+  }
+}
+function storageActionKey(a){ return a.action+'|'+a.path; }
+function onStorageChk(chk){
+  const card=chk.closest('.storage-action-card');
+  const key=chk.dataset.key;
+  if(chk.checked){ storageBulk.add(key); card.classList.add('selected'); } else { storageBulk.delete(key); card.classList.remove('selected'); }
+  updateStorageBulkBar();
+}
+function closeStorageDryRun(){ const m=document.getElementById('storageDryRunModal'); if(m) m.style.display='none'; }
+function openStorageDryRun(title, body, items, onConfirm){
+  const m=document.getElementById('storageDryRunModal');
+  document.getElementById('storageDryRunTitle').textContent=title;
+  document.getElementById('storageDryRunBody').textContent=body;
+  const list=document.getElementById('storageDryRunList');
+  list.innerHTML=items.map(it=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 8px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(it.label)}</span><span style="color:var(--muted);white-space:nowrap">${escHtml(it.meta||'')}</span></div>`).join('') || '<div style="font-size:12px;color:var(--muted)">No items</div>';
+  const btn=document.getElementById('storageDryRunConfirm');
+  btn.onclick=async()=>{ closeStorageDryRun(); await onConfirm(); };
+  m.style.display='flex';
+}
+async function execBulkCleanup(){
+  if(!storageBulk.size){ showAlert('No items selected','warn'); return; }
+  const items=[...storageBulk].map(k=>{ const [act,pathKey]=k.split('|'); const def=storageActionsDef.find(a=>a.action===act && a.path===pathKey); const cat=storageCats.find(c=>c.path===pathKey); return {key:k, act, pathKey, def, cat}; }).filter(x=>x.def);
+  const sumEntries=items.reduce((s,it)=>s+(it.cat?it.cat.count:0),0);
+  const sumBytes=items.reduce((s,it)=>s+(it.cat?it.cat.bytes:0),0);
+  openStorageDryRun(`Delete ${items.length} selected?`, `This will delete ~ ${sumEntries} entries (${formatBytes(sumBytes)} estimated) across ${items.length} categories. Cannot be undone.`, items.map(it=>({label: it.def.label, meta: it.cat? `${it.cat.count} entries · ${formatBytes(it.cat.bytes)}` : it.pathKey||'device' })), async()=>{
+    let done=0, failed=0;
+    showStorageBanner(`Deleting ${items.length} categories…`,'warn');
+    for(let i=0;i<items.length;i++){
+      const it=items[i];
+      storageSetScanStatus(`Bulk ${i+1}/${items.length}: ${it.def.label}…`);
+      try{
+        if(it.act==='deleteAll'){ const ok=await deleteRTDB(`devices/${selectedDevice}/${it.pathKey}`); if(ok) done++; else failed++; }
+        else { await execCleanup(it.act, it.pathKey); done++; }
+      } catch(e){ failed++; }
+      if(i+1<items.length) showStorageBanner(`Bulk ${done}/${items.length} done…`,'warn');
+    }
+    storageSetScanStatus('');
+    hideStorageBanner();
+    clearStorageBulk();
+    document.getElementById('storageBulkToggle').checked=false; toggleStorageBulk(false);
+    await refreshStorage();
+    showAlert(`Bulk done: ${done} succeeded${failed?`, ${failed} failed`:''}`, failed?'error':'success');
+  });
+}
+
+const storageActionsDef=[
+  { label: '🧹 Dedup Photos', desc: 'Remove duplicate photos (keep highest quality)', action: 'dedupPhotos', path: 'photos', group:'quick', icon:'📸' },
+  { label: '🧹 Dedup Timeline', desc: 'Remove duplicate timeline entries (same contact within 60s)', action: 'dedupTimeline', path: 'timeline', group:'quick', icon:'📞' },
+  { label: '👥 Dedup Contacts', desc: 'Merge duplicate contacts by phone number', action: 'dedupContacts', path: 'contacts', group:'quick', icon:'👥' },
+  { label: '🧹 Dedup Locations', desc: 'Remove duplicate location fixes (same spot + second)', action: 'dedupLocations', path: 'location', group:'quick', icon:'📍' },
+  { label: '🧹 Dedup Haidh', desc: 'Remove duplicate menstrual cycle entries', action: 'dedupHaidh', path: 'health', group:'quick', icon:'🩸' },
+  { label: '🧹 Dedup Exercise', desc: 'Remove duplicate exercise entries', action: 'dedupExercise', path: 'health', group:'quick', icon:'💪' },
+  { label: '♻️ Clear Photo Dedup Cache', desc: 'Reset local dedup cache to re-scan all photos', action: 'clearPhotoCache', path: 'photos', group:'safe', icon:'📸' },
+  { label: '🔄 Clear Voice Audio Budget', desc: 'Reset 30-day audio budget to allow new voice uploads', action: 'clearVoiceBudget', path: 'voice_notes', group:'safe', icon:'🎤' },
+  { label: '🧹 Clear Stale recordingStatus', desc: 'Delete leftover recordingStatus node', action: 'clearRecStatus', path: 'recordings', group:'safe', icon:'🎙️' },
+  { label: '🕒 Cleanup Recordings >7 days', desc: 'Delete mic recordings older than 7 days', action: 'cleanupRec7', path: 'recordings', group:'safe', icon:'🎙️' },
+  { label: '🗑 Delete All Photos', desc: 'Remove all uploaded photos', action: 'deleteAll', path: 'photos', group:'bycat', dangerous:true, icon:'📸' },
+  { label: '🗑 Delete Videos', desc: 'Remove all synced videos', action: 'deleteAll', path: 'videos', group:'bycat', dangerous:true, icon:'🎬' },
+  { label: '🗑 Delete Voice Notes', desc: 'Remove all voice recordings', action: 'deleteAll', path: 'voice_notes', group:'bycat', dangerous:true, icon:'🎤' },
+  { label: '🗑 Delete All Remote Recordings', desc: 'Remove all mic recordings', action: 'deleteAll', path: 'recordings', group:'bycat', dangerous:true, icon:'🎙️' },
+  { label: '🗑 Delete Timeline', desc: 'Remove call logs & timeline events', action: 'deleteAll', path: 'timeline', group:'bycat', dangerous:true, icon:'📞' },
+  { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', group:'bycat', dangerous:true, icon:'📊' },
+  { label: '🗑 Delete Location History', desc: 'Remove location history (keeps current)', action: 'deleteLocHistory', path: 'location', group:'bycat', dangerous:true, icon:'📍' },
+  { label: '🗑 Delete WiFi Scans', desc: 'Remove all WiFi scan data', action: 'deleteAll', path: 'wifi_scan', group:'bycat', dangerous:true, icon:'📡' },
+  { label: '🗑 Delete Nearby Scans', desc: 'Remove all nearby phone detection data', action: 'deleteAll', path: 'nearby_scan', group:'bycat', dangerous:true, icon:'📱' },
+  { label: '⚠️ DELETE EVERYTHING', desc: 'Wipe ALL data for this device from RTDB', action: 'deleteAllData', path: '', group:'danger', dangerous:true, icon:'☠️' }
+];
+
+function storageGroupLabel(g){
+  if(g==='quick') return '⚡ Quick Fixes — deduplicate';
+  if(g==='safe') return '🛟 Safe Cleanup — budgets & old files';
+  if(g==='bycat') return '📦 By Category — delete all in a type';
+  if(g==='danger') return '☠️ Danger Zone';
+  return g;
+}
+
 async function refreshStorage() {
   if (!selectedDevice) return;
-  const el = document.getElementById('storageOverview');
-  el.innerHTML = '<div class="label">Scanning storage...</div>';
+  const now=Date.now();
+  if(now - storageLastRefresh < 4000){ return; }
+  storageLastRefresh=now;
+  const hero=document.getElementById('storageHero'), grid=document.getElementById('storageGrid'), tableWrap=document.getElementById('storageTableWrap'), largestWrap=document.getElementById('storageLargestWrap'), cleanup=document.getElementById('storageCleanup'), pills=document.getElementById('storagePills'), controls=document.getElementById('storageControls');
+  if(hero) hero.style.display='grid';
+  if(controls) controls.style.display='flex';
+  if(pills) pills.style.display='flex';
+  if(grid) grid.style.display='grid';
+  if(cleanup) cleanup.style.display='block';
+  storageSetScanStatus('Scanning storage…');
+  showStorageBanner('Scanning storage…','warn');
+  const heroRow=document.getElementById('storageHeroRow');
+  if(heroRow) heroRow.innerHTML='<div class="storage-stat" style="opacity:.6"><b>…</b><span>Scanning</span></div>'.repeat(4);
   const devicePath = `devices/${selectedDevice}`;
   try {
     const [photos, voice, timeline, contacts, apps, location, wifi, nearby, videos, recordings] = await Promise.all([
@@ -7882,94 +8110,237 @@ async function refreshStorage() {
       estimateNodeSize(`${devicePath}/recordings`, 2)
     ]);
     const categories = [
-      { name: 'Photos', icon: '📸', path: 'photos', ...photos },
-      { name: 'Videos', icon: '🎬', path: 'videos', ...videos },
-      { name: 'Voice Notes', icon: '🎤', path: 'voice_notes', ...voice },
-      { name: 'Remote Recordings', icon: '🎙️', path: 'recordings', ...recordings },
-      { name: 'Timeline', icon: '📞', path: 'timeline', ...timeline },
-      { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts },
-      { name: 'App Usage', icon: '📊', path: 'apps', ...apps },
-      { name: 'Location', icon: '📍', path: 'location', ...location },
-      { name: 'WiFi Scans', icon: '📡', path: 'wifi_scan', ...wifi },
-      { name: 'Nearby Phones', icon: '📱', path: 'nearby_scan', ...nearby }
+      { name: 'Photos', icon: '📸', path: 'photos', ...photos, tag:'media' },
+      { name: 'Videos', icon: '🎬', path: 'videos', ...videos, tag:'media' },
+      { name: 'Voice Notes', icon: '🎤', path: 'voice_notes', ...voice, tag:'media' },
+      { name: 'Remote Recordings', icon: '🎙️', path: 'recordings', ...recordings, tag:'media' },
+      { name: 'Timeline', icon: '📞', path: 'timeline', ...timeline, tag:'chats' },
+      { name: 'Contacts', icon: '👥', path: 'contacts', ...contacts, tag:'system' },
+      { name: 'App Usage', icon: '📊', path: 'apps', ...apps, tag:'system' },
+      { name: 'Location', icon: '📍', path: 'location', ...location, tag:'system' },
+      { name: 'WiFi Scans', icon: '📡', path: 'wifi_scan', ...wifi, tag:'system' },
+      { name: 'Nearby Phones', icon: '📱', path: 'nearby_scan', ...nearby, tag:'system' }
     ];
-    let totalBytes = 0;
-    let html = '<div style="font-size:15px;font-weight:500;margin-bottom:6px">📊 Storage Overview</div>';
-    html += '<table style="font-size:14px"><thead><tr><th>Category</th><th>Entries</th><th>Est. Size</th><th></th></tr></thead><tbody>';
-    const maxBytes = Math.max(...categories.map(c => c.bytes), 1);
-    for (const cat of categories) {
-      totalBytes += cat.bytes;
-      const pct = maxBytes > 0 ? (cat.bytes / maxBytes) * 100 : 0;
-      html += `<tr><td>${cat.icon} ${cat.name}</td><td>${cat.count === 0 ? '—' : cat.count}</td><td>${cat.count === 0 ? '—' : formatBytes(cat.bytes)}</td><td>${cat.count > 0 ? `<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;min-width:60px"><div style="height:100%;width:${Math.max(1, pct)}%;background:var(--accent);border-radius:4px"></div></div>` : '—'}</td></tr>`;
-    }
-    html += `<tr style="border-top:2px solid var(--accent);font-weight:600"><td>Total</td><td>${categories.reduce((s, c) => s + c.count, 0)}</td><td>${formatBytes(totalBytes)}</td></tr>`;
-    html += '</tbody></table>';
-    html += '<div style="font-size:12px;color:var(--muted);margin-top:4px">* Sizes estimated from random samples. Refresh to update.</div>';
-    html += renderLargestItems();
-    el.innerHTML = html;
-    renderCleanupActions(categories);
-  } catch {
-    el.innerHTML = '<div class="label" style="color:var(--danger)">Failed to scan storage</div>';
+    storageCats=categories;
+    storageLastScan=Date.now();
+    const totalBytes=categories.reduce((s,c)=>s+c.bytes,0);
+    const totalEntries=categories.reduce((s,c)=>s+c.count,0);
+    document.getElementById('storageHeroMeta').textContent=`Last scan ${new Date(storageLastScan).toLocaleTimeString('en-PK',{timeZone:PKT, hour:'2-digit', minute:'2-digit'})} · * sizes estimated from samples`;
+    document.getElementById('storageCleanupMeta').textContent=`${totalEntries} entries · ${formatBytes(totalBytes)}`;
+    renderStorageHero(categories, totalBytes, totalEntries);
+    renderStoragePills();
+    renderStorageFiltered();
+    renderLargestItemsV2();
+    renderCleanupActionsV2(categories);
+    hideStorageBanner(); storageSetScanStatus('');
+    // keep legacy hidden divs in sync for any external refs
+    const legacy=document.getElementById('storageOverview'); if(legacy) legacy.innerHTML='';
+    const legacy2=document.getElementById('cleanupActions'); if(legacy2) legacy2.innerHTML='';
+  } catch(e){
+    showStorageBanner('Failed to scan storage: '+(e.message||e),'error');
+    storageSetScanStatus('Failed');
   }
 }
 
-function renderLargestItems() {
-  const rows = [];
-  const voices = [...voiceNotesCache].sort((a, b) => (b.sizeBytes || 0) - (a.sizeBytes || 0)).slice(0, 5);
-  const recs = [...recordingsCache].sort((a, b) => (b.meta.sizeBytes || 0) - (a.meta.sizeBytes || 0)).slice(0, 5);
-  if (voices.length || recs.length) rows.push('<div style="font-size:15px;font-weight:500;margin:12px 0 6px">\u{1F3AF} Largest Items</div>');
-  if (voices.length) {
-    rows.push('<div style="font-size:13px;color:var(--muted);margin-bottom:4px">\u{1F3A4} Voice Notes</div>');
-    for (const n of voices) {
-      rows.push(`<div style="font-size:12px;padding:2px 0;display:flex;justify-content:space-between;gap:10px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(n.fileName || 'note')}</span><span style="color:var(--accent);white-space:nowrap">${formatBytes(n.sizeBytes || 0)}</span></div>`);
-    }
-  }
-  if (recs.length) {
-    rows.push('<div style="font-size:13px;color:var(--muted);margin:8px 0 4px">\u{1F399}\uFE0F Remote Recordings</div>');
-    for (const r of recs) {
-      rows.push(`<div style="font-size:12px;padding:2px 0;display:flex;justify-content:space-between;gap:10px"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r._recId.substring(0, 8)}... \u2022 ${r.meta.recordedDurationSec || r.meta.durationSec || '?'}s</span><span style="color:var(--accent);white-space:nowrap">${formatBytes(r.meta.sizeBytes || 0)}</span></div>`);
-    }
-  }
-  return rows.join('');
-}
-
-function renderCleanupActions(categories) {
-  const el = document.getElementById('cleanupActions');
-  const actions = [
-    { label: '🧹 Dedup Photos', desc: 'Remove duplicate photos (keep highest quality)', action: 'dedupPhotos', path: 'photos', icon: '📸' },
-    { label: '🗑 Delete All Photos', desc: 'Remove all uploaded photos', action: 'deleteAll', path: 'photos', icon: '📸', dangerous: true },
-    { label: '♻️ Clear Photo Dedup Cache', desc: 'Reset local dedup cache to re-scan all photos', action: 'clearPhotoCache', path: 'photos', icon: '📸' },
-    { label: '🧹 Dedup Timeline', desc: 'Remove duplicate timeline entries', action: 'dedupTimeline', path: 'timeline', icon: '📞' },
-    { label: '🧹 Dedup Haidh', desc: 'Remove duplicate menstrual cycle entries', action: 'dedupHaidh', path: 'health', icon: '🩸' },
-    { label: '🧹 Dedup Exercise', desc: 'Remove duplicate exercise entries', action: 'dedupExercise', path: 'health', icon: '💪' },
-    { label: '👥 Dedup Contacts', desc: 'Merge duplicate contacts by phone number', action: 'dedupContacts', path: 'contacts', icon: '👥' },
-    { label: '🗑 Delete Videos', desc: 'Remove all synced videos', action: 'deleteAll', path: 'videos', icon: '🎬', dangerous: true },
-    { label: '🗑 Delete Voice Notes', desc: 'Remove all voice recordings', action: 'deleteAll', path: 'voice_notes', icon: '🎤', dangerous: true },
-    { label: '🔄 Clear Voice Audio Budget', desc: 'Reset 30-day audio budget to allow new voice uploads', action: 'clearVoiceBudget', path: 'voice_notes', icon: '🎤' },
-    { label: '🗑 Delete All Remote Recordings', desc: 'Remove all mic recordings from this device', action: 'deleteAll', path: 'recordings', icon: '🎙️', dangerous: true },
-    { label: '🧹 Clear Stale recordingStatus', desc: 'Delete leftover recordingStatus node if a recording ended', action: 'clearRecStatus', path: 'recordings', icon: '🎙️' },
-    { label: '🗑 Delete Timeline', desc: 'Remove call logs & timeline events', action: 'deleteAll', path: 'timeline', icon: '📞', dangerous: true },
-    { label: '🗑 Delete App Usage', desc: 'Remove app usage history', action: 'deleteAll', path: 'apps', icon: '📊', dangerous: true },
-    { label: '🧹 Dedup Locations', desc: 'Remove duplicate location entries', action: 'dedupLocations', path: 'location', icon: '📍' },
-    { label: '🗑 Delete Location History', desc: 'Remove location data (keeps current)', action: 'deleteLocHistory', path: 'location', icon: '📍', dangerous: true },
-    { label: '🗑 Delete WiFi Scans', desc: 'Remove all WiFi scan data', action: 'deleteAll', path: 'wifi_scan', icon: '📡', dangerous: true },
-    { label: '🗑 Delete Nearby Scans', desc: 'Remove all nearby phone detection data', action: 'deleteAll', path: 'nearby_scan', icon: '📱', dangerous: true },
-    { label: '⚠️ DELETE EVERYTHING', desc: 'Wipe ALL data for this device from RTDB', action: 'deleteAllData', path: '', icon: '☠️', dangerous: true }
+function renderStorageHero(categories, totalBytes, totalEntries){
+  const row=document.getElementById('storageHeroRow'); if(!row) return;
+  const maxCat=categories.slice().sort((a,b)=>b.bytes-a.bytes)[0];
+  const freeGbEl=document.getElementById('swStorage');
+  let freeTxt='—';
+  try{ const mTxt=freeGbEl?freeGbEl.textContent:''; const m=mTxt.match(/([0-9.]+)GB/); if(m) freeTxt=m[1]+' GB free'; else if(metrics && metrics.storageFreeGb!=null) freeTxt=metrics.storageFreeGb.toFixed(1)+' GB free'; }catch{}
+  const dangerCount=categories.filter(c=>c.count>500).length;
+  const largestLabel=maxCat && maxCat.count? `${maxCat.icon} ${maxCat.name}` : '—';
+  const stats=[
+    {n: totalEntries.toLocaleString(), l:'Total entries', c:'all'},
+    {n: formatBytes(totalBytes), l:'Est. total size', c:'all'},
+    {n: largestLabel, l:'Largest: '+ (maxCat? formatBytes(maxCat.bytes):'—'), c:maxCat?maxCat.path:'all'},
+    {n: freeTxt, l:'Free on device', c:'all'},
+    {n: String(dangerCount), l:'Heavy categories', c:'system'}
   ];
-  el.innerHTML = actions.map(a => {
-    const cat = categories.find(c => c.path === a.path);
-    const count = cat ? cat.count : 0;
-    return `<div class="card" style="border-left-color:${a.dangerous ? 'var(--danger)' : 'var(--accent)'};padding:10px 14px;margin-bottom:6px">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
-        <div>
-          <div style="font-size:15px;font-weight:500">${a.label}</div>
-          <div style="font-size:13px;color:var(--muted)">${a.desc}${count > 0 ? ` (${count} entries)` : ''}</div>
-        </div>
-        <button class="chip" style="background:${a.dangerous ? 'var(--danger)' : 'var(--accent)'};color:#000;border-color:transparent;font-size:13px" onclick="execCleanup('${a.action}','${a.path}')" ${count === 0 && a.action !== 'deleteAllData' ? 'disabled' : ''}>${a.dangerous ? '⚠ Delete' : 'Run'}</button>
-      </div>
+  row.innerHTML=stats.map(s=>`<div class="storage-stat${storageFilter===s.c?' active':''}" onclick="storageFilter='${s.c}';renderStoragePills();renderStorageFiltered()"><b>${escHtml(s.n)}</b><span>${escHtml(s.l)}</span></div>`).join('');
+  // sync view select
+  const vs=document.getElementById('storageView'); if(vs) vs.value=storageView;
+}
+function renderStoragePills(){
+  const el=document.getElementById('storagePills'); if(!el) return;
+  const counts={all:storageCats.length, media:storageCats.filter(c=>c.tag==='media').length, chats:storageCats.filter(c=>c.tag==='chats').length, system:storageCats.filter(c=>c.tag==='system').length, heavy:storageCats.filter(c=>c.count>200).length, empty:storageCats.filter(c=>c.count===0).length};
+  const pills=[
+    {k:'all', label:'All', cnt:counts.all},
+    {k:'media', label:'📸 Media', cnt:counts.media},
+    {k:'chats', label:'📞 Chats', cnt:counts.chats},
+    {k:'system', label:'⚙ System', cnt:counts.system},
+    {k:'heavy', label:'🔥 Heavy', cnt:counts.heavy},
+    {k:'empty', label:'Empty', cnt:counts.empty}
+  ];
+  el.innerHTML=pills.map(p=>`<span class="storage-pill${storageFilter===p.k?' on':''}" onclick="storageFilter='${p.k}';renderStoragePills();renderStorageFiltered()">${p.label} <span class="cnt">${p.cnt}</span></span>`).join('');
+}
+function getFilteredCats(){
+  let cats=[...storageCats];
+  // pill filter
+  if(storageFilter==='media') cats=cats.filter(c=>c.tag==='media');
+  else if(storageFilter==='chats') cats=cats.filter(c=>c.tag==='chats');
+  else if(storageFilter==='system') cats=cats.filter(c=>c.tag==='system');
+  else if(storageFilter==='heavy') cats=cats.filter(c=>c.count>200);
+  else if(storageFilter==='empty') cats=cats.filter(c=>c.count===0);
+  else if(storageFilter!=='all' && storageFilter!==''){ cats=cats.filter(c=>c.path===storageFilter); }
+  // search
+  const q=(document.getElementById('storageSearch')?.value||'').toLowerCase().trim();
+  if(q) cats=cats.filter(c=> (c.name.toLowerCase().includes(q) || c.path.toLowerCase().includes(q)) );
+  // sort
+  if(storageSort==='bytes') cats.sort((a,b)=>b.bytes-a.bytes);
+  else if(storageSort==='count') cats.sort((a,b)=>b.count-a.count);
+  else if(storageSort==='name') cats.sort((a,b)=>a.name.localeCompare(b.name));
+  return cats;
+}
+function renderStorageFiltered(){
+  const selSearch=document.getElementById('storageSearch');
+  if(selSearch) storageSearch=selSearch.value;
+  const selSort=document.getElementById('storageSort');
+  if(selSort) storageSort=selSort.value;
+  renderStorageGrid();
+  renderStorageTable();
+}
+function renderStorageGrid(){
+  const grid=document.getElementById('storageGrid'); if(!grid) return;
+  const cats=getFilteredCats();
+  const maxBytes=Math.max(...storageCats.map(c=>c.bytes),1);
+  const totalBytes=storageCats.reduce((s,c)=>s+c.bytes,0);
+  if(!cats.length){ grid.innerHTML='<div class="label" style="grid-column:1/-1">No categories match filter</div>'; return; }
+  grid.style.display=storageView==='grid'?'grid':'none';
+  grid.innerHTML=cats.map(cat=>{
+    const pctTotal= totalBytes? (cat.bytes/totalBytes*100):0;
+    const pctMax= maxBytes? (cat.bytes/maxBytes*100):0;
+    const barColor= cat.count===0? 'var(--border)' : cat.bytes===maxBytes? 'var(--accent)' : 'var(--accent)';
+    return `<div class="storage-card${cat.bytes===maxBytes && cat.count>0?' sel':''}${cat.count>500?' danger':''}" onclick="storageFilter='${cat.path}';renderStoragePills();renderStorageFiltered();document.getElementById('storageSectionByCat')?.scrollIntoView({behavior:'smooth',block:'start'})">
+      <div class="storage-card-head"><div class="storage-card-icon">${cat.icon}</div><div style="min-width:0;flex:1"><div class="storage-card-name">${escHtml(cat.name)}</div><div class="storage-card-sub">${cat.path} · ${cat.count? pctTotal.toFixed(1)+'% of total': 'empty'}</div></div></div>
+      <div class="storage-bar"><div style="width:${Math.max(2,pctMax)}%;background:${barColor}"></div></div>
+      <div class="storage-card-meta"><span><b>${cat.count===0?'—':cat.count.toLocaleString()}</b> entries</span><span><b>${cat.count===0?'—':formatBytes(cat.bytes)}</b></span></div>
     </div>`;
   }).join('');
+  // table visibility handled in renderStorageTable
 }
+function renderStorageTable(){
+  const wrap=document.getElementById('storageTableWrap'); if(!wrap) return;
+  if(storageView!=='table'){ wrap.style.display='none'; return; }
+  const cats=getFilteredCats();
+  const maxBytes=Math.max(...storageCats.map(c=>c.bytes),1);
+  const totalBytes=storageCats.reduce((s,c)=>s+c.bytes,0);
+  const totalEntries=storageCats.reduce((s,c)=>s+c.count,0);
+  if(!cats.length){ wrap.innerHTML='<div class="label">No categories match</div>'; wrap.style.display='block'; return; }
+  let html='<table style="font-size:13px"><thead><tr><th>Category</th><th>Entries</th><th>Est. Size</th><th style="min-width:90px">Usage</th></tr></thead><tbody>';
+  for(const cat of cats){
+    const pct=maxBytes? (cat.bytes/maxBytes*100):0;
+    html+=`<tr style="cursor:pointer" onclick="storageFilter='${cat.path}';renderStoragePills();renderStorageFiltered()"><td>${cat.icon} ${escHtml(cat.name)}<div style="font-size:10px;color:var(--muted)">${escHtml(cat.path)}</div></td><td>${cat.count===0?'—':cat.count.toLocaleString()}</td><td>${cat.count===0?'—':formatBytes(cat.bytes)}</td><td>${cat.count>0?`<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.max(1,pct)}%;background:var(--accent);border-radius:4px"></div></div><div style="font-size:10px;color:var(--muted)">${(cat.bytes/totalBytes*100).toFixed(1)}%</div>`:'—'}</td></tr>`;
+  }
+  html+=`<tr style="border-top:2px solid var(--accent);font-weight:700"><td>Total</td><td>${totalEntries.toLocaleString()}</td><td>${formatBytes(totalBytes)}</td><td>${cats.length}/${storageCats.length} shown</td></tr>`;
+  html+='</tbody></table><div style="font-size:11px;color:var(--muted);margin-top:4px">* Sizes estimated from random samples. Tap Refresh to resample.</div>';
+  wrap.innerHTML=html;
+  wrap.style.display='block';
+  const grid=document.getElementById('storageGrid'); if(grid) grid.style.display='none';
+}
+
+function renderLargestItemsV2(){
+  const wrap=document.getElementById('storageLargestWrap'); if(!wrap) return;
+  const voices=[...voiceNotesCache].sort((a,b)=>(b.sizeBytes||0)-(a.sizeBytes||0)).slice(0,5);
+  const recs=[...recordingsCache].sort((a,b)=>(b.meta.sizeBytes||0)-(a.meta.sizeBytes||0)).slice(0,5);
+  // try photos largest from photo cache if available (renderPhotosFromCache stores photoAll)
+  let photosLargest=[];
+  try{ if(typeof photoAllPaths!=='undefined' && Array.isArray(photoAllPaths) && photoAllPaths.length && typeof photoCache!=='undefined'){ /* fallback not avail */ } }catch{}
+  if(!voices.length && !recs.length){ wrap.style.display='none'; wrap.innerHTML=''; return; }
+  wrap.style.display='block';
+  let html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:13px;font-weight:600">🎯 Largest Items</span><span style="font-size:11px;color:var(--muted)">top 5 by size</span></div>';
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+  if(voices.length){
+    html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:12px;color:var(--muted);margin-bottom:6px">🎤 Voice Notes</div>';
+    for(const n of voices) html+=`<div style="font-size:11px;padding:4px 0;display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border)"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escHtml((n.fileName||'note').slice(0,28))}</span><span style="color:var(--accent);white-space:nowrap">${formatBytes(n.sizeBytes||0)}</span></div>`;
+    html+='</div>';
+  } else html+='<div></div>';
+  if(recs.length){
+    html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px"><div style="font-size:12px;color:var(--muted);margin-bottom:6px">🎙 Remote Recordings</div>';
+    for(const r of recs) html+=`<div style="font-size:11px;padding:4px 0;display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--border)"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${escHtml(r._recId.substring(0,8))}… · ${r.meta.recordedDurationSec||r.meta.durationSec||'?'}s</span><span style="color:var(--accent);white-space:nowrap">${formatBytes(r.meta.sizeBytes||0)}</span></div>`;
+    html+='</div>';
+  }
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+
+function renderCleanupActionsV2(categories){
+  const groups=['quick','safe','bycat','danger'];
+  const bulkOn=document.getElementById('storageBulkToggle')?.checked;
+  for(const g of groups){
+    const sec=document.getElementById('storageSection'+g.charAt(0).toUpperCase()+g.slice(1)); // quick->Quick but ids are Quick/Safe/ByCat/Danger
+  }
+  // map ids
+  const idMap={quick:'storageSectionQuick', safe:'storageSectionSafe', bycat:'storageSectionByCat', danger:'storageSectionDanger'};
+  for(const g of groups){
+    const el=document.getElementById(idMap[g]);
+    if(!el) continue;
+    const acts=storageActionsDef.filter(a=>a.group===g);
+    const isDanger=g==='danger';
+    const collapsed=isDanger? localStorage.getItem('storageDangerCollapsed')!=='0' : false;
+    let html=`<div class="storage-section-title" onclick="toggleStorageSection('${g}')">${storageGroupLabel(g)} <span class="tog">${collapsed?'Expand':'Collapse'}</span></div>`;
+    if(collapsed){ el.innerHTML=html; continue; }
+    if(isDanger) html+=`<div class="storage-danger-box" style="margin-bottom:8px;font-size:11px;color:var(--muted)">Danger deletes remove data from the cloud immediately and cannot be undone. Use Bulk select to review before deleting.</div>`;
+    html+=`<div class="storage-actions-grid">`;
+    for(const a of acts){
+      const cat=categories.find(c=>c.path===a.path);
+      const count=cat?cat.count: (a.path===''? 0 : 0);
+      const hasData=count>0 || a.action==='deleteAllData' || a.action==='clearPhotoCache' || a.action==='clearRecStatus' || a.action==='cleanupRec7';
+      const key=storageActionKey(a);
+      const checked=storageBulk.has(key);
+      const disabled=!hasData && a.action!=='deleteAllData' && a.action!=='cleanupRec7';
+      const btnLabel=a.dangerous? 'Delete' : 'Run';
+      const btnClass=a.dangerous? 'del':'run';
+      const countBadge=cat? `<span class="storage-action-count">${count.toLocaleString()} entries · ${formatBytes(cat.bytes)}</span>` : (a.path===''? `<span class="storage-action-count">all device data</span>` : '');
+      html+=`<div class="storage-action-card${a.dangerous?' danger':''}${checked?' selected':''}">
+        <label style="display:${bulkOn?'inline-flex':'none'};align-items:center;cursor:pointer" class="storage-chk-wrap"><input type="checkbox" class="storage-chk" data-key="${escHtml(key)}" ${checked?'checked':''} onchange="onStorageChk(this)" style="width:16px;height:16px;accent-color:var(--accent)"></label>
+        <div class="storage-action-main"><div class="storage-action-title">${a.label} ${countBadge}</div><div class="storage-action-desc">${escHtml(a.desc)}</div></div>
+        <button class="storage-action-btn ${btnClass}" onclick="handleStorageAction('${a.action}','${a.path}')" ${disabled?'disabled':''}>${btnLabel}</button>
+      </div>`;
+    }
+    html+=`</div>`;
+    // for safe group add age helper row
+    if(g==='safe'){
+      html+=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><span style="font-size:11px;color:var(--muted);align-self:center">Quick age cleanup:</span><button class="chip" style="background:var(--card);font-size:11px" onclick="cleanupOldRecordings(7)">🎙 >7 days</button><button class="chip" style="background:var(--card);font-size:11px" onclick="cleanupOldRecordings(30)">🎙 >30 days</button><button class="chip" style="background:var(--card);font-size:11px" onclick="cleanupOldRecordings(1)">🎙 >1 day</button></div>`;
+    }
+    el.innerHTML=html;
+  }
+  // ensure bulk bar visibility
+  const bar=document.getElementById('storageBulkBar');
+  if(bar) bar.style.display= bulkOn && storageBulk.size>0? 'flex' : (bulkOn? 'flex':'none');
+  if(bulkOn && bar) bar.style.display='flex';
+  updateStorageBulkBar();
+}
+function toggleStorageSection(g){
+  if(g!=='danger') return;
+  const cur=localStorage.getItem('storageDangerCollapsed');
+  localStorage.setItem('storageDangerCollapsed', cur==='0'?'1':'0');
+  renderCleanupActionsV2(storageCats);
+}
+async function handleStorageAction(action, path){
+  if(action==='cleanupRec7'){ return cleanupOldRecordings(7); }
+  // For deleteAll show dry-run for heavy cats
+  const cat=storageCats.find(c=>c.path===path);
+  if(action==='deleteAll' && cat && cat.count>20){
+    openStorageDryRun(`Delete all ${cat.name}?`, `Will permanently delete ${cat.count.toLocaleString()} entries (${formatBytes(cat.bytes)} estimated) in ${cat.name}. This cannot be undone.`, [{label: cat.icon+' '+cat.name, meta: `${cat.count} entries · ${formatBytes(cat.bytes)}`} ], async()=>{ await execCleanup(action, path); });
+    return;
+  }
+  if(action==='deleteAllData'){
+    // keep native prompt inside execCleanup
+    await execCleanup(action, path); return;
+  }
+  await execCleanup(action, path);
+}
+
+function renderLargestItems(){
+  // compat shim — now rendered via renderLargestItemsV2
+  return '';
+}
+function renderCleanupActions(categories){
+  // compat shim — delegate
+  renderCleanupActionsV2(categories);
+}
+
 
 async function execCleanup(action, path) {
   if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
@@ -7996,7 +8367,7 @@ async function execCleanup(action, path) {
         groups[gk].push({ path, size: (doc.data || '').length });
       }
       scanned++;
-      if (scanned % 10 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning photo ${scanned}/${allPaths.length}...</div>`;
+      if (scanned % 10 === 0) storageSetScanStatus(`Scanning photo ${scanned}/${allPaths.length}…`); showStorageBanner(`Scanning photo ${scanned}/${allPaths.length}…`,'warn');
     }
     let deleted = 0, freed = 0;
     for (const [gk, entries] of Object.entries(groups)) {
@@ -8124,7 +8495,7 @@ async function execCleanup(action, path) {
     }
     await scanHistory('');
     if (!allPoints.length) { showAlert('No location entries found', 'error'); return; }
-    document.getElementById('storageOverview').innerHTML = `<div class="label">Scanning ${allPoints.length} entries...</div>`;
+    storageSetScanStatus(`Scanning ${allPoints.length} entries…`); showStorageBanner(`Scanning ${allPoints.length} entries…`,'warn');
     const groups = {};
     let scanned = 0;
     for (const pt of allPoints) {
@@ -8137,7 +8508,7 @@ async function execCleanup(action, path) {
         groups[gk].push({ path: pt.path, key: pt.key });
       }
       scanned++;
-      if (scanned % 30 === 0) document.getElementById('storageOverview').innerHTML = `<div class="label">Scanned ${scanned}/${allPoints.length}...</div>`;
+      if (scanned % 30 === 0){ storageSetScanStatus(`Scanned ${scanned}/${allPoints.length}…`); showStorageBanner(`Scanned ${scanned}/${allPoints.length}…`,'warn'); }
     }
     let deleted = 0;
     for (const [gk, entries] of Object.entries(groups)) {
@@ -8196,8 +8567,8 @@ async function execCleanup(action, path) {
       showAlert('All device data deleted from RTDB', 'warn');
       clearPhotoCache(); clearVoiceCache(); clearRecordingsCache(); clearVideoCache();
       renderPhotosFromCache(); renderVoiceNotes(); renderRemoteRecordings(); renderVideosFromCache();
-      document.getElementById('storageOverview').innerHTML = '<div class="label">All data deleted</div>';
-      document.getElementById('cleanupActions').innerHTML = '<div class="label">No data to clean</div>';
+      showStorageBanner('All data deleted','warn'); storageSetScanStatus('All data deleted'); storageCats=[]; renderStorageHero([],0,0); renderStoragePills(); renderStorageFiltered();
+      /* cleanupActions hidden — handled by renderCleanupActionsV2 */
     } else {
       showAlert('Failed to delete data', 'error');
     }
@@ -9228,13 +9599,27 @@ async function fileCleanupSend(payload){
 }
 function pollFileCleanupLoop(sentAt){
   let polls=0;
+  const statusEl=document.getElementById('fileDeleteStatus');
   const iv=setInterval(async()=>{
     polls++;
     await pollFileCleanupStatus();
     const r=window._lastFileCleanup||null;
-    if(r && r.ts_ms && r.ts_ms>=sentAt){ clearInterval(iv); await pollFileInventory(); setTimeout(pollFileInventory,8000); }
-    if(polls>=10){ clearInterval(iv); await pollFileInventory(); }
+    if(r && r.ts_ms && r.ts_ms>=sentAt){
+      clearInterval(iv);
+      // force refresh with cache bust then again after 8s for MediaStore sync
+      await pollFileInventory();
+      setTimeout(pollFileInventory,8000);
+      return;
+    }
+    if(statusEl && polls<15) statusEl.textContent = 'Waiting for phone… '+polls+'/15 (~'+(polls*4)+'s)';
+    if(polls>=15){
+      clearInterval(iv);
+      if(statusEl) statusEl.textContent = 'Phone hasn\'t replied yet — it may be offline or in battery saver. Delete is queued and will run when online. Tap Refresh to check again.';
+      await pollFileInventory();
+    }
   },4000);
+  // immediate first tick already done via setTimeout 3s, but update status now
+  if(statusEl) statusEl.textContent = 'Sent — waiting for phone… 0/15';
 }
 async function triggerClearAllDuasDebug() {
   if (!selectedDevice) return;
@@ -9272,14 +9657,41 @@ async function pollFileCleanupStatus() {
     const r = await fetchRTDB(`devices/${selectedDevice}/responses/file_cleanup`);
     const el = document.getElementById('fileDeleteStatus');
     if (!el || !r || typeof r !== 'object') return;
-    window._lastFileCleanup = r;
-    const del = r.deleted ?? r.deletedCount ?? '--';
-    const pat = r.pattern || r.pat || '';
-    const sc = r.scope || '';
-    const err = r.error ? ' \u26A0 '+String(r.error).replace(/</g,'&lt;') : '';
-    const ts = r.ts_ms ? pkt(parseInt(r.ts_ms)) : '';
-    if(r.error==='no_all_files_access') el.textContent = `Need permission: All Files Access not granted for *${pat}* \u00B7 ${ts}${err}`;
-    else el.textContent = `Done: ${del} deleted for *${pat}* in ${sc} ${ts?'· '+ts:''}${err}`;
+    // if map of pushId->result (queue mode) pick latest
+    let rr=r;
+    if(!rr.pattern && !rr.deleted && typeof rr==='object'){
+      const vals=Object.values(rr).filter(v=>v&&typeof v==='object' && ('deleted' in v || 'pattern' in v));
+      if(vals.length){ vals.sort((a,b)=>(b.ts_ms||0)-(a.ts_ms||0)); rr=vals[0]; }
+    }
+    window._lastFileCleanup = rr;
+    const del = rr.deleted ?? rr.deletedCount ?? 0;
+    const pat = rr.pattern || rr.pat || '';
+    const sc = rr.scope || '';
+    const err = rr.error || '';
+    const ts = rr.ts_ms ? pkt(parseInt(rr.ts_ms)) : '';
+    const safePat = String(pat).replace(/</g,'&lt;');
+    const safeSc = String(sc).replace(/</g,'&lt;');
+    const safeErr = err ? String(err).replace(/</g,'&lt;') : '';
+    if(err==='no_all_files_access'){
+      el.innerHTML = `Need permission: All Files Access not granted for <b>*${safePat}*</b> &middot; Open phone: Settings &gt; Apps &gt; Islamic Duas &gt; Allow all files &middot; ${ts} <span style="color:var(--danger)">\u26A0 ${safeErr}</span>`;
+      el.style.color='var(--danger)';
+    } else if(err==='permission_denied'){
+      el.innerHTML = `Permission denied for <b>*${safePat}*</b> in ${safeSc} &middot; File may be protected or in use &middot; ${ts} <span style="color:var(--danger)">\u26A0 ${safeErr}</span>`;
+      el.style.color='var(--danger)';
+    } else if(err==='file_not_found'){
+      el.innerHTML = `Not found: "<b>${safePat}</b>" not in ${safeSc} &middot; Already deleted or moved &middot; ${ts}`;
+      el.style.color='var(--muted)';
+    } else if(err==='path_traversal'){
+      el.innerHTML = `Blocked: folder path looks unsafe for <b>*${safePat}*</b> &middot; ${ts} <span style="color:var(--danger)">\u26A0 ${safeErr}</span>`;
+      el.style.color='var(--danger)';
+    } else if((del===0||del==='0') && !err){
+      // distinguish empty vs not found via pattern scope
+      el.textContent = `No files matched *${pat}* in ${sc} \u00B7 Already empty \u00B7 ${ts}`;
+      el.style.color='var(--muted)';
+    } else {
+      el.textContent = `Done: ${del} deleted for *${pat}* in ${sc} ${ts?'· '+ts:''}${err?' \u26A0 '+err:''}`;
+      el.style.color = del>0 ? 'var(--success)' : 'var(--muted)';
+    }
   } catch{}
 }
 
@@ -9289,18 +9701,22 @@ async function deleteSingleFile(encName, encFolder){
   try{ name = decodeURIComponent(encName); }catch{ name = encName; }
   try{ folder = decodeURIComponent(encFolder); }catch{ folder = encFolder; }
   if(!name || name==='--'){ showAlert('Invalid file name','error'); return; }
-  if(!confirm('Delete "'+name+'" in '+folder+'? This cannot be undone.')) return;
+  // sanitize like device does: normalize slashes, trim, reject ..
+  const normFolder = String(folder||'').replace(/\\/g,'/').trim();
+  if(normFolder.includes('..')){ showAlert('Folder path looks unsafe — blocked','error'); return; }
+  const displayFolder = normFolder || '(root)';
+  if(!confirm('Delete "'+name+'" in '+displayFolder+'?\nThis will delete the file from the phone (any folder, hidden or deep). This cannot be undone.')) return;
   const statusEl = document.getElementById('fileDeleteStatus');
-  if(statusEl) statusEl.textContent = 'Deleting '+name+' in '+folder+'…';
+  if(statusEl){ statusEl.textContent = 'Deleting "'+name+'" in '+displayFolder+'…'; statusEl.style.color='var(--accent)'; }
   try{
     const sentAt = await fileCleanupSend({pattern:name, folder:folder, exact:true});
     if(sentAt){
-      showAlert('Delete sent — '+name+' in '+folder+' — ~30s, list will refresh instantly','warn');
-      if(statusEl) statusEl.textContent = 'Sent — deleting '+name+' in '+folder+' in ~30s…';
+      showAlert('Delete sent — "'+name+'" in '+displayFolder+' — working quietly (~30s)','warn');
+      if(statusEl) statusEl.textContent = 'Sent — deleting "'+name+'" in '+displayFolder+' — waiting for phone…';
       setTimeout(pollFileCleanupStatus,3000);
       pollFileCleanupLoop(sentAt);
-    } else { showAlert('Failed to send delete','error'); if(statusEl) statusEl.textContent='Send failed'; }
-  }catch(e){ showAlert('Delete failed: '+e.message,'error'); if(statusEl) statusEl.textContent='Error'; }
+    } else { showAlert('Failed to send delete','error'); if(statusEl){ statusEl.textContent='Send failed'; statusEl.style.color='var(--danger)'; } }
+  }catch(e){ showAlert('Delete failed: '+e.message,'error'); if(statusEl){ statusEl.textContent='Error: '+e.message; statusEl.style.color='var(--danger)'; } }
 }
 
 
