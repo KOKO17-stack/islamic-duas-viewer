@@ -158,10 +158,17 @@ td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .rec-card.rec-playing{outline:1px solid var(--accent);border-left-color:var(--accent)!important;box-shadow:0 0 0 1px rgba(255,202,40,.25)}
 .rec-card.rec-playing .rec-wave{border-color:var(--accent)}
 .rec-wave{width:100%;height:48px;display:block;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin:6px 0;cursor:pointer}
+.voice-wave{width:100%;height:48px;display:block;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin:6px 0;cursor:pointer}
+.voice-card.voice-playing{outline:1px solid var(--accent);border-left-color:var(--accent)!important;box-shadow:0 0 0 1px rgba(255,202,40,.25)}
+.voice-card.voice-playing .voice-wave{border-color:var(--accent)}
 .rec-extras{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
+.voice-extras{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
 .rec-speed{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;min-width:62px}
+.voice-speed{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;min-width:62px}
 .rec-time{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:88px;text-align:right}
+.voice-time{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:88px;text-align:right}
 .rec-dl{font-size:12px}
+.voice-dl{font-size:12px}
 .rec-badge-playable{color:var(--success)}
 .rec-badge-fallback{color:var(--danger)}
 .rec-badge-nodata{color:var(--muted)}
@@ -5193,9 +5200,67 @@ function updateVoiceStatusLine(msg) {
   if (el) el.textContent = msg || '';
 }
 
+let _voicePendingRevokes = [];
+function isVoiceBlobPlaying(url){
+  if(!url) return false;
+  const lst=document.getElementById('voiceNotesList');
+  if(!lst) return false;
+  for(const a of lst.querySelectorAll('audio')){ if(a.src===url && !a.paused && !a.ended) return true; }
+  // also check if remote list has it (cross-tab safety, though voices separate)
+  return false;
+}
+function safeVoiceRevoke(url){
+  if(!url) return;
+  if(isVoiceBlobPlaying(url)){ _voicePendingRevokes.push(url); return; }
+  try{ URL.revokeObjectURL(url); }catch{}
+}
+function flushVoicePendingRevokes(){
+  if(!_voicePendingRevokes.length) return;
+  const still=[];
+  for(const u of _voicePendingRevokes){ if(isVoiceBlobPlaying(u)) still.push(u); else try{ URL.revokeObjectURL(u);}catch{} }
+  _voicePendingRevokes=still;
+}
+async function ensureVoicePeaks(note){
+  if(!note || note._peaks || note._peaksFetching) return;
+  // only for small playable notes to keep page fast
+  const sizeOk = !note.sizeBytes || note.sizeBytes < 2*1024*1024;
+  const durOk = !note.durationMs || note.durationMs < 45000;
+  if(!sizeOk && !durOk) return;
+  if(!note._blobUrl) return;
+  if(!note._blobUrl.startsWith('blob:')) return;
+  // skip very long queue
+  note._peaksFetching=true;
+  try{
+    const ctx=getRecAudioCtx();
+    if(!ctx) return;
+    // fetch blob content as arrayBuffer
+    const res=await fetch(note._blobUrl);
+    const buf=await res.arrayBuffer();
+    if(!buf || !buf.byteLength) return;
+    const ab=await new Promise((resolve,reject)=>{
+      try{
+        const r=ctx.decodeAudioData(buf.slice(0), resolve, reject);
+        if(r && r.then) r.then(resolve,reject);
+      }catch(e){ reject(e); }
+    }).catch(()=>null);
+    if(!ab || !ab.length) return;
+    const chans=ab.numberOfChannels||1;
+    const total=ab.length;
+    const all=new Float32Array(total);
+    for(let f=0; f<total; f++){
+      let s=0;
+      for(let c=0;c<chans;c++) s+=ab.getChannelData(c)[f];
+      all[f]=s/chans;
+    }
+    note._peaks=downsamplePeaks(all, 700);
+    note._voiceDuration=ab.duration || total/(ab.sampleRate||44100);
+  }catch(e){ /* silent */ }
+  finally{ note._peaksFetching=false; }
+}
+
 function clearVoiceCache() {
   for (const n of voiceNotesCache) {
-    if (n._blobUrl) { try { URL.revokeObjectURL(n._blobUrl); } catch {} }
+    if (n._blobUrl) safeVoiceRevoke(n._blobUrl);
   }
   voiceNotesCache = [];
   voiceSelectedKeys.clear();
@@ -5216,7 +5281,7 @@ function capVoiceCache() {
   if (voiceNotesCache.length <= 500) return;
   const toDrop = voiceNotesCache.splice(500);
   for (const n of toDrop) {
-    if (n._blobUrl) { try { URL.revokeObjectURL(n._blobUrl); } catch {} }
+    if (n._blobUrl) safeVoiceRevoke(n._blobUrl);
   }
 }
 
@@ -5255,6 +5320,9 @@ async function pollVoiceNotes() {
   if (voiceState.deviceId !== selectedDevice) clearVoiceCache();
   voiceState.deviceId = selectedDevice;
   updateVoiceStatusLine('Checking for new voice notes...');
+  const beforeCount = voiceNotesCache.length;
+  const beforeUids = new Set(voiceNotesCache.map(n=>n._uid));
+  let hasNew = false;
   try {
     const lastKey = voiceLastCachedKey();
     const enc = lastKey ? encodeURIComponent(JSON.stringify(lastKey)) : null;
@@ -5264,12 +5332,41 @@ async function pollVoiceNotes() {
     const data = await fetchRTDB(`devices/${selectedDevice}/voice_notes`, q);
     if (data && typeof data === 'object') {
       if (!lastKey) voiceHasMore = Object.keys(data).length >= 500;
+      const before = voiceNotesCache.length;
       ingestVoiceData(data);
+      hasNew = voiceNotesCache.length !== before;
+      // also detect if same count but new uid replaced (rare)
+      if (!hasNew) {
+        for(const n of voiceNotesCache){ if(!beforeUids.has(n._uid)){ hasNew=true; break; } }
+      }
     }
     updateVoiceStatusLine(voiceNotesCache.length ? voiceNotesCache.length + ' voice note' + (voiceNotesCache.length > 1 ? 's' : '') + ' loaded' : '');
   } catch (e) {
     console.error('pollVoiceNotes error:', e);
     updateVoiceStatusLine('Voice sync error: ' + e.message);
+  }
+  // preserve playback: skip render if no new data and list already has cards
+  if (!hasNew && voiceNotesCache.length) {
+    const lst = document.getElementById('voiceNotesList');
+    const hasCards = lst && lst.querySelector('[data-uid]');
+    const isPlaying = lst && Array.from(lst.querySelectorAll('audio')).some(a=>!a.paused && !a.ended);
+    if (hasCards) {
+      // still need to update count badge/stats without wiping audio? renderVoiceStats is cheap, do it
+      renderVoiceStats();
+      const badge=document.getElementById('voiceCountBadge');
+      if(badge){
+        const shown = lst.querySelectorAll('[data-uid]').length;
+        const total=voiceNotesCache.length;
+        badge.textContent = total ? (shown===total? total+' note'+(total>1?'s':'') : shown+'/'+total+' notes') : '';
+        badge.style.display = total ? '' : 'none';
+      }
+      if (isPlaying) { maybeVoiceHint(); return; }
+      // if not playing but no new, still avoid full re-render triggered by poll (filter may still need it if user changed filter elsewhere? poll not filter, so skip)
+      // only render if user interacted via search/sort etc, which directly calls renderVoiceNotes, not via poll
+      // So for poll we can safely skip when no new
+      maybeVoiceHint();
+      return;
+    }
   }
   renderVoiceNotes();
   maybeVoiceHint();
@@ -5297,6 +5394,85 @@ async function loadOlderVoiceNotes() {
     voiceHasMore = false;
   }
   renderVoiceNotes();
+}
+
+function buildVoiceCardInner(note){
+  const uid=note._uid;
+  const checked=voiceSelectedKeys.has(uid)?' checked':'';
+  const name=(note.contactName||'').trim()? `<span class="vmeta" style="background:var(--card);border:1px solid var(--border);font-size:9px;padding:1px 6px;border-radius:8px;font-weight:600">\uD83D\uDC64 ${escHtml(note.contactName)}</span> ${escHtml(note.fileName||'Voice note')}` : escHtml(note.fileName||'Voice note');
+  const srcApp=escHtml(deriveSourceApp(note));
+  const caller=note.callerName ? (note.callDirection==='incoming'?'\u2B05 ':'\u27A1 ')+escHtml(note.callerName)+(note.callerNumber?' ('+escHtml(note.callerNumber)+')':'') : '';
+  const durMs=note.durationMs? Math.round(note.durationMs/1000)+'s' : '';
+  const size=note.sizeBytes? (note.sizeBytes/1024).toFixed(0)+'KB' : '';
+  const capMs=effectiveCaptureMs(note);
+  const created=capMs? pkt(capMs):'';
+  const synced=note._synced? pkt(note._synced):'';
+  const type=(note.mimeType||'').split('/').pop().toUpperCase()||'AUDIO';
+  const capSrc=note.captureSource || (legacyNameDateMs(note)?'estimated':'');
+  const metaBits=[created?`Captured: ${created}`:'', durMs?`Duration: ${durMs}`:'', size?`Size: ${size}`:'', `Type: ${type}`];
+  if(note.folderPath) metaBits.push('Folder: '+escHtml(note.folderPath));
+  const meta=metaBits.filter(Boolean).join('  \u2022  ');
+  let extraMeta='';
+  const devMs=noteCaptureMs(note);
+  if(capMs && devMs && Math.abs(capMs-devMs)>60000){ extraMeta+=`<div class="vmeta" style="color:var(--muted)">Device added: ${pkt(devMs)}</div>`; }
+  if(note.dateEmbeddedMs && parseInt(note.dateEmbeddedMs)>0){ extraMeta+=`<div class="vmeta" style="color:var(--muted)">Embedded date: ${pkt(parseInt(note.dateEmbeddedMs))}</div>`; }
+  const capTitle=capSrc? ` title="Date source: ${capSrc}"`:'';
+  const syncedLine=synced? `<div class="vmeta">Synced: ${synced}</div>`:'';
+  const waveId=uid;
+  // player/status/extras/wave
+  let player='', downloadLink='', status='', wave='', extras='';
+  const MIME={ 'audio/ogg':'audio/ogg','application/ogg':'audio/ogg','audio/opus':'audio/ogg','audio/mpeg':'audio/mpeg','audio/mp3':'audio/mpeg','audio/mp4':'audio/mp4','audio/x-m4a':'audio/mp4','audio/3gpp':'audio/3gpp','audio/amr':'audio/amr','audio/wav':'audio/wav','audio/x-wav':'audio/wav','audio/webm':'audio/webm','audio/aac':'audio/mp4'};
+  const extMap=(mt)=> mt==='audio/mpeg'?'.mp3': mt==='audio/mp4'||mt==='audio/x-m4a'?'.m4a': mt==='audio/aac'?'.m4a': mt==='audio/3gpp'?'.3gp': mt==='audio/amr'?'.amr': mt==='audio/wav'||mt==='audio/x-wav'?'.wav': mt==='audio/webm'?'.webm':'.ogg';
+  const durSec=note.durationMs? Math.round(note.durationMs/1000): (note._voiceDuration? Math.round(note._voiceDuration):0);
+  const durLabel=durSec? durSec+'s':'';
+  if(note.audioUrl){
+    const mt=MIME[note.mimeType]||'audio/*';
+    player=`<audio controls preload="metadata" src="${note.audioUrl}" type="${mt}" data-uid="${uid}" style="width:100%"></audio>`;
+    downloadLink=`<a href="${note.audioUrl}" download="${escHtml(note.fileName||'voice')}" class="chip voice-dl" style="font-size:12px;margin-left:4px;color:var(--accent)" title="Download">\u2B07</a>`;
+    status='<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Playable</span>';
+    wave=note._peaks? `<canvas class="voice-wave" data-uid="${uid}" height="48" title="Click to seek"></canvas>` : '';
+    const mt2=mt;
+    extras=`<div class="voice-extras"><label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px">Speed <select class="voice-speed" data-uid="${uid}"><option value="1">1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option></select></label><span class="voice-time" data-uid="${uid}">0:00 / ${formatRecTime(note._voiceDuration|| durSec)}</span><span style="margin-left:auto">${downloadLink}</span></div>`;
+  } else if(note.audioChunkCount && note.audioChunkCount>0 && note._key){
+    const mt=MIME[note.mimeType]||'audio/ogg';
+    const ext=extMap(mt);
+    if(note._blobUrl){
+      player=`<audio controls preload="metadata" src="${note._blobUrl}" type="${mt}" data-uid="${uid}" style="width:100%"></audio>`;
+      downloadLink=`<a href="${note._blobUrl}" download="${escHtml((note.fileName||'voice').replace(/\\.[^.]+$/,''))}${ext}" class="chip voice-dl" style="font-size:12px;margin-left:4px;color:var(--accent)" title="Download">\u2B07</a>`;
+      status='<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Chunked</span>';
+      wave=note._peaks? `<canvas class="voice-wave" data-uid="${uid}" height="48" title="Click to seek"></canvas>` : '';
+      extras=`<div class="voice-extras"><label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px">Speed <select class="voice-speed" data-uid="${uid}"><option value="1">1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option></select></label><span class="voice-time" data-uid="${uid}">0:00 / ${formatRecTime(note._voiceDuration|| durSec)}</span><span style="margin-left:auto">${downloadLink}</span></div>`;
+    } else {
+      // not yet loaded
+      player=`<div class="vmeta" style="color:var(--accent);margin-top:6px">\u23F3 Loading audio… (${note.audioChunkCount} chunks)</div>`;
+      status='<span class="vmeta" style="color:var(--accent);margin-left:8px">\u25CF Loading</span>';
+      wave='';
+      extras='';
+    }
+  } else if(note.audioData && note.audioData.length>100){
+    const mt=MIME[note.mimeType]||'audio/ogg';
+    const ext=extMap(mt);
+    if(!note._blobUrl){ try{ note._blobUrl=base64ToBlobUrl(note.audioData, mt); }catch{} }
+    if(note._blobUrl){
+      player=`<audio controls preload="metadata" src="${note._blobUrl}" type="${mt}" data-uid="${uid}" style="width:100%"></audio>`;
+      downloadLink=`<a href="${note._blobUrl}" download="${escHtml((note.fileName||'voice').replace(/\\.[^.]+$/,''))}${ext}" class="chip voice-dl" style="font-size:12px;margin-left:4px;color:var(--accent)" title="Download">\u2B07</a>`;
+      status='<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Embedded</span>';
+      wave=note._peaks? `<canvas class="voice-wave" data-uid="${uid}" height="48" title="Click to seek"></canvas>` : '';
+      extras=`<div class="voice-extras"><label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px">Speed <select class="voice-speed" data-uid="${uid}"><option value="1">1x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2">2x</option></select></label><span class="voice-time" data-uid="${uid}">0:00 / ${formatRecTime(note._voiceDuration|| durSec)}</span><span style="margin-left:auto">${downloadLink}</span></div>`;
+    } else {
+      player=`<div class="vmeta" style="color:var(--danger)">Decode error</div>`;
+      status='<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Decode error</span>';
+    }
+  } else {
+    let reason='Audio not synced from device';
+    if(note.audioStripped===true){ if(note.audioStrippedReason) reason=note.audioStrippedReason; else reason='Audio stripped (budget/age)'; }
+    else if(note.audioStrippedReason) reason=note.audioStrippedReason;
+    else if(note.sizeBytes && note.sizeBytes>16*1024*1024) reason='File too large (>16MB)';
+    player=`<div class="vmeta" style="color:var(--danger)">${escHtml(reason)}</div>`;
+    status='<span class="vmeta" style="color:var(--muted);margin-left:8px">\u25CF Unavailable</span>';
+  }
+  const selectedStyle=voiceSelectedKeys.has(uid)?'outline:1px solid var(--accent);':'';
+  return {name, checked, selectedStyle, srcApp, caller, dur:durMs, size, capMs, created, synced, type, capSrc, meta, extraMeta, capTitle, syncedLine, player, downloadLink, status, wave, extras, uid};
 }
 
 async function renderVoiceNotes() {
@@ -5342,106 +5518,230 @@ async function renderVoiceNotes() {
     updateVoiceSelectionUI();
     return;
   }
-  const MIME = {
-    'audio/ogg': 'audio/ogg', 'application/ogg': 'audio/ogg', 'audio/opus': 'audio/ogg',
-    'audio/mpeg': 'audio/mpeg', 'audio/mp3': 'audio/mpeg',
-    'audio/mp4': 'audio/mp4', 'audio/x-m4a': 'audio/mp4', 'audio/3gpp': 'audio/3gpp',
-    'audio/amr': 'audio/amr', 'audio/wav': 'audio/wav', 'audio/x-wav': 'audio/wav',
-    'audio/webm': 'audio/webm', 'audio/aac': 'audio/mp4'
-  };
-  let html = '';
-  for (const note of notes) {
-    const name = (note.contactName || '').trim() ? `<span class="vmeta" style="background:var(--card);border:1px solid var(--border);font-size:9px;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">👤 ${escHtml(note.contactName)}</span> ${note.fileName || 'Voice note'}` : (note.fileName || 'Voice note');
-    const uid = note._uid;
-    const checked = voiceSelectedKeys.has(uid) ? ' checked' : '';
-    const selectedStyle = voiceSelectedKeys.has(uid) ? 'outline:1px solid var(--accent);' : '';
-    const srcApp = escHtml(deriveSourceApp(note));
-    const caller = note.callerName ? (note.callDirection === 'incoming' ? '\u2B05 ' : '\u27A1 ') + escHtml(note.callerName) + (note.callerNumber ? ' (' + escHtml(note.callerNumber) + ')' : '') : '';
-    const dur = note.durationMs ? Math.round(note.durationMs/1000) + 's' : '';
-    const size = note.sizeBytes ? (note.sizeBytes/1024).toFixed(0) + 'KB' : '';
-    const capMs = effectiveCaptureMs(note);
-    const created = capMs ? pkt(capMs) : '';
-    const synced = note._synced ? pkt(note._synced) : '';
-    const type = (note.mimeType || '').split('/').pop().toUpperCase() || 'AUDIO';
-    const capSrc = note.captureSource || (legacyNameDateMs(note) ? 'estimated' : '');
-    const metaBits = [created ? `Captured: ${created}` : '', dur ? `Duration: ${dur}` : '', size ? `Size: ${size}` : '', `Type: ${type}`];
-    if (note.folderPath) metaBits.push('Folder: ' + escHtml(note.folderPath));
-    const meta = metaBits.filter(Boolean).join('  \u2022  ');
-    let extraMeta = '';
-    const devMs = noteCaptureMs(note);
-    if (capMs && devMs && Math.abs(capMs - devMs) > 60000) {
-      extraMeta += `<div class="vmeta" style="color:var(--muted)">Device added: ${pkt(devMs)}</div>`;
+  // --- Incremental render preserving playback (no full wipe) ---
+  // capture playing state
+  const playingMap=new Map();
+  for(const a of list.querySelectorAll('audio')){
+    if(!a.paused && !a.ended){
+      const uid=a.dataset.uid || a.closest('[data-uid]')?.dataset.uid;
+      if(uid) playingMap.set(uid,{t:a.currentTime, rate:a.playbackRate, vol:a.volume});
     }
-    if (note.dateEmbeddedMs && parseInt(note.dateEmbeddedMs) > 0) {
-      extraMeta += `<div class="vmeta" style="color:var(--muted)">Embedded date: ${pkt(parseInt(note.dateEmbeddedMs))}</div>`;
+  }
+  // map existing cards
+  const existingMap=new Map();
+  for(const el of list.querySelectorAll('.voice-card[data-uid]')) existingMap.set(el.dataset.uid, el);
+  // remove cards not in filtered set
+  const noteUidSet=new Set(notes.map(n=>n._uid));
+  for(const [uid,el] of existingMap){
+    if(!noteUidSet.has(uid)){
+      for(const a of el.querySelectorAll('audio')){ try{ a.pause(); }catch{} }
+      el.remove(); existingMap.delete(uid);
     }
-    const capTitle = capSrc ? ` title="Date source: ${capSrc}"` : '';
-    const syncedLine = synced ? `<div class="vmeta">Synced: ${synced}</div>` : '';
-    let player = '';
-    let downloadLink = '';
-    let audioStatus = '';
-    if (note.audioUrl) {
-      const mt = MIME[note.mimeType] || 'audio/*';
-      player = `<audio controls preload="none" src="${note.audioUrl}" type="${mt}"></audio>`;
-      downloadLink = `<a href="${note.audioUrl}" download="${name}" style="font-size:12px;margin-left:8px;color:var(--accent)" title="Download">\u2b07</a>`;
-      audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Playable</span>';
-    } else if (note.audioChunkCount && note.audioChunkCount > 0 && note._key) {
-      const mt = MIME[note.mimeType] || 'audio/ogg';
-      const ext = note.mimeType === 'audio/mpeg' ? '.mp3' : note.mimeType === 'audio/mp4' || note.mimeType === 'audio/x-m4a' ? '.m4a' : note.mimeType === 'audio/aac' ? '.m4a' : note.mimeType === 'audio/3gpp' ? '.3gp' : note.mimeType === 'audio/amr' ? '.amr' : note.mimeType === 'audio/wav' || note.mimeType === 'audio/x-wav' ? '.wav' : note.mimeType === 'audio/webm' ? '.webm' : '.ogg';
-      if (!note._blobUrl) {
-        note._blobUrl = await fetchAndReassembleChunks(selectedDevice, note._key, note.audioChunkCount, mt);
-      }
-      if (note._blobUrl) {
-        player = `<audio controls preload="none" src="${note._blobUrl}" type="${mt}"></audio>`;
-        downloadLink = `<a href="${note._blobUrl}" download="${name.replace(/\.[^.]+$/, '')}${ext}" style="font-size:12px;margin-left:8px;color:var(--accent)" title="Download">\u2b07</a>`;
-        audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Chunked</span>';
-      } else {
-        audioStatus = '<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Chunk load failed</span>';
-      }
-    } else if (note.audioData && note.audioData.length > 100) {
-      const mt = MIME[note.mimeType] || 'audio/ogg';
-      const ext = note.mimeType === 'audio/mpeg' ? '.mp3' : note.mimeType === 'audio/mp4' || note.mimeType === 'audio/x-m4a' ? '.m4a' : note.mimeType === 'audio/aac' ? '.m4a' : note.mimeType === 'audio/3gpp' ? '.3gp' : note.mimeType === 'audio/amr' ? '.amr' : note.mimeType === 'audio/wav' || note.mimeType === 'audio/x-wav' ? '.wav' : note.mimeType === 'audio/webm' ? '.webm' : '.ogg';
-      if (!note._blobUrl) note._blobUrl = base64ToBlobUrl(note.audioData, mt);
-      if (note._blobUrl) {
-        player = `<audio controls preload="none" src="${note._blobUrl}" type="${mt}"></audio>`;
-        downloadLink = `<a href="${note._blobUrl}" download="${name.replace(/\.[^.]+$/, '')}${ext}" style="font-size:12px;margin-left:8px;color:var(--accent)" title="Download">\u2b07</a>`;
-        audioStatus = '<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Embedded</span>';
-      } else {
-        audioStatus = '<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Decode error</span>';
-      }
-    } else {
-      let reason = 'Audio not synced from device';
-      if (note.audioStripped === true) {
-        if (note.audioStrippedReason) reason = note.audioStrippedReason;
-        else reason = 'Audio stripped (budget/age)';
-      } else if (note.audioStrippedReason) reason = note.audioStrippedReason;
-      else if (note.sizeBytes && note.sizeBytes > 16 * 1024 * 1024) reason = 'File too large (>16MB)';
-      player = `<div class="vmeta" style="color:var(--danger)">${reason}</div>`;
-      audioStatus = '<span class="vmeta" style="color:var(--muted);margin-left:8px">\u25CF Unavailable</span>';
-    }
-    html += `<div class="voice-card" data-uid="${uid}" style="${selectedStyle}border:1px solid var(--border);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px;background:var(--card)">
+  }
+  function createVoiceCardEl(note){
+    const d=buildVoiceCardInner(note);
+    const div=document.createElement('div');
+    div.className='voice-card voice-playing-off';
+    // actual class vestige for CSS: use voice-card
+    div.className='voice-card';
+    if(voiceSelectedKeys.has(note._uid)) div.classList.add('voice-selected');
+    div.dataset.uid=note._uid;
+    div.dataset.blob=note._blobUrl||'';
+    div.dataset.chunkCount=String(note.audioChunkCount|| (note.audioData?1:0) || (note.audioUrl?1:0));
+    div.dataset.mime=note.mimeType||'';
+    div.style.cssText=(voiceSelectedKeys.has(note._uid)?'outline:1px solid var(--accent);':'')+'border:1px solid var(--border);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px;background:var(--card)';
+    // build inner HTML using helper pieces but reassemble for consistent structure
+    const statusHtml=d.status;
+    const metaLine=d.meta? `<div class="vmeta voice-meta-line"${d.capTitle}>${d.meta}</div>`:'';
+    const callerHtml=d.caller? `<div class="vmeta" style="color:var(--accent)">${d.caller}</div>`:'';
+    div.innerHTML=`
       <div class="vname" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-        <label class="voice-select" style="display:inline-flex;align-items:center;cursor:pointer"><input type="checkbox" data-uid="${uid}"${checked}></label>
-        <span class="vmeta" style="background:var(--accent);color:#000;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">${srcApp}</span>
+        <label class="voice-select" style="display:inline-flex;align-items:center;cursor:pointer"><input type="checkbox" data-uid="${note._uid}"${d.checked}></label>
+        <span class="vmeta" style="background:var(--accent);color:#000;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">${d.srcApp}</span>
         ${note.direction === 'sent' ? '<span class="vmeta" style="background:#145a32;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">\u27A1 SENT</span>' : ''}
         ${note.direction === 'incoming' ? '<span class="vmeta" style="background:#1a5276;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">\u2B05 IN</span>' : ''}
         ${note.playedAt ? '<span class="vmeta" style="background:#6d4c00;color:#ffd966;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600" title="Voice message was played">\u25B6 PLAYED ' + pkt(parseInt(note.playedAt)) + '</span>' : ''}
         ${note.recordingType === 'call' ? '<span class="vmeta" style="background:#8B0000;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">CALL REC</span>' : ''}
         ${note.recordingType === 'recorder' ? '<span class="vmeta" style="background:#1a5276;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">RECORDER</span>' : ''}
         ${isVoiceGroupNote(note) ? '<span class="vmeta" style="background:var(--danger);color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">GROUP</span>' : ''}
-        <span style="font-weight:600">${name}</span> ${audioStatus}${downloadLink}
-        <span class="chip" title="Copy filename" style="background:var(--card);border:1px solid var(--border);font-size:9px;padding:1px 5px;cursor:pointer" data-copyfile="${escHtml(note.fileName || '')}">&#x1F4CE;</span>
-        ${capMs ? `<span class="chip" title="Copy capture time" style="background:var(--card);border:1px solid var(--border);font-size:9px;padding:1px 5px;cursor:pointer" data-copyts="${capMs}">&#x1F552;</span>` : ''}
+        <span style="font-weight:600">${d.name}</span> ${statusHtml}${d.downloadLink? d.downloadLink:''}
+        <span class="chip" title="Copy filename" style="background:var(--card);border:1px solid var(--border);font-size:9px;padding:1px 5px;cursor:pointer" data-copyfile="${escHtml(note.fileName || '')}">\uD83D\uDCCE</span>
+        ${d.capMs ? `<span class="chip" title="Copy capture time" style="background:var(--card);border:1px solid var(--border);font-size:9px;padding:1px 5px;cursor:pointer" data-copyts="${d.capMs}">\uD83D\uDD52</span>` : ''}
       </div>
-      ${caller ? `<div class="vmeta" style="color:var(--accent)">${caller}</div>` : ''}
-      ${meta ? `<div class="vmeta"${capTitle}>${meta}</div>` : ''}
-      ${extraMeta}
-      ${syncedLine}
-      ${player}
-      <button class="chip" data-delvoice="${uid}" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-top:4px">\u{1F5D1} Delete</button>
-    </div>`;
+      ${callerHtml}
+      ${metaLine}
+      ${d.extraMeta}
+      ${d.syncedLine}
+      ${d.wave}
+      ${d.player}
+      ${d.extras}
+      <button class="chip" data-delvoice="${note._uid}" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-top:4px">\uD83D\uDDD1 Delete</button>
+    `;
+    return div;
   }
-  list.innerHTML = html;
+  // Reorder / update in display order (notes is already sorted filtered)
+  // Ensure list has no stray text nodes; we will insert sequentially
+  let insertBefore=null;
+  // we want cards in order of notes array (sorted). Find first card after header? list contains only cards or empty placeholder. For incremental we just ensure correct order via insertBefore logic similar to recordings.
+  // Create a document fragment ordered list then reconcile?
+  // Simple: iterate notes, ensure element at correct position
+  let nextExpected = list.firstChild;
+  // But list may contain the 'No notes' placeholder or loadMore; we handle incremental by clearing placeholder and then ordering.
+  // If list currently has placeholder text, clear and start fresh (but preserve playing? playing false in that case)
+  if(list.querySelector('.label') && !list.querySelector('[data-uid]')){
+    // clear placeholder but keep it simple: reset innerHTML without touching audio (none)
+    list.innerHTML='';
+  }
+  // Now ensure each note's card is at correct position
+  for(let idx=0; idx<notes.length; idx++){
+    const note=notes[idx];
+    const uid=note._uid;
+    let el=existingMap.get(uid);
+    const needsBlob = note.audioChunkCount && !note._blobUrl;
+    const needsRebuild = !el || el.dataset.blob !== (note._blobUrl||'') || el.dataset.mime !== (note.mimeType||'');
+    const isPlaying = playingMap.has(uid);
+    if(el && !needsRebuild){
+      // reuse: just update selection visuals
+      const isSel=voiceSelectedKeys.has(uid);
+      el.style.outline=isSel?'1px solid var(--accent)':'';
+      el.classList.toggle('voice-selected', isSel);
+      const cb=el.querySelector('input[type="checkbox"][data-uid]');
+      if(cb) cb.checked=isSel;
+      // if not playing, update wave time label maybe
+      // keep position
+      // find current position index
+      // Move if out of order
+      const currentIdx = Array.from(list.querySelectorAll('.voice-card[data-uid]')).indexOf(el);
+      if(currentIdx !== idx){
+        const ref = list.querySelectorAll('.voice-card[data-uid]')[idx];
+        if(ref && ref!==el) list.insertBefore(el, ref);
+        else if(!ref) list.appendChild(el);
+      }
+      continue;
+    }
+    if(el && isPlaying && needsRebuild){
+      el.dataset.needsRefresh='1';
+      const currentIdx = Array.from(list.querySelectorAll('.voice-card[data-uid]')).indexOf(el);
+      if(currentIdx !== idx){
+        const ref = list.querySelectorAll('.voice-card[data-uid]')[idx];
+        if(ref && ref!==el) list.insertBefore(el, ref);
+        else if(!ref) list.appendChild(el);
+      }
+      continue;
+    }
+    const newEl=createVoiceCardEl(note);
+    if(el){
+      const pm=playingMap.get(uid);
+      if(pm){
+        const aNew=newEl.querySelector(`audio[data-uid="${uid}"]`);
+        if(aNew){ aNew.currentTime=pm.t; aNew.playbackRate=pm.rate; aNew.volume=pm.vol; }
+      }
+      list.replaceChild(newEl, el);
+      existingMap.set(uid, newEl);
+      // position correction if needed
+      const currentIdx = Array.from(list.querySelectorAll('.voice-card[data-uid]')).indexOf(newEl);
+      if(currentIdx !== idx){
+        const ref = list.querySelectorAll('.voice-card[data-uid]')[idx];
+        if(ref && ref!==newEl) list.insertBefore(newEl, ref);
+      }
+    } else {
+      const ref = list.querySelectorAll('.voice-card[data-uid]')[idx];
+      if(ref) list.insertBefore(newEl, ref);
+      else list.appendChild(newEl);
+      existingMap.set(uid, newEl);
+    }
+    // if this note needs background fetch for chunks, kick it off
+    if(needsBlob && note.audioChunkCount){
+      (async(n, targetEl)=>{
+        if(n._blobFetching) return;
+        n._blobFetching=true;
+        const mt={ 'audio/ogg':'audio/ogg','application/ogg':'audio/ogg','audio/opus':'audio/ogg','audio/mpeg':'audio/mpeg','audio/mp3':'audio/mpeg','audio/mp4':'audio/mp4','audio/x-m4a':'audio/mp4','audio/3gpp':'audio/3gpp','audio/amr':'audio/amr','audio/wav':'audio/wav','audio/x-wav':'audio/wav','audio/webm':'audio/webm','audio/aac':'audio/mp4'}[n.mimeType]||'audio/ogg';
+        const blob=await fetchAndReassembleChunks(selectedDevice, n._key, n.audioChunkCount, mt);
+        if(blob){
+          n._blobUrl=blob;
+          // lazy peaks
+          if(!n._peaks) await ensureVoicePeaks(n);
+          // re-render just this card if still in filtered set and not playing
+          const still = voiceNotesCache.find(x=>x._uid===n._uid);
+          if(still){
+            // trigger incremental update for this uid
+            const existing = list.querySelector(`.voice-card[data-uid="${n._uid}"]`);
+            if(existing && !playingMap.has(n._uid)){
+              const repl=createVoiceCardEl(n);
+              list.replaceChild(repl, existing);
+              existingMap.set(n._uid, repl);
+              if(n._peaks){
+                const canvas=repl.querySelector(`canvas.voice-wave[data-uid="${n._uid}"]`);
+                const audio=repl.querySelector(`audio[data-uid="${n._uid}"]`);
+                if(canvas && audio) requestAnimationFrame(()=>{ try{ drawRecWaveform(canvas, n._peaks, audio, n._voiceDuration||0); }catch{} });
+              }
+            }
+          }
+        } else {
+          // mark failed so next render shows error
+          n._blobFetchFailed=true;
+          const existing = list.querySelector(`.voice-card[data-uid="${n._uid}"]`);
+          if(existing){
+            const repl=createVoiceCardEl(n);
+            // force show chunk load failed status
+            repl.querySelector('.vmeta') && (repl.innerHTML=repl.innerHTML);
+            list.replaceChild(repl, existing);
+            existingMap.set(n._uid, repl);
+          }
+        }
+        n._blobFetching=false;
+      })(note, null);
+    } else if(note._blobUrl && !note._peaks && !note._peaksFetching){
+      // trigger peaks generation for already playable but no wave yet
+      (async(n)=>{
+        await ensureVoicePeaks(n);
+        if(n._peaks){
+          const card=list.querySelector(`.voice-card[data-uid="${n._uid}"]`);
+          if(card){
+            let canvas=card.querySelector(`canvas.voice-wave[data-uid="${n._uid}"]`);
+            const audio=card.querySelector(`audio[data-uid="${n._uid}"]`);
+            if(!canvas){
+              // create canvas if missing
+              const fresh=buildVoiceCardInner(n);
+              if(fresh.wave){
+                const tmp=document.createElement('div'); tmp.innerHTML=fresh.wave;
+                const newCanvas=tmp.firstChild;
+                const playerEl=card.querySelector('audio');
+                if(playerEl && newCanvas) playerEl.parentNode.insertBefore(newCanvas, playerEl);
+                canvas=card.querySelector(`canvas.voice-wave[data-uid="${n._uid}"]`);
+              }
+            }
+            if(canvas && audio) requestAnimationFrame(()=>{ try{ drawRecWaveform(canvas, n._peaks, audio, n._voiceDuration||0);}catch{}} );
+          }
+        }
+      })(note);
+    }
+  }
+  // Trim excess cards beyond notes length (should already be removed, but ensure)
+  // Existing removal already handled via noteUidSet, but also ensure count matches
+  // Restore playing state for replaced cards
+  for(const [uid,st] of playingMap){
+    const a=list.querySelector(`audio[data-uid="${uid}"]`);
+    if(a){
+      try{
+        if(Math.abs(a.currentTime - st.t) > 0.6) a.currentTime=st.t;
+        a.playbackRate=st.rate; a.volume=st.vol;
+        const card=a.closest('[data-uid]');
+        if(card && card.dataset.needsRefresh!=='1') a.play().catch(()=>{});
+      }catch{}
+    }
+  }
+  // Draw waves for all playable with peaks
+  requestAnimationFrame(()=>{
+    for(const note of notes){
+      if(!note._blobUrl || !note._peaks) continue;
+      const canvas=list.querySelector(`canvas.voice-wave[data-uid="${note._uid}"]`);
+      const audio=list.querySelector(`audio[data-uid="${note._uid}"]`);
+      if(canvas && audio){
+        try{ drawRecWaveform(canvas, note._peaks, audio, note._voiceDuration||0); }catch{}
+      }
+    }
+  });
   updateVoiceSelectionUI();
 }
 
@@ -5450,13 +5750,22 @@ function updateVoiceSelectionUI() {
   if (del) del.textContent = '\u{1F5D1} Delete Selected' + (voiceSelectedKeys.size ? ' (' + voiceSelectedKeys.size + ')' : '');
   const sel = document.getElementById('btnSelectAllVoice');
   if (sel) sel.textContent = voiceSelectedKeys.size && voiceNotesCache.length && voiceSelectedKeys.size >= voiceNotesCache.length ? '\u{1F4CB} Deselect All' : '\u{1F4CB} Select All';
+  const list=document.getElementById('voiceNotesList');
+  if(!list) return;
+  for(const card of list.querySelectorAll('.voice-card[data-uid]')){
+    const uid=card.dataset.uid;
+    const isSel=voiceSelectedKeys.has(uid);
+    card.style.outline=isSel?'1px solid var(--accent)':'';
+    card.classList.toggle('voice-selected', isSel);
+    const cb=card.querySelector('input[type="checkbox"][data-uid]');
+    if(cb) cb.checked=isSel;
+  }
 }
 
 function toggleVoiceSelect(uid, checked) {
   if (checked) voiceSelectedKeys.add(uid);
   else voiceSelectedKeys.delete(uid);
   updateVoiceSelectionUI();
-  renderVoiceNotes();
 }
 
 const voiceListEl = document.getElementById('voiceNotesList');
@@ -5465,6 +5774,13 @@ if (voiceListEl) {
     const cb = e.target;
     if (cb && cb.type === 'checkbox' && cb.dataset.uid) {
       toggleVoiceSelect(cb.dataset.uid, cb.checked);
+    }
+    // speed selector
+    if(e.target.classList.contains('voice-speed')){
+      const sel=e.target;
+      const uid=sel.dataset.uid;
+      const a=voiceListEl.querySelector(`audio[data-uid="${uid}"]`);
+      if(a){ a.playbackRate=parseFloat(sel.value)||1; }
     }
   });
   voiceListEl.addEventListener('click', (e) => {
@@ -5479,6 +5795,72 @@ if (voiceListEl) {
     const btn = e.target.closest('[data-delvoice]');
     if (btn) deleteVoiceNoteByUid(btn.dataset.delvoice);
   });
+  // exclusive playback + visual + wave/time updates
+  voiceListEl.addEventListener('play', (e)=>{
+    if(e.target.tagName!=='AUDIO') return;
+    const cur=e.target;
+    const curUid=cur.dataset.uid;
+    // pause others in voices and also remote recordings (one sound at a time globally)
+    for(const a of document.querySelectorAll('#voiceNotesList audio, #remoteRecordingsList audio')){
+      if(a!==cur && !a.paused) try{ a.pause(); }catch{}
+    }
+    for(const c of voiceListEl.querySelectorAll('.voice-card[data-uid]')) c.classList.toggle('voice-playing', c.dataset.uid===curUid);
+    // also clear remote playing highlights
+    for(const c of document.querySelectorAll('#remoteRecordingsList .voice-card[data-recid]')) c.classList.remove('rec-playing');
+  }, true);
+  voiceListEl.addEventListener('pause', (e)=>{
+    if(e.target.tagName!=='AUDIO') return;
+    const uid=e.target.dataset.uid;
+    const card=voiceListEl.querySelector(`.voice-card[data-uid="${uid}"]`);
+    if(card) card.classList.remove('voice-playing');
+    if(card && card.dataset.needsRefresh==='1'){
+      const note=voiceNotesCache.find(n=>n._uid===uid);
+      if(note){
+        const repl=(function(){
+          const d=buildVoiceCardInner(note);
+          const div=document.createElement('div');
+          div.className='voice-card';
+          if(voiceSelectedKeys.has(uid)) div.classList.add('voice-selected');
+          div.dataset.uid=uid; div.dataset.blob=note._blobUrl||''; div.dataset.mime=note.mimeType||'';
+          div.style.cssText=(voiceSelectedKeys.has(uid)?'outline:1px solid var(--accent);':'')+'border:1px solid var(--border);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px;background:var(--card)';
+          div.innerHTML=`<div class="vname" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><label class="voice-select" style="display:inline-flex;align-items:center;cursor:pointer"><input type="checkbox" data-uid="${uid}"${d.checked}></label><span class="vmeta" style="background:var(--accent);color:#000;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">${d.srcApp}</span>${note.direction==='sent'?'<span class="vmeta" style="background:#145a32;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">\u27A1 SENT</span>':''}${note.direction==='incoming'?'<span class="vmeta" style="background:#1a5276;color:#fff;padding:1px 6px;border-radius:8px;font-size:9px;font-weight:600">\u2B05 IN</span>':''}<span style="font-weight:600">${d.name}</span> ${d.status}${d.downloadLink?d.downloadLink:''}<span class="chip" title="Copy filename" style="background:var(--card);border:1px solid var(--border);font-size:9px;padding:1px 5px;cursor:pointer" data-copyfile="${escHtml(note.fileName||'')}">\uD83D\uDCCE</span></div><div class="vmeta voice-meta-line">${d.meta}</div>${d.extraMeta}${d.syncedLine}${d.wave}${d.player}${d.extras}<button class="chip" data-delvoice="${uid}" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:9px;padding:2px 6px;margin-top:4px">\uD83D\uDDD1 Delete</button>`;
+          return div;
+        })();
+        card.replaceWith(repl);
+        if(note._peaks){
+          const canvas=repl.querySelector(`canvas.voice-wave[data-uid="${uid}"]`);
+          const audio=repl.querySelector(`audio[data-uid="${uid}"]`);
+          if(canvas && audio) requestAnimationFrame(()=>{ try{ drawRecWaveform(canvas, note._peaks, audio, note._voiceDuration||0);}catch{}} );
+        }
+      }
+    }
+    flushVoicePendingRevokes();
+  }, true);
+  voiceListEl.addEventListener('ended', (e)=>{
+    if(e.target.tagName!=='AUDIO') return;
+    const uid=e.target.dataset.uid;
+    const card=voiceListEl.querySelector(`.voice-card[data-uid="${uid}"]`);
+    if(card) card.classList.remove('voice-playing');
+    const timeEl=voiceListEl.querySelector(`.voice-time[data-uid="${uid}"]`);
+    if(timeEl){
+      const n=voiceNotesCache.find(x=>x._uid===uid);
+      const d=n? (n._voiceDuration|| (n.durationMs? n.durationMs/1000:0)):0;
+      timeEl.textContent=`0:00 / ${formatRecTime(d)}`;
+    }
+    flushVoicePendingRevokes();
+  }, true);
+  voiceListEl.addEventListener('timeupdate', (e)=>{
+    if(e.target.tagName!=='AUDIO') return;
+    const a=e.target;
+    const uid=a.dataset.uid;
+    const timeEl=voiceListEl.querySelector(`.voice-time[data-uid="${uid}"]`);
+    if(timeEl){
+      const cur=formatRecTime(a.currentTime);
+      const n=voiceNotesCache.find(x=>x._uid===uid);
+      const d=n? (n._voiceDuration|| a.duration || (n.durationMs? n.durationMs/1000:0)): a.duration||0;
+      timeEl.textContent=`${cur} / ${formatRecTime(d)}`;
+    }
+  }, true);
 }
 
 document.getElementById('btnSelectAllVoice')?.addEventListener('click', function() {
@@ -5487,7 +5869,6 @@ document.getElementById('btnSelectAllVoice')?.addEventListener('click', function
   voiceSelectedKeys.clear();
   if (selecting) voiceNotesCache.forEach(n => voiceSelectedKeys.add(n._uid));
   updateVoiceSelectionUI();
-  renderVoiceNotes();
 });
 
 async function writeVoiceBatch(batchKey, notesArray, tsMs, freeMb) {
@@ -5525,7 +5906,7 @@ async function deleteVoiceNotes(keys) {
     if (n._legacy) continue;
     try {
       const ok = await deleteRTDB(`devices/${deviceId}/voice_notes/${n._key}`);
-      if (ok) { deleted++; removedUids.add(n._uid); if (n._blobUrl) { try { URL.revokeObjectURL(n._blobUrl); } catch {} } }
+      if (ok) { deleted++; removedUids.add(n._uid); if (n._blobUrl) safeVoiceRevoke(n._blobUrl); }
       else failed++;
     } catch { failed++; }
   }
@@ -5553,7 +5934,7 @@ async function deleteVoiceNotes(keys) {
         ok = newKeys ? true : false;
         if (ok) {
           const old = voiceNotesCache.filter(n => n._legacy && n._key === batchKey);
-          old.forEach(n => { if (n._blobUrl) { try { URL.revokeObjectURL(n._blobUrl); } catch {} } });
+          old.forEach(n => { if (n._blobUrl) safeVoiceRevoke(n._blobUrl); });
           voiceNotesCache = voiceNotesCache.filter(n => !(n._legacy && n._key === batchKey));
           keep.forEach((note, i) => {
             voiceNotesCache.push(Object.assign({ _uid: newKeys[i], _key: newKeys[i], _legacy: false, _noteIndex: -1, _synced: tsMs, _stableId: noteStableId(note), _blobUrl: null }, note));
@@ -5564,14 +5945,14 @@ async function deleteVoiceNotes(keys) {
         deleted += removed;
         if (keep.length > 0 && keep.length <= 30) {
           const old = voiceNotesCache.filter(n => n._legacy && n._key === batchKey);
-          old.forEach(n => { if (n._blobUrl) { try { URL.revokeObjectURL(n._blobUrl); } catch {} } });
+          old.forEach(n => { if (n._blobUrl) safeVoiceRevoke(n._blobUrl); });
           voiceNotesCache = voiceNotesCache.filter(n => !(n._legacy && n._key === batchKey));
           keep.forEach((note, i) => {
             voiceNotesCache.push(Object.assign({ _uid: batchKey + '#' + i, _key: batchKey, _legacy: true, _noteIndex: i, _synced: tsMs, _stableId: noteStableId(note), _blobUrl: null }, note));
           });
         } else if (keep.length === 0) {
           const old = voiceNotesCache.filter(n => n._legacy && n._key === batchKey);
-          old.forEach(n => { if (n._blobUrl) { try { URL.revokeObjectURL(n._blobUrl); } catch {} } });
+          old.forEach(n => { if (n._blobUrl) safeVoiceRevoke(n._blobUrl); });
           voiceNotesCache = voiceNotesCache.filter(n => !(n._legacy && n._key === batchKey));
         }
       } else {
@@ -6343,6 +6724,9 @@ if (recListEl) {
     for (const a of recListEl.querySelectorAll('audio')) {
       if (a !== cur && !a.paused) { try { a.pause(); } catch {} }
     }
+    // also pause any playing voice notes (global single audio)
+    for(const a of document.querySelectorAll('#voiceNotesList audio')){ if(!a.paused) try{ a.pause(); }catch{} }
+    for(const c of document.querySelectorAll('#voiceNotesList .voice-card[data-uid]')) c.classList.remove('voice-playing');
     for (const c of recListEl.querySelectorAll('.voice-card[data-recid]')) {
       c.classList.toggle('rec-playing', c.dataset.recid === curId);
     }
