@@ -5062,6 +5062,9 @@ function deriveSourceApp(note) {
 
 function isVoiceGroupNote(n) {
   if (n.isGroup === true || String(n.isGroup || '').toLowerCase() === 'true') return true;
+  if (n.isGroupRaw === true) return true;
+  if (n.chatCategory && /group_chat|group|broadcast|channel|community/i.test(String(n.chatCategory))) return true;
+  if (String(n.classification||'').toLowerCase() === 'group') return true;
   if (n.contactName || n.conversationTitle) {
     const c = waClassify(n);
     if (c === 'group' || c === 'noise') return true;
