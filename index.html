@@ -951,6 +951,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer" id="btnSelectAllVoice">&#x1F4CB; Select All</span>
 <span class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:11px;cursor:pointer" id="btnDeleteSelectedVoice" onclick="deleteSelectedVoiceNotes()">&#x1F5D1; Delete Selected</span>
 <span class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:11px;cursor:pointer" onclick="deleteWhatsAppVoiceNotes()">&#x1F5D1; Delete All WhatsApp</span>
+<span class="chip" style="background:#6d4c00;color:#ffd966;border-color:var(--warning);font-size:11px;cursor:pointer" onclick="cleanupGroupVoicesOnce()" title="Delete already-synced group voice notes (one-time)">&#x1F9F9; Clean Groups</span>
 <span class="chip" style="background:var(--accent);color:#000;font-size:11px;cursor:pointer;margin-left:auto" onclick="pollVoiceNotes()">&#x1F504; Refresh</span>
 </div>
 <div id="voiceHintBanner" style="display:none;font-size:12px;color:var(--warning);background:var(--card);border:1px solid var(--warning);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px"></div>
@@ -6004,6 +6005,19 @@ async function deleteWhatsAppVoiceNotes() {
   refreshStorage();
   showAlert('Deleted ' + deleted + ' WhatsApp voice note' + (deleted === 1 ? '' : 's') + (failed ? ' (' + failed + ' failed)' : ''), failed ? 'error' : 'warn');
   return { deleted, failed };
+}
+
+async function cleanupGroupVoicesOnce(){
+  const groups = voiceNotesCache.filter(n => isVoiceGroupNote(n));
+  if(!groups.length){ showAlert('No group voice notes found — already clean','success'); return; }
+  const preview = groups.slice(0,5).map(n=> (n.contactName||n.conversationTitle||n.fileName||'group') + ' • ' + (n.chatCategory||n.classification||'group')).join('\n');
+  if(!confirm('Delete ' + groups.length + ' already-synced GROUP voice notes from RTDB?\nThis is one-time cleanup. Individual voices will stay.\n\nExamples:\n' + preview + (groups.length>5?'\n… and '+(groups.length-5)+' more':'') + '\n\nThis cannot be undone. Continue?')) return;
+  const keys=new Set(groups.map(n=>n._uid));
+  const {deleted, failed}=await deleteVoiceNotes(keys);
+  renderVoiceNotes();
+  refreshStorage();
+  showAlert('Cleaned '+deleted+' group voice note'+(deleted===1?'':'s')+(failed?' ('+failed+' failed)':''), failed?'error':'success');
+  try{ localStorage.setItem('groupVoiceCleanedAt', String(Date.now())); }catch{}
 }
 
 async function findDeviceWithData(path, shallowKey) {
