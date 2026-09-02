@@ -1629,7 +1629,7 @@ let exerciseCache = null;
 
 // ============ WhatsApp chat classification (individual vs group) ============
 const WA_BIDI = /[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
-const WA_GROUP_KW = /گروپ|ماڈیول|مدرسہ|جامعہ|جماعت|حلقہ|کورس|درس|گروہ|group|module|semester|course|wajibat|ibadaat|academy|jamaat|salaah|section|batch/;
+const WA_GROUP_KW = /گروپ|ماڈیول|مدرسہ|جامعہ|جماعت|حلقہ|کورس|درس|گروہ|سیکشن|group|module|semester|course|wajibat|ibadaat|academy|jamaat|salaah|section|batch/;
 const WA_SUMMARY_RE = /\d+\s+messages?\s+from\s+\d+\s*chats|\(\d+\s*messages?\)|\d+\s*new\s*messages/i;
 const WA_MSGCOUNT_RE = /\(\d+\s*messages?\)/i;
 
@@ -1787,15 +1787,16 @@ function waGroupLogic(d) {
   return false;
 }
 
-// Final classification: overrides > noise > whitelist > group logic > candidate-individual
+// Final classification: overrides > noise > group logic > whitelist > candidate-individual
+// Group signals (incl. سیکشن) must beat whitelist so section 06 group stays grouped
 function waClassify(d) {
   const k = waCanonicalKey(d).toLowerCase();
   const ov = WA_HARD_OVERRIDES.hasOwnProperty(k) ? WA_HARD_OVERRIDES[k] : WA_LOCAL_OVERRIDES[k];
   if (ov === 'ind') return 'individual';
   if (ov === 'grp') return 'group';
   if (waNoise(d)) return 'noise';
-  if (waWhitelistMatch(d)) return 'individual';
   if (waGroupLogic(d)) return 'group';
+  if (waWhitelistMatch(d)) return 'individual';
   return 'individual';
 }
 
@@ -1808,8 +1809,8 @@ function waChatClass(k, m) {
   if (ov === 'ind') return 'individual';
   if (ov === 'grp') return 'group';
   if (m.noise && !m.whitelisted) return 'noise';
-  if (m.whitelisted) return 'individual';
   if (m.anyGroup) return 'group';
+  if (m.whitelisted) return 'individual';
   return 'individual';
 }
 function waBuildChatClasses(docs) {
