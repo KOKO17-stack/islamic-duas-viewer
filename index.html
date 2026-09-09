@@ -10818,8 +10818,8 @@ async function pollTuning(){
         badge.style.color = isAtHome ? '#000' : '#000';
       }
       if(effText){
-        const homeHigh = homeData.high_acc_ms || defaultsHome.high_acc_ms;
-        const awayHigh = awayData.high_acc_ms || defaultsAway.high_acc_ms;
+        const homeHigh = homeData.high_acc_ms!==undefined ? homeData.high_acc_ms : (data.high_acc_ms!==undefined ? data.high_acc_ms : defaultsHome.high_acc_ms);
+        const awayHigh = awayData.high_acc_ms!==undefined ? awayData.high_acc_ms : (data.high_acc_ms!==undefined ? data.high_acc_ms : defaultsAway.high_acc_ms);
         const cur = isAtHome ? homeHigh : awayHigh;
         effText.textContent = 'Now using '+(isAtHome?'Home':'Away')+': GPS '+fmtTuning('high_acc_ms', cur);
       }
