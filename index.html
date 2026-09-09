@@ -312,12 +312,44 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 .snap-thread-wrap .snap-chat-col{flex:1;min-width:0}
 @media(max-width:720px){.snap-thread-wrap{flex-direction:column}.snap-thread-wrap .snap-list-col{flex:1 1 auto}.snap-list{max-height:26vh}}
 .priority-window{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#efeae2;max-width:520px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.12)}
-.priority-header{background:#075E54;color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;border-bottom:1px solid #054a41}
-.priority-chat-bg{background:#efeae2;background-image:radial-gradient(rgba(0,0,0,.04) 1px, transparent 1px);background-size:18px 18px;padding:14px 10px;display:flex;flex-direction:column;gap:5px;min-height:260px}
-.priority-bubble{max-width:74%;padding:8px 11px;border-radius:7px;font-size:14px;line-height:1.35;box-shadow:0 1px .5px rgba(0,0,0,.13);white-space:pre-wrap;word-break:break-word}
-.priority-bubble.in{background:#fff;color:#000;align-self:flex-start;border-top-left-radius:0;border:1px solid #e6e6e6}
-.priority-bubble.out{background:#dcf8c6;color:#000;align-self:flex-end;border-top-right-radius:0}
-.priority-daysep{text-align:center;font-size:11px;color:#667781;margin:10px 0 6px;letter-spacing:.4px;text-transform:uppercase;background:rgba(255,255,255,.9);align-self:center;padding:3px 10px;border-radius:7px;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.priority-header{background:#075E54;color:#fff;padding:0 10px 0 12px;display:flex;align-items:center;gap:10px;height:59px;border-bottom:1px solid #054a41;flex-shrink:0}
+.priority-header .pri-hd-av{width:40px;height:40px;border-radius:50%;background:#DFE5E7;color:#54656f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;overflow:hidden}
+.priority-header .pri-hd-av.pri-green{background:#128C7E;color:#fff}
+.priority-header .pri-hd-main{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}
+.priority-header .pri-hd-name{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+.priority-header .pri-hd-sub{font-weight:400;font-size:11.5px;opacity:.88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+.priority-header .pri-hd-icons{display:flex;align-items:center;gap:14px;margin-left:auto;flex-shrink:0}
+.priority-header .pri-hd-icons span{font-size:19px;opacity:.95;cursor:default;user-select:none}
+.priority-chat-bg{background-color:#efeae2;background-image:url("data:image/svg+xml,%3Csvg width='400' height='400' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='20' y='40' font-size='22' opacity='0.035'%3E%F0%9F%92%AC%3C/text%3E%3Ctext x='120' y='90' font-size='18' opacity='0.035'%3E%E2%98%8E%3C/text%3E%3Ctext x='260' y='50' font-size='20' opacity='0.035'%3E%F0%9F%93%B7%3C/text%3E%3Ctext x='60' y='160' font-size='20' opacity='0.035'%3E%F0%9F%92%AD%3C/text%3E%3Ctext x='200' y='180' font-size='22' opacity='0.035'%3E%F0%9F%98%8A%3C/text%3E%3Ctext x='320' y='150' font-size='18' opacity='0.035'%3E%F0%9F%8E%A5%3C/text%3E%3Ctext x='30' y='260' font-size='18' opacity='0.035'%3E%E2%9C%89%3C/text%3E%3Ctext x='150' y='280' font-size='20' opacity='0.035'%3E%F0%9F%93%8E%3C/text%3E%3Ctext x='280' y='260' font-size='20' opacity='0.035'%3E%F0%9F%92%AC%3C/text%3E%3C/svg%3E");background-size:430px 430px;padding:12px 10px 14px;display:flex;flex-direction:column;gap:2px;min-height:340px;max-height:62vh;overflow-y:auto;scroll-behavior:smooth}
+.priority-bubble{max-width:74%;padding:6px 7px 6px 8px;border-radius:7.5px;font-size:14.2px;line-height:1.32;box-shadow:0 1px .5px rgba(0,0,0,.13);white-space:pre-wrap;word-break:break-word;position:relative}
+.priority-bubble.in{background:#fff;color:#111b21;align-self:flex-start;border-top-left-radius:0;border:1px solid #e6e6e6;margin-right:auto}
+.priority-bubble.in::before{content:"";position:absolute;top:0;left:-8px;width:8px;height:13px;background:radial-gradient(circle at 0 0, transparent 50%, #fff 50%);filter:drop-shadow(-1px 0 0 #e6e6e6)}
+.priority-bubble.out{background:#dcf8c6;color:#111b21;align-self:flex-end;border-top-right-radius:0;margin-left:auto}
+.priority-bubble.out::before{content:"";position:absolute;top:0;right:-8px;width:8px;height:13px;background:radial-gradient(circle at 100% 0, transparent 50%, #dcf8c6 50%)}
+.priority-bubble .bubble-text{display:inline}
+.priority-bubble .bubble-meta{float:right;font-size:11px;color:#667781;line-height:1;margin:6px 0 -2px 10px;white-space:nowrap;user-select:none}
+.priority-bubble.out .bubble-meta{color:#667781}
+.priority-bubble .bubble-meta .ticks{color:#53bdeb;font-weight:400;letter-spacing:-2px;margin-left:3px}
+.priority-daysep{text-align:center;font-size:11.5px;color:#54656f;margin:12px auto 8px;letter-spacing:.2px;background:#fff;align-self:center;padding:5px 12px;border-radius:7.5px;box-shadow:0 1px 1px rgba(0,0,0,.1);text-transform:uppercase}
+.priority-media{max-width:74%;padding:10px 12px;border-radius:7.5px;font-size:13px;line-height:1.35;box-shadow:0 1px .5px rgba(0,0,0,.13);background:#fff;color:#54656f;align-self:center;border:1px dashed #cfd4d8;font-style:italic;text-align:center}
+.priority-list{display:flex;flex-direction:column;gap:1px;max-height:56vh;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:10px}
+.priority-list-item{display:flex;align-items:center;gap:12px;padding:8px 10px;cursor:pointer;border-bottom:1px solid #f0f2f5;transition:background .12s;background:#fff}
+.priority-list-item:last-child{border-bottom:none}
+.priority-list-item:hover{background:#f5f6f6}
+.priority-list-item.active{background:#f0f2f5;border-color:transparent}
+.priority-list-item .pri-av{width:49px;height:49px;border-radius:50%;background:#DFE5E7;color:#54656f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0;overflow:hidden}
+.priority-list-item.active .pri-li-name{color:#111b21}
+.priority-li-name{font-size:17px;font-weight:400;color:#111b21;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.priority-li-prev{font-size:13px;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.priority-li-prev .ticks{color:#667781;letter-spacing:-1px;margin-right:3px}
+.priority-li-time{font-size:12px;color:#667781;white-space:nowrap;flex-shrink:0;margin-left:auto;align-self:flex-start;padding-top:2px}
+.priority-li-badge{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#25D366;color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-left:6px;flex-shrink:0}
+.priority-fake-input{height:46px;background:#f0f2f5;display:flex;align-items:center;gap:10px;padding:6px 10px;border-top:1px solid #e6e6e6;flex-shrink:0}
+.priority-fake-input .fake-emo{font-size:22px;opacity:.85;flex-shrink:0}
+.priority-fake-input .fake-attach{font-size:18px;opacity:.7;flex-shrink:0}
+.priority-fake-input .fake-field{flex:1;height:36px;background:#fff;border-radius:21px;display:flex;align-items:center;padding:0 14px;font-size:14px;color:#667781;border:1px solid #fff}
+.priority-fake-input .fake-mic{width:36px;height:36px;border-radius:50%;background:#075E54;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+@media(max-width:720px){.priority-list{max-height:26vh}.priority-chat-bg{max-height:52vh}}
 .global-search{display:flex;align-items:center;gap:6px;margin-left:auto;position:relative}
 .global-search input{padding:5px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;width:160px;transition:border-color .15s}
 .global-search input:focus{outline:none;border-color:var(--accent);width:220px}
@@ -7862,46 +7894,96 @@ function renderPriorityView(filtered){
   const partners=Object.keys(groups).sort((a,b)=> parseInt(groups[b][groups[b].length-1].ts_ms||0)-parseInt(groups[a][groups[a].length-1].ts_ms||0));
   if(!selectedPriorityPartner || !groups[selectedPriorityPartner]) selectedPriorityPartner=partners[0];
   const BUBBLE_LIMIT=140;
-  let leftHtml='<div class="snap-list">';
+  // dedup helper for left preview counts — keep same fingerprint as bubble dedup
+  let leftHtml='<div class="priority-list">';
   for(const p of partners){
     const entries=groups[p];
     const last=entries[entries.length-1];
     const lastBubbles=getBubbles(last);
-    const preview=(lastBubbles[lastBubbles.length-1]?.text||last.messagePreview||'').slice(0,38);
+    const previewRaw=(lastBubbles[lastBubbles.length-1]?.text||last.messagePreview||'').slice(0,38);
+    const preview=escHtml(previewRaw)||'—';
     const cnt=entries.reduce((s,e)=>s+getBubbles(e).length,0);
+    // if cnt==0 but media tap present, show media preview label
+    let previewLabel=preview;
+    if(cnt===0){
+      const rawMedia=(last.messagePreview||'').toLowerCase();
+      if(rawMedia.indexOf('tap to view')!==-1 || rawMedia.indexOf('tap to chat')!==-1) previewLabel='👁 View once';
+    }
     const active=p===selectedPriorityPartner?' active':'';
-    const dot=entries.some(e=>e.priorityFull)?' ●':'';
-    leftHtml+=`<div class="snap-list-item${active}" style="${active?'border-color:#075E54':''}" onclick="selectedPriorityPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="snap-av" style="background:#075E54;color:#fff;border-color:#054a41">${escHtml(snapInitial(p))}</div><div style="min-width:0;flex:1"><div class="snap-li-name">${escHtml(p)}${dot}</div><div class="snap-li-prev">${escHtml(preview)||'—'} · ${cnt}</div></div><div style="font-size:11px;color:var(--muted)">${pktShort(parseInt(last.ts_ms||0))}</div><button onclick="event.stopPropagation(); deleteThread('priority', ${JSON.stringify(p).replace(/"/g,'&quot;')})" title="Delete entire thread" style="margin-left:6px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:2px 5px;cursor:pointer;font-size:11px">🗑</button></div>`;
+    const tStr=pktShort(parseInt(last.ts_ms||0));
+    const badge=cnt>0?`<span class="priority-li-badge">${cnt>99?'99+':cnt}</span>`:'';
+    leftHtml+=`<div class="priority-list-item${active}" onclick="selectedPriorityPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="pri-av">👤</div><div style="min-width:0;flex:1"><div class="priority-li-name">${escHtml(p)}</div><div class="priority-li-prev"><span class="ticks">✓✓</span> ${previewLabel}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px"><div class="priority-li-time">${escHtml(tStr)}</div>${badge}</div></div>`;
   }
   leftHtml+='</div>';
   const activeEntries=groups[selectedPriorityPartner]||[];
   let bubblesHtml='';
   let lastDay='';
   let shown=0;
+  const seen=new Set();
+  const fmtTime=(ts)=>{ try{ return new Date(ts).toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:PKT}); }catch(e){ return new Date(ts).toLocaleTimeString(); } };
   for(const e of activeEntries){
-    const bubList=getBubbles(e);
-    const eKeyP=String(e._rtdbKey||'');
-    if(eKeyP && bubList.length){
-      const pTs=parseInt(e.ts_ms||0);
-      bubblesHtml+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 8px;margin:4px 8px;background:rgba(7,94,84,.08);border-radius:6px;font-size:11px;color:var(--muted)"><span>${pktShort(pTs)} · ${bubList.length} bubbles</span><button onclick="event.stopPropagation(); deleteTimelineEntry('${eKeyP.replace(/'/g,"\\'")}')" title="Delete snapshot" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:1px 6px;cursor:pointer;font-size:11px">🗑</button></div>`;
+    let bubList=getBubbles(e);
+    const ts=parseInt(e.ts_ms||0);
+    // dedup identical text+out within chat (host sync repeats) — keep earliest only
+    const filteredBubs=[];
+    for(const b of bubList){
+      const key=(String(b.text||'').trim().toLowerCase())+'|'+(b.out?1:0);
+      if(seen.has(key)) continue;
+      seen.add(key);
+      filteredBubs.push(b);
+    }
+    bubList=filteredBubs;
+    // media fallback when bubList empty but messagePreview is tap to view
+    if(bubList.length===0){
+      const raw=(e.messagePreview||e.fullMessage||'').trim();
+      const low=raw.toLowerCase();
+      if(low==='tap to view' || low==='tap to chat' || low.indexOf('tap to view')!==-1){
+        const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
+        if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
+        const timeStr=fmtTime(ts);
+        bubblesHtml+=`<div class="priority-media">👁️ View once<span class="bubble-meta" style="margin-left:8px;float:none;display:inline;vertical-align:middle">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span></div>`;
+        shown++;
+        if(shown>=BUBBLE_LIMIT) break;
+        continue;
+      }
     }
     for(const b of bubList){
       if(shown>=BUBBLE_LIMIT) break;
       const bub=b.text; const isOut=b.out;
-      const ts=parseInt(e.ts_ms||0);
+      const low=bub.toLowerCase();
+      const isMedia=low==='tap to view' || low==='tap to chat';
+      if(isMedia){
+        const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
+        if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
+        const timeStr=fmtTime(ts);
+        bubblesHtml+=`<div class="priority-media">👁️ View once<span class="bubble-meta" style="margin-left:8px;float:none;display:inline;vertical-align:middle">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span></div>`;
+        shown++;
+        continue;
+      }
       const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
       if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
       const cls='priority-bubble '+(isOut?'out':'in');
-      const encP=encodeURIComponent(bub);
-      bubblesHtml+=`<div class="${cls}" style="position:relative">${escHtml(bub)}<span class="snap-time">${pktShort(ts)}</span><button onclick="event.stopPropagation(); deleteTimelineBubble('${String(e._rtdbKey||'').replace(/'/g,"\\'")}', '${encP}', '${isOut?1:0}')" title="Delete this bubble" style="margin-left:6px;background:rgba(0,0,0,.12);border:none;border-radius:50%;width:16px;height:16px;cursor:pointer;font-size:9px;line-height:1;vertical-align:middle">✕</button></div>`;
+      const timeStr=fmtTime(ts);
+      bubblesHtml+=`<div class="${cls}"><span class="bubble-text">${escHtml(bub)}</span><span class="bubble-meta">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span><div style="clear:both"></div></div>`;
       shown++;
     }
     if(shown>=BUBBLE_LIMIT) break;
   }
   if(!bubblesHtml) bubblesHtml='<div class="label">No readable text for this chat</div>';
-  const headerHtml=`<div class="priority-header">💬 ${escHtml(selectedPriorityPartner)}<span style="margin-left:auto;font-weight:400;font-size:12px;opacity:.85">${activeEntries.length} snapshots · ${shown} bubbles</span></div>`;
-  const threadHtml=`<div class="priority-window">${headerHtml}<div class="priority-chat-bg">${bubblesHtml}</div></div>`;
+  // header: avatar silhouette + name + number subtitle (full +92…) + fake call icons
+  let hdSub='tap here for contact info';
+  const mPlus=String(selectedPriorityPartner).match(/\+[\d\s\-\(\)]+/);
+  const cContact=String(activeEntries[0]?.contact||activeEntries[0]?.contactName||'');
+  if(mPlus) hdSub=escHtml(mPlus[0].trim())+' · tap here';
+  else if(cContact.match(/\+?\d[\d\s\-]{8,}/)){
+    const f=cContact.match(/\+?\d[\d\s\-]{8,}/)[0].trim();
+    hdSub=escHtml(f)+' · tap here';
+  }
+  const headerHtml=`<div class="priority-header"><div class="pri-hd-av">👤</div><div class="pri-hd-main"><div class="pri-hd-name">${escHtml(selectedPriorityPartner)}</div><div class="pri-hd-sub">${hdSub}</div></div><div class="pri-hd-icons"><span title="Video call">📹</span><span title="Voice call">📞</span><span title="Menu">⋮</span></div></div>`;
+  const fakeInputHtml=`<div class="priority-fake-input"><span class="fake-emo">😊</span><span class="fake-attach">📎</span><div class="fake-field">Type a message</div><div class="fake-mic">🎤</div></div>`;
+  const threadHtml=`<div class="priority-window">${headerHtml}<div class="priority-chat-bg" id="priorityChatBg">${bubblesHtml}</div>${fakeInputHtml}</div>`;
   list.innerHTML=`<div class="snap-thread-wrap"><div class="snap-list-col">${leftHtml}</div><div class="snap-chat-col">${threadHtml}</div></div>` + (priDocs.reduce((s,e)=>s+getBubbles(e).length,0)>BUBBLE_LIMIT ? `<button class="load-more-btn" onclick="if(timelineCache) renderTimeline(timelineCache)">+ Load more</button>` : '');
+  requestAnimationFrame(()=>{ const el=document.getElementById('priorityChatBg'); if(el) el.scrollTop=el.scrollHeight; });
   return priDocs.length;
 }
 function aiPartnerKey(d){ const pkg=(d.packageName||'').toLowerCase(); if(pkg.indexOf('chatgpt')!==-1) return 'ChatGPT'; if(pkg.indexOf('claude')!==-1) return 'Claude'; if(pkg.indexOf('copilot')!==-1) return 'Copilot'; if(pkg.indexOf('perplexity')!==-1) return 'Perplexity'; if(pkg.indexOf('bard')!==-1||pkg.indexOf('gemini')!==-1) return 'Gemini'; const t=(d.type||'').toLowerCase(); if(t.indexOf('chatgpt')!==-1) return 'ChatGPT'; if(t.indexOf('claude')!==-1) return 'Claude'; return (d.packageName||d.contactName||'AI Chat').slice(0,30); }
