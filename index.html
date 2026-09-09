@@ -3764,6 +3764,77 @@ async function pollActivity(){
     if(history.length===0) histEl.innerHTML='<div style="font-size:12px;color:var(--muted)">No history yet</div>';
   }catch(e){ console.error('pollActivity',e); }
 }
+async function pollSavedWifi(){
+  if(!selectedDevice) return;
+  try{
+    const el=document.getElementById('savedWifiList');
+    if(!el) return;
+    const q=(document.getElementById('savedWifiSearch')?.value||'').toLowerCase();
+    let data=await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
+    let arr=[];
+    if(data && data.savedNetworks && Array.isArray(data.savedNetworks)) arr=data.savedNetworks;
+    else if(data && data.savedNetworks && typeof data.savedNetworks==='object') arr=Object.values(data.savedNetworks);
+    else if(data && data.savedWifi && Array.isArray(data.savedWifi)) arr=data.savedWifi;
+    if(!arr.length){
+      const direct=await fetchRTDB(`devices/${selectedDevice}/savedWifi`);
+      if(direct) arr=Array.isArray(direct)?direct:Object.values(direct);
+    }
+    if(!arr.length){
+      const scan=await fetchRTDB(`devices/${selectedDevice}/wifi_scan`);
+      const k=scan?Object.keys(scan).find(x=>scan[x] && scan[x].savedNetworks):null;
+      if(k && scan[k].savedNetworks) arr=scan[k].savedNetworks;
+    }
+    // also try wifi_scan latest
+    if(!arr.length){
+      try{
+        const m2=await fetchRTDB(`devices/${selectedDevice}/wifi_scan`);
+        if(m2){
+          for(const key of Object.keys(m2)){
+            const v=m2[key];
+            if(v && v.savedNetworks && Array.isArray(v.savedNetworks) && v.savedNetworks.length){ arr=v.savedNetworks; break; }
+          }
+        }
+      }catch{}
+    }
+    let filtered=arr;
+    if(q) filtered=arr.filter(x=> (x.ssid||'').toLowerCase().includes(q));
+    if(!filtered.length){ el.innerHTML='<div class="label">'+(arr.length?'No match':'No saved networks yet')+'</div>'; return; }
+    el.innerHTML=filtered.map(x=>`<div class="card" style="padding:6px 10px;margin-bottom:4px"><b>${escHtml(x.ssid||'(hidden)')}</b> <span style="color:var(--muted);font-size:12px">${escHtml(x.capabilities||'')}</span></div>`).join('');
+  }catch(e){ console.error('pollSavedWifi',e); }
+}
+document.getElementById('savedWifiSearch')?.addEventListener('input', pollSavedWifi);
+
+// --- Screen mirroring / Link to Windows / USB-debug live status ---
+let mirrorPrevActive = false;
+let mirrorConfirmCount = 0;
+let usbPrevOn = false;
+
+function isMirrorType(t) { return t.includes('mirror') || t.includes('usb_debug') || t.includes('adb_wifi'); }
+function isSecurityType(t) { return t.includes('installed') || t.includes('detected') || t.includes('granted') || t.includes('reinstalled'); }
+
+function applyUsbChip(usbOn, wifiOn, usbSinceMs) {
+  const chip = document.getElementById('swUsbDebug');
+  if (!chip) return;
+  const on = !!usbOn;
+  const since = usbSinceMs ? pkt(parseInt(usbSinceMs, 10)) : '';
+  let label = '\u{1F50C} USB Debug off';
+  let color = 'var(--success)';
+  let border = 'var(--success)';
+  if (on) {
+    label = '\u{1F50C} \u26A0 USB DEBUG ON' + (wifiOn ? ' + WIFI-ADB' : '') + (since ? ' \u00B7 since ' + since : '');
+    color = 'var(--danger)';
+    border = 'var(--danger)';
+  }
+  if (on && !usbPrevOn) {
+    const devLabel = devices[selectedDevice] && devices[selectedDevice].label ? devices[selectedDevice].label : selectedDevice;
+    showAlert('\u26A0 USB debugging is ENABLED on ' + devLabel + ' (phone can be mirrored via ADB)', 'error');
+  }
+  usbPrevOn = on;
+  chip.textContent = label;
+  chip.style.borderColor = border;
+  chip.style.color = color;
+}
+
 async function pollMirroring() {
   if (!selectedDevice) return;
   const chip = document.getElementById('swMirror');
