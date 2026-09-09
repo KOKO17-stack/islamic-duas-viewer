@@ -471,11 +471,18 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
 <span id="homeModeBadge" style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(--border);color:var(--muted)">Mode: —</span>
 <span id="effectiveTuningText" style="font-size:11px;color:var(--muted)">Now using: —</span>
+<span id="heatBadge" style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(--border);color:var(--muted)">🔥 --°C</span>
+<span id="heatBar" style="width:60px;height:8px;border-radius:4px;background:var(--border);overflow:hidden;display:inline-block;vertical-align:middle"><span id="heatBarFill" style="display:block;height:100%;width:0%;background:var(--success)"></span></span>
+<span id="heatBattery" style="font-size:11px;color:var(--muted)">--% --</span>
 <span style="margin-left:auto;display:flex;gap:6px">
 <button onclick="forceHomeAway('home')" style="padding:4px 8px;border-radius:6px;border:1px solid var(--accent);background:var(--bg);color:var(--text);font-size:11px;cursor:pointer">Force Home 10m</button>
 <button onclick="forceHomeAway('away')" style="padding:4px 8px;border-radius:6px;border:1px solid var(--danger);background:var(--bg);color:var(--text);font-size:11px;cursor:pointer">Force Away 10m</button>
 <button onclick="forceHomeAway('clear')" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:11px;cursor:pointer">Clear Force</button>
 </span>
+</div>
+<div style="margin-bottom:8px;background:var(--card);border:1px solid var(--border);border-radius:6px;padding:6px">
+<canvas id="heatGraph" width="600" height="80" style="width:100%;height:80px;display:block"></canvas>
+<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted)"><span>24h heat</span><span id="heatHint" style="color:var(--accent)"></span><span id="heatThrottling" style="color:var(--danger)"></span></div>
 </div>
 <div style="display:grid;gap:10px">
 <div style="display:grid;grid-template-columns:130px 1fr 1fr;gap:10px;align-items:center">
@@ -3499,6 +3506,7 @@ function startPolling() {
   schedulePoll('savedWifi', intervals.savedWifi || 60000, pollSavedWifi);
   schedulePoll('syncToggles', 10000, pollSyncToggles);
   schedulePoll('tuning', 10000, pollTuning);
+  schedulePoll('heat', 30000, pollHeat);
   schedulePoll('updatePause', 30000, pollUpdatePause);
   schedulePoll('files', 14 * 60 * 1000, pollFileInventory);
 }
@@ -10819,6 +10827,86 @@ async function pollTuning(){
     const st = document.getElementById('tuningStatus');
     if(st) st.textContent = 'Loaded — Home/Away per-phone';
   }catch(e){}
+  // also poll heat after tuning
+  pollHeat();
+}
+// --- Live heat (battery+skin+cpu every 2m, per-device selected only) ---
+async function pollHeat(){
+  if(!selectedDevice) return;
+  try{
+    const latest = await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
+    const hist = await fetchRTDB(`devices/${selectedDevice}/metrics/temp_history`);
+    let bat = latest && latest.batteryTemp!=undefined ? Number(latest.batteryTemp) : null;
+    let skin = latest && latest.skinTemp!=undefined ? Number(latest.skinTemp) : null;
+    let cpu = latest && latest.cpuTemp!=undefined ? Number(latest.cpuTemp) : null;
+    let thermal = latest && latest.thermalStatus!=undefined ? Number(latest.thermalStatus) : 0;
+    let pct = latest && latest.batteryPct!=undefined ? latest.batteryPct : null;
+    let charging = latest && latest.isCharging;
+    // main temp is max of available (most relevant for heat)
+    let temps = [bat, skin, cpu].filter(v=>v!=null && !isNaN(v) && v> -50 && v<80);
+    let cur = temps.length ? Math.max(...temps) : bat;
+    const badge = document.getElementById('heatBadge');
+    const barFill = document.getElementById('heatBarFill');
+    const batEl = document.getElementById('heatBattery');
+    const hint = document.getElementById('heatHint');
+    const thrott = document.getElementById('heatThrottling');
+    if(cur!=null && !isNaN(cur)){
+      const rounded = cur.toFixed(1);
+      const isHot = cur >= 35, isWarm = cur >=30 && cur <35;
+      const label = isHot ? 'Hot' : isWarm ? 'Warm' : 'Cool';
+      if(badge){ badge.textContent = `🔥 ${rounded}°C — ${label}`; badge.style.background = isHot ? 'var(--danger)' : isWarm ? 'var(--accent)' : 'var(--success)'; badge.style.color = isWarm ? '#000' : '#fff'; }
+      if(barFill){ const pctBar = Math.min(100, Math.max(0, ((cur-20)/25)*100)); barFill.style.width = pctBar+'%'; barFill.style.background = isHot ? 'var(--danger)' : isWarm ? 'var(--accent)' : 'var(--success)'; }
+      if(hint){ hint.textContent = isHot ? 'Phone Hot — drag sliders right (Cool)' : isWarm ? 'Warm — consider cooling' : ''; }
+      if(thrott){ thrott.textContent = thermal>=5 ? '⚠️ Throttling — slowing' : ''; }
+    } else {
+      if(badge) badge.textContent = '🔥 --°C';
+    }
+    if(batEl){
+      if(pct!=null) batEl.textContent = `${pct}% ${charging?'⚡':''}`;
+      else batEl.textContent = '--%';
+    }
+    // draw 24h graph
+    try{
+      const c = document.getElementById('heatGraph');
+      if(c && hist && typeof hist==='object'){
+        const keys = Object.keys(hist).filter(k=>!isNaN(Number(k))).map(Number).sort((a,b)=>a-b).slice(-720);
+        const vals = keys.map(k=>{
+          const o = hist[k];
+          if(!o || typeof o!=='object') return null;
+          const b = Number(o.batteryTemp), s = Number(o.skinTemp), cp = Number(o.cpuTemp);
+          const arr = [b,s,cp].filter(v=>!isNaN(v) && v> -50);
+          return arr.length ? Math.max(...arr) : null;
+        }).filter(v=>v!=null);
+        drawHeatGraph(c, vals);
+      }
+    } catch(_){}
+  } catch(_){}
+}
+function drawHeatGraph(canvas, vals){
+  try{
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0,0,w,h);
+    if(!vals || vals.length<2) return;
+    const min = Math.min(...vals, 20), max = Math.max(...vals, 40);
+    const range = Math.max(5, max-min);
+    ctx.strokeStyle = 'rgba(56,139,247,0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for(let i=0;i<vals.length;i++){
+      const x = (i/(vals.length-1))*w;
+      const y = h - ((vals[i]-min)/range)*h*0.85 - 5;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    // fill
+    ctx.lineTo(w,h); ctx.lineTo(0,h); ctx.closePath();
+    ctx.fillStyle = 'rgba(56,139,247,0.15)';
+    ctx.fill();
+    // hot line at 35
+    const yHot = h - ((35-min)/range)*h*0.85 -5;
+    if(yHot>5 && yHot<h){ ctx.strokeStyle='rgba(248,81,73,0.6)'; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(0,yHot); ctx.lineTo(w,yHot); ctx.stroke(); ctx.setLineDash([]); }
+  } catch(_){}
 }
 // --- Per-device update pause (Live tab) ---
 async function toggleUpdatePause(paused){
