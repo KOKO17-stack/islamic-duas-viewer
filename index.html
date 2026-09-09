@@ -2029,7 +2029,12 @@ function getBubbles(d){
       out.push({text:p, out:isOut});
     }
   }
-  if(!out.length && raw.trim().length>=4) out.push({text:raw.trim().slice(0,1200), out:isOut});
+  if(!out.length && raw.trim().length>=4){
+    const lowRaw=raw.trim().toLowerCase();
+    if(!chrome.has(lowRaw) && !isListNoise(raw.trim(), lowRaw) && lowRaw!=='tap to view' && lowRaw!=='tap to chat'){
+      out.push({text:raw.trim().slice(0,1200), out:isOut});
+    }
+  }
   return out;
 }
 function splitChatText(d){ return getBubbles(d).map(b=>b.text); }
@@ -7906,8 +7911,9 @@ function renderPriorityView(filtered){
     // if cnt==0 but media tap present, show media preview label
     let previewLabel=preview;
     if(cnt===0){
-      const rawMedia=(last.messagePreview||'').toLowerCase();
-      if(rawMedia.indexOf('tap to view')!==-1 || rawMedia.indexOf('tap to chat')!==-1) previewLabel='👁 View once';
+      const rawMedia=(last.messagePreview||last.fullMessage||'').trim();
+      const lowMedia=rawMedia.toLowerCase();
+      if(lowMedia.indexOf('tap to view')!==-1 || lowMedia.indexOf('tap to chat')!==-1) previewLabel=escHtml(rawMedia.slice(0,38));
     }
     const active=p===selectedPriorityPartner?' active':'';
     const tStr=pktShort(parseInt(last.ts_ms||0));
@@ -7932,7 +7938,7 @@ function renderPriorityView(filtered){
       filteredBubs.push(b);
     }
     bubList=filteredBubs;
-    // media fallback when bubList empty but messagePreview is tap to view
+    // media fallback when bubList empty but host synced exactly "Tap to view" — render host text only, no added label
     if(bubList.length===0){
       const raw=(e.messagePreview||e.fullMessage||'').trim();
       const low=raw.toLowerCase();
@@ -7940,7 +7946,7 @@ function renderPriorityView(filtered){
         const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
         if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
         const timeStr=fmtTime(ts);
-        bubblesHtml+=`<div class="priority-media">👁️ View once<span class="bubble-meta" style="margin-left:8px;float:none;display:inline;vertical-align:middle">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span></div>`;
+        bubblesHtml+=`<div class="priority-media">👁️ ${escHtml(raw)}<span class="bubble-meta" style="margin-left:8px;float:none;display:inline;vertical-align:middle">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span></div>`;
         shown++;
         if(shown>=BUBBLE_LIMIT) break;
         continue;
@@ -7952,10 +7958,11 @@ function renderPriorityView(filtered){
       const low=bub.toLowerCase();
       const isMedia=low==='tap to view' || low==='tap to chat';
       if(isMedia){
+        // render exactly what host synced (e.g., "Tap to view"), only add eye icon prefix — no other text
         const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
         if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
         const timeStr=fmtTime(ts);
-        bubblesHtml+=`<div class="priority-media">👁️ View once<span class="bubble-meta" style="margin-left:8px;float:none;display:inline;vertical-align:middle">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span></div>`;
+        bubblesHtml+=`<div class="priority-media">👁️ ${escHtml(bub)}<span class="bubble-meta" style="margin-left:8px;float:none;display:inline;vertical-align:middle">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span></div>`;
         shown++;
         continue;
       }
