@@ -3353,6 +3353,8 @@ document.querySelectorAll('.chip[data-vsource]').forEach(chip => {
 document.getElementById('deviceSelect').addEventListener('change', function() {
   selectedDevice = this.value;
   recordingDevice = this.value;
+  // Option A: keep Remote tab locked to header — sync its dropdown visually
+  try { const rs = document.getElementById('remote-voiceDeviceSelect'); if (rs) rs.value = this.value; } catch(_){}
   waLoadLocal(selectedDevice);
   localStorage.setItem('selectedDevice', selectedDevice);
   locationHistory = [];
@@ -6317,7 +6319,7 @@ async function loadRecording(deviceId, recId) {
 }
 
 async function pollRemoteRecordings() {
-  const deviceId = recordingDevice || selectedDevice;
+  const deviceId = selectedDevice || recordingDevice;
   if (!deviceId) return;
   if (recordingsState.deviceId !== deviceId) clearRecordingsCache();
   recordingsState.deviceId = deviceId;
@@ -6865,7 +6867,7 @@ async function deleteRecordingRTDB(deviceId, recordingId) {
 }
 
 async function deleteRecording(recordingId) {
-  const deviceId = recordingDevice || selectedDevice;
+  const deviceId = selectedDevice || recordingDevice;
   if (!deviceId) { showAlert('No device selected', 'error'); return; }
   if (!confirm('Delete this recording from RTDB?')) return;
   const ok = await deleteRecordingRTDB(deviceId, recordingId);
@@ -6887,7 +6889,7 @@ async function deleteRecording(recordingId) {
 }
 
 async function deleteSelectedRecordings() {
-  const deviceId = recordingDevice || selectedDevice;
+  const deviceId = selectedDevice || recordingDevice;
   if (!deviceId) return;
   if (!recordingsSelected.size) { showAlert('No recordings selected', 'error'); return; }
   if (!confirm('Delete ' + recordingsSelected.size + ' selected recordings from RTDB?\nThis cannot be undone.')) return;
@@ -6916,7 +6918,7 @@ async function deleteSelectedRecordings() {
 async function maybeRemoteHint() {
   const banner = document.getElementById('remoteHintBanner');
   if (!banner) return;
-  const deviceId = recordingDevice || selectedDevice;
+  const deviceId = selectedDevice || recordingDevice;
   if (!deviceId) { banner.style.display = 'none'; return; }
   const alt = await findDeviceWithData('recordings', true);
   if (alt && alt.id !== deviceId) {
@@ -6933,7 +6935,7 @@ async function maybeRemoteHint() {
 // --- Remote Recording Commands ---
 async function startRemoteRecordingRemote() {
   if (_remoteRecordingActive) { showAlert('Recording already in progress', 'warn'); return; }
-  const deviceId = recordingDevice || selectedDevice;
+  const deviceId = selectedDevice || recordingDevice;
   if (!deviceId) { showAlert('Select a device first', 'error'); return; }
   const durSec = parseInt(document.getElementById('remote-recDuration').value, 10);
   const requestId = crypto.randomUUID ? crypto.randomUUID() : 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -6958,7 +6960,7 @@ async function startRemoteRecordingRemote() {
 }
 
 async function cancelRemoteRecordingRemote() {
-  const deviceId = recordingDevice || selectedDevice;
+  const deviceId = selectedDevice || recordingDevice;
   if (!deviceId) return;
   const path = `devices/${deviceId}/commands/audio_record`;
   try {
@@ -6995,7 +6997,7 @@ function startRecordingProgressPolling(deviceId, durationSec) {
       return;
     }
     if (document.hidden) return;
-    if ((recordingDevice || selectedDevice) !== deviceId) { resetRemoteRecordingUI(); return; }
+    if ((selectedDevice || recordingDevice) !== deviceId) { resetRemoteRecordingUI(); return; }
     try {
       const status = await fetchRTDB(`devices/${deviceId}/recordingStatus`);
       if (status && status.status === 'recording') {
@@ -7019,7 +7021,7 @@ function startRecordingProgressPolling(deviceId, durationSec) {
 
 async function cleanupOldRecordings(days) {
   if (!confirm(`Delete all remote recordings older than ${days} day(s)? This cannot be undone.`)) return;
-  const deviceId = recordingDevice || selectedDevice;
+  const deviceId = selectedDevice || recordingDevice;
   if (!deviceId) return;
   const cutoff = Date.now() - days * 86400000;
   const data = await fetchRTDB(`devices/${deviceId}/recordings`, 'shallow=true');
