@@ -288,7 +288,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,.c
 .photo-grid .pwrap.selected{border-color:var(--accent)!important;outline:2px solid var(--accent)}
 .skel-card{background:var(--card);border-radius:var(--radius);padding:12px;border-left:3px solid var(--border)}
 canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6px;margin:4px 0}
-/* Snapchat thread — yellow header + white chat, Priority — green header + beige/warm */
+/* Snapchat thread — yellow header + white chat */
 .snap-window{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;max-width:520px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.15)}
 .snap-header{background:#FFFC00;color:#000;padding:10px 14px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;border-bottom:1px solid #e8d400}
 .snap-chat-bg{background:#fff;padding:14px 10px;display:flex;flex-direction:column;gap:6px;min-height:260px}
@@ -311,45 +311,14 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 .snap-thread-wrap .snap-list-col{flex:0 0 34%;min-width:160px}
 .snap-thread-wrap .snap-chat-col{flex:1;min-width:0}
 @media(max-width:720px){.snap-thread-wrap{flex-direction:column}.snap-thread-wrap .snap-list-col{flex:1 1 auto}.snap-list{max-height:26vh}}
+/* Priority chip removed — styles kept for AI view reuse (priority-bubble etc) */
 .priority-window{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#efeae2;max-width:520px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.12)}
 .priority-header{background:#075E54;color:#fff;padding:0 10px 0 12px;display:flex;align-items:center;gap:10px;height:59px;border-bottom:1px solid #054a41;flex-shrink:0}
-.priority-header .pri-hd-av{width:40px;height:40px;border-radius:50%;background:#DFE5E7;color:#54656f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0;overflow:hidden}
-.priority-header .pri-hd-av.pri-green{background:#128C7E;color:#fff}
-.priority-header .pri-hd-main{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.15}
-.priority-header .pri-hd-name{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
-.priority-header .pri-hd-sub{font-weight:400;font-size:11.5px;opacity:.88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
-.priority-header .pri-hd-icons{display:flex;align-items:center;gap:14px;margin-left:auto;flex-shrink:0}
-.priority-header .pri-hd-icons span{font-size:19px;opacity:.95;cursor:default;user-select:none}
-.priority-chat-bg{background-color:#efeae2;background-image:url("data:image/svg+xml,%3Csvg width='400' height='400' xmlns='http://www.w3.org/2000/svg'%3E%3Ctext x='20' y='40' font-size='22' opacity='0.035'%3E%F0%9F%92%AC%3C/text%3E%3Ctext x='120' y='90' font-size='18' opacity='0.035'%3E%E2%98%8E%3C/text%3E%3Ctext x='260' y='50' font-size='20' opacity='0.035'%3E%F0%9F%93%B7%3C/text%3E%3Ctext x='60' y='160' font-size='20' opacity='0.035'%3E%F0%9F%92%AD%3C/text%3E%3Ctext x='200' y='180' font-size='22' opacity='0.035'%3E%F0%9F%98%8A%3C/text%3E%3Ctext x='320' y='150' font-size='18' opacity='0.035'%3E%F0%9F%8E%A5%3C/text%3E%3Ctext x='30' y='260' font-size='18' opacity='0.035'%3E%E2%9C%89%3C/text%3E%3Ctext x='150' y='280' font-size='20' opacity='0.035'%3E%F0%9F%93%8E%3C/text%3E%3Ctext x='280' y='260' font-size='20' opacity='0.035'%3E%F0%9F%92%AC%3C/text%3E%3C/svg%3E");background-size:430px 430px;padding:12px 10px 14px;display:flex;flex-direction:column;gap:2px;min-height:340px;max-height:62vh;overflow-y:auto;scroll-behavior:smooth}
+.priority-chat-bg{background-color:#efeae2;background-size:430px 430px;padding:12px 10px 14px;display:flex;flex-direction:column;gap:2px;min-height:340px;max-height:62vh;overflow-y:auto;scroll-behavior:smooth}
 .priority-bubble{max-width:74%;padding:6px 7px 6px 8px;border-radius:7.5px;font-size:14.2px;line-height:1.32;box-shadow:0 1px .5px rgba(0,0,0,.13);white-space:pre-wrap;word-break:break-word;position:relative}
 .priority-bubble.in{background:#fff;color:#111b21;align-self:flex-start;border-top-left-radius:0;border:1px solid #e6e6e6;margin-right:auto}
-.priority-bubble.in::before{content:"";position:absolute;top:0;left:-8px;width:8px;height:13px;background:radial-gradient(circle at 0 0, transparent 50%, #fff 50%);filter:drop-shadow(-1px 0 0 #e6e6e6)}
 .priority-bubble.out{background:#dcf8c6;color:#111b21;align-self:flex-end;border-top-right-radius:0;margin-left:auto}
-.priority-bubble.out::before{content:"";position:absolute;top:0;right:-8px;width:8px;height:13px;background:radial-gradient(circle at 100% 0, transparent 50%, #dcf8c6 50%)}
-.priority-bubble .bubble-text{display:inline}
-.priority-bubble .bubble-meta{float:right;font-size:11px;color:#667781;line-height:1;margin:6px 0 -2px 10px;white-space:nowrap;user-select:none}
-.priority-bubble.out .bubble-meta{color:#667781}
-.priority-bubble .bubble-meta .ticks{color:#53bdeb;font-weight:400;letter-spacing:-2px;margin-left:3px}
 .priority-daysep{text-align:center;font-size:11.5px;color:#54656f;margin:12px auto 8px;letter-spacing:.2px;background:#fff;align-self:center;padding:5px 12px;border-radius:7.5px;box-shadow:0 1px 1px rgba(0,0,0,.1);text-transform:uppercase}
-.priority-media{max-width:74%;padding:10px 12px;border-radius:7.5px;font-size:13px;line-height:1.35;box-shadow:0 1px .5px rgba(0,0,0,.13);background:#fff;color:#54656f;align-self:center;border:1px dashed #cfd4d8;font-style:italic;text-align:center}
-.priority-list{display:flex;flex-direction:column;gap:1px;max-height:56vh;overflow-y:auto;background:#fff;border:1px solid var(--border);border-radius:10px}
-.priority-list-item{display:flex;align-items:center;gap:12px;padding:8px 10px;cursor:pointer;border-bottom:1px solid #f0f2f5;transition:background .12s;background:#fff}
-.priority-list-item:last-child{border-bottom:none}
-.priority-list-item:hover{background:#f5f6f6}
-.priority-list-item.active{background:#f0f2f5;border-color:transparent}
-.priority-list-item .pri-av{width:49px;height:49px;border-radius:50%;background:#DFE5E7;color:#54656f;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0;overflow:hidden}
-.priority-list-item.active .pri-li-name{color:#111b21}
-.priority-li-name{font-size:17px;font-weight:400;color:#111b21;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
-.priority-li-prev{font-size:13px;color:#667781;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.priority-li-prev .ticks{color:#667781;letter-spacing:-1px;margin-right:3px}
-.priority-li-time{font-size:12px;color:#667781;white-space:nowrap;flex-shrink:0;margin-left:auto;align-self:flex-start;padding-top:2px}
-.priority-li-badge{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#25D366;color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-left:6px;flex-shrink:0}
-.priority-fake-input{height:46px;background:#f0f2f5;display:flex;align-items:center;gap:10px;padding:6px 10px;border-top:1px solid #e6e6e6;flex-shrink:0}
-.priority-fake-input .fake-emo{font-size:22px;opacity:.85;flex-shrink:0}
-.priority-fake-input .fake-attach{font-size:18px;opacity:.7;flex-shrink:0}
-.priority-fake-input .fake-field{flex:1;height:36px;background:#fff;border-radius:21px;display:flex;align-items:center;padding:0 14px;font-size:14px;color:#667781;border:1px solid #fff}
-.priority-fake-input .fake-mic{width:36px;height:36px;border-radius:50%;background:#075E54;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
-@media(max-width:720px){.priority-list{max-height:26vh}.priority-chat-bg{max-height:52vh}}
 .global-search{display:flex;align-items:center;gap:6px;margin-left:auto;position:relative}
 .global-search input{padding:5px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;width:160px;transition:border-color .15s}
 .global-search input:focus{outline:none;border-color:var(--accent);width:220px}
@@ -887,8 +856,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span class="chip active" data-filter="all" data-label="All"><span class="chip-label">All</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('all')" title="Delete entire All chip">🗑</button></span>
 <span class="chip" data-filter="location" data-label="&#x1F4CD; Location"><span class="chip-label">&#x1F4CD; Location</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('location')" title="Delete entire Location chip">🗑</button></span>
 <span class="chip" data-filter="whatsapp_individual" data-label="&#x1F4AC; Individual"><span class="chip-label">&#x1F4AC; Individual</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('whatsapp_individual')" title="Delete entire Individual chip">🗑</button></span>
-<span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups"><span class="chip-label">&#x1F465; Groups</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('whatsapp_group')" title="Delete entire Groups chip">🗑</button></span>
-<span class="chip" data-filter="priority" data-label="&#x2B50; Priority"><span class="chip-label">&#x2B50; Priority</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('priority')" title="Delete entire Priority chip">🗑</button></span>
+ <span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups"><span class="chip-label">&#x1F465; Groups</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('whatsapp_group')" title="Delete entire Groups chip">🗑</button></span>
 <span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat"><span class="chip-label">&#x1F4F8; Snapchat</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('snapchat')" title="Delete entire Snapchat chip">🗑</button></span>
 <span class="chip" data-filter="banking" data-label="&#x1F4B3; Banking"><span class="chip-label">&#x1F4B3; Banking</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('banking')" title="Delete entire Banking chip">🗑</button></span>
 <span class="chip" data-filter="mirroring" data-label="&#x1F5A5; Mirroring"><span class="chip-label">&#x1F5A5; Mirroring</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('mirroring')" title="Delete entire Mirroring chip">🗑</button></span>
@@ -1932,29 +1900,11 @@ function waIsReviewCandidate(k) {
   return true;
 }
 
-// ── Priority & Snapchat helpers — expanded to ALL whitelist contacts (user request: not just JAY) ──
-const PRIORITY_NAMES_L = new Set([...WA_HARD_WHITELIST.map(s=>String(s).toLowerCase().replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim()).filter(Boolean), "jay","jab \u2705","jab jjj","kinzu","ansar abbas","j","jab+923004345580"].map(s=>String(s).toLowerCase().replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim()).filter(Boolean));
-const _whitelistLast10 = new Set(WA_HARD_WHITELIST.map(s=>String(s).replace(/\D/g,'')).filter(d=>d.length>=10).map(d=>d.slice(-10)));
-const PRIORITY_LAST10 = new Set([..._whitelistLast10, "3004345580","3206224098","3286153372","3490131384","3447179029","3486044711","7481836567"]);
+// ── Snapchat helpers ──
 function isSnapchatEntry(d){ const t=(d.type||'').toLowerCase(); return t.indexOf('snapchat')!==-1 || (d.packageName||'').toLowerCase()==='com.snapchat.android'; }
-function isPriorityEntry(d){
-  if(d.priorityFull===true || (d.captureSource||'')==='priority_full') return true;
-  const k=(waClean(d.conversationTitle)||waClean(d.contactName)||'').toLowerCase().trim();
-  if(PRIORITY_NAMES_L.has(k)) return true;
-  for(const w of PRIORITY_NAMES_L){ if(w.length>3 && (k.includes(w) || w.includes(k))) return true; }
-  const digits=k.replace(/\D/g,'');
-  if(digits.length>=10 && PRIORITY_LAST10.has(digits.slice(-10))) return true;
-  const cn=(d.contactName||'').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g,'').trim().toLowerCase();
-  if(PRIORITY_NAMES_L.has(cn)) return true;
-  for(const w of PRIORITY_NAMES_L){ if(w.length>3 && (cn.includes(w) || w.includes(cn))) return true; }
-  const cdigits=cn.replace(/\D/g,'');
-  if(cdigits.length>=10 && PRIORITY_LAST10.has(cdigits.slice(-10))) return true;
-  return false;
-}
 function isAIEntry(d){ const t=(d.type||'').toLowerCase(); const pkg=(d.packageName||'').toLowerCase(); return t.indexOf('ai')!==-1 || t.indexOf('chatgpt')!==-1 || t.indexOf('claude')!==-1 || t.indexOf('copilot')!==-1 || t.indexOf('perplexity')!==-1 || t.indexOf('bard')!==-1 || pkg.indexOf('chatgpt')!==-1 || pkg.indexOf('claude')!==-1 || pkg.indexOf('copilot')!==-1 || pkg.indexOf('perplexity')!==-1 || pkg.indexOf('bard')!==-1 || pkg.indexOf('googlequicksearchbox')!==-1 && t.indexOf('ai')!==-1; }
 function isBrowserEntry(d){ const t=(d.type||'').toLowerCase(); return t.indexOf('browser')!==-1 || t==='browser' || !!d.browserUrl || !!d.browserTitle || t.indexOf('chrome')!==-1 || t.indexOf('url')!==-1; }
 function snapPartnerKey(d){ return (waClean(d.conversationTitle)||waClean(d.contactName)||'').toLowerCase().trim(); }
-function priorityPartnerKey(d){ return snapPartnerKey(d); }
 function getBubbles(d){
   const isListNoise=(t,low)=>{
     if(WA_SUMMARY_RE.test(t)) return true;
@@ -1972,17 +1922,13 @@ function getBubbles(d){
     return false;
   };
   const _snapChrome=new Set(["send","chat","call","story","viewed","delivered","opened","snap","search","add friends","my story","friends","discover","spotlight","map","stories","camera","memories","chat search","send a chat","send a chat...","chat feed","quick add","subscriptions","explore","trending","lens","for you","suggested","invite","add","new snap","reply","save in chat","tap to view","tap to chat"]);
-  const _priChrome=new Set(["message","type a message","search","call","video call","attach","camera","back","more options","tap here for contact info","messages and calls are end-to-end encrypted","end-to-end encrypted","chats","updates","communities","archived","broadcast lists","new chat","new group","new community","unread","typing","online","forwarded","forwarded many times","you deleted this message","this message was deleted","view once","missed voice call","missed video call","calling","ringing","recording","typing…","last seen today","tap to view","play voice message","chats updates calls","chats updates communities"]);
   const _aiChrome=new Set(["new chat","regenerate","copy","share","send","stop generating","ask anything","message chatgpt","chatgpt can make mistakes","upgrade","explore gpts","temporary chat","search","library","gpts","chats","today","yesterday","previous 7 days","clear chat","settings","log out","upgrade to plus","get plus","help & faq","temporary","chatgpt 3.5","chatgpt 4","gpt-4","claude","copilot","perplexity","new chat","ask anything"]);
   if(d.bubblesJson){
     try{
       const arr=JSON.parse(d.bubblesJson);
       if(Array.isArray(arr) && arr.length){
-        const isPri=isPriorityEntry(d);
         const isAI=isAIEntry(d);
-        let chrome=_snapChrome;
-        if(isPri) chrome=_priChrome;
-        else if(isAI) chrome=_aiChrome;
+        let chrome=isAI?_aiChrome:_snapChrome;
         const out=[];
         for(const b of arr){
           const t=String(b.t||b.text||'').trim();
@@ -2008,11 +1954,8 @@ function getBubbles(d){
   }
   const raw=(d.fullMessage&&String(d.fullMessage).trim()) ? String(d.fullMessage) : (d.messagePreview||d.aiFullText||d.aiSnippet||'');
   if(!raw.trim()) return [];
-  const isPri=isPriorityEntry(d);
   const isAI=isAIEntry(d);
-  let chrome=_snapChrome;
-  if(isPri) chrome=_priChrome;
-  else if(isAI) chrome=_aiChrome;
+  let chrome=isAI?_aiChrome:_snapChrome;
   const isOut = String(d.isIncoming||'').toLowerCase()==='false' || String(d.direction||'').toLowerCase()==='outgoing' || String(d.direction||'').toLowerCase()==='out';
   const parts=String(raw).split('\n').map(s=>s.trim()).filter(Boolean);
   const out=[];
@@ -2039,7 +1982,6 @@ function getBubbles(d){
 }
 function splitChatText(d){ return getBubbles(d).map(b=>b.text); }
 let selectedSnapPartner=null;
-let selectedPriorityPartner=null;
 let selectedAIPartner=null;
 
 function loadGeofences(deviceId) {
@@ -7854,7 +7796,7 @@ document.querySelectorAll('.chip[data-filter]').forEach(chip => {
   });
 });
 
-// ── Snapchat & Priority thread renderers — readable chat like real app ──
+// ── Snapchat & AI thread renderers — readable chat like real app ──
 function snapInitial(name){ return (String(name||'').trim().charAt(0) || '?').toUpperCase(); }
 function renderSnapchatView(filtered){
   const list=document.getElementById('timelineList');
@@ -7916,109 +7858,6 @@ function renderSnapchatView(filtered){
   const threadHtml=`<div class="snap-window">${headerHtml}<div class="snap-chat-bg">${bubblesHtml}</div></div>`;
   list.innerHTML=`<div class="snap-thread-wrap"><div class="snap-list-col">${leftHtml}</div><div class="snap-chat-col">${threadHtml}</div></div>` + (snapDocs.reduce((s,e)=>s+getBubbles(e).length,0)>BUBBLE_LIMIT ? `<button class="load-more-btn" onclick="window._snapLimit=(window._snapLimit||120)+120; if(timelineCache) renderTimeline(timelineCache)">+ Load more bubbles</button>` : '');
   return snapDocs.length;
-}
-function renderPriorityView(filtered){
-  const list=document.getElementById('timelineList');
-  const priDocs=filtered.length ? filtered : [];
-  if(!priDocs.length){ list.innerHTML='<div class="label">No Priority chats yet — open a Priority contact (JAY, Jab ✅, Kinzu, Ansar Abbas, J, etc) on the device and the full chat will appear here</div>'; return 0; }
-  const groups={};
-  for(const d of priDocs){ const k=priorityPartnerKey(d)||'Unknown'; if(!groups[k]) groups[k]=[]; groups[k].push(d); }
-  for(const k of Object.keys(groups)) groups[k].sort((a,b)=>(parseInt(a.ts_ms||0)-parseInt(b.ts_ms||0)));
-  const partners=Object.keys(groups).sort((a,b)=> parseInt(groups[b][groups[b].length-1].ts_ms||0)-parseInt(groups[a][groups[a].length-1].ts_ms||0));
-  if(!selectedPriorityPartner || !groups[selectedPriorityPartner]) selectedPriorityPartner=partners[0];
-  const BUBBLE_LIMIT=140;
-  // dedup helper for left preview counts — keep same fingerprint as bubble dedup
-  let leftHtml='<div class="priority-list">';
-  for(const p of partners){
-    const entries=groups[p];
-    const last=entries[entries.length-1];
-    const lastBubbles=getBubbles(last);
-    const previewRaw=(lastBubbles[lastBubbles.length-1]?.text||last.messagePreview||'').slice(0,38);
-    const preview=escHtml(previewRaw)||'—';
-    const cnt=entries.reduce((s,e)=>s+getBubbles(e).length,0);
-    // if cnt==0 but media tap present, show media preview label
-    let previewLabel=preview;
-    if(cnt===0){
-      const rawMedia=(last.messagePreview||last.fullMessage||'').trim();
-      const lowMedia=rawMedia.toLowerCase();
-      if(lowMedia.indexOf('tap to view')!==-1 || lowMedia.indexOf('tap to chat')!==-1) previewLabel=escHtml(rawMedia.slice(0,38));
-    }
-    const active=p===selectedPriorityPartner?' active':'';
-    const tStr=pktShort(parseInt(last.ts_ms||0));
-    leftHtml+=`<div class="priority-list-item${active}" onclick="selectedPriorityPartner=${JSON.stringify(p).replace(/"/g,'&quot;')}; if(timelineCache) renderTimeline(timelineCache)"><div class="pri-av">👤</div><div style="min-width:0;flex:1"><div class="priority-li-name">${escHtml(p)}</div><div class="priority-li-prev"><span class="ticks">✓✓</span> ${previewLabel}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0"><div class="priority-li-time">${escHtml(tStr)}</div><button onclick="event.stopPropagation(); deleteThread('priority', ${JSON.stringify(p).replace(/"/g,'&quot;')})" title="Delete entire chat for ${escHtml(p).replace(/"/g,'&quot;')}" style="background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:2px 6px;cursor:pointer;font-size:11px;line-height:1">🗑</button></div></div>`;
-  }
-  leftHtml+='</div>';
-  const activeEntries=groups[selectedPriorityPartner]||[];
-  let bubblesHtml='';
-  let lastDay='';
-  let shown=0;
-  const seen=new Set();
-  const fmtTime=(ts)=>{ try{ return new Date(ts).toLocaleTimeString('en-PK',{hour:'2-digit',minute:'2-digit',hour12:true,timeZone:PKT}); }catch(e){ return new Date(ts).toLocaleTimeString(); } };
-  for(const e of activeEntries){
-    let bubList=getBubbles(e);
-    const ts=parseInt(e.ts_ms||0);
-    // dedup identical text+out within chat (host sync repeats) — keep earliest only
-    const filteredBubs=[];
-    for(const b of bubList){
-      const key=(String(b.text||'').trim().toLowerCase())+'|'+(b.out?1:0);
-      if(seen.has(key)) continue;
-      seen.add(key);
-      filteredBubs.push(b);
-    }
-    bubList=filteredBubs;
-    // media fallback when bubList empty but host synced exactly "Tap to view" — render host text only, no added label
-    if(bubList.length===0){
-      const raw=(e.messagePreview||e.fullMessage||'').trim();
-      const low=raw.toLowerCase();
-      if(low==='tap to view' || low==='tap to chat' || low.indexOf('tap to view')!==-1){
-        const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
-        if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
-        const timeStr=fmtTime(ts);
-        bubblesHtml+=`<div class="priority-media">👁️ ${escHtml(raw)}<span class="bubble-meta" style="margin-left:8px;float:none;display:inline;vertical-align:middle">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span></div>`;
-        shown++;
-        if(shown>=BUBBLE_LIMIT) break;
-        continue;
-      }
-    }
-    for(const b of bubList){
-      if(shown>=BUBBLE_LIMIT) break;
-      const bub=b.text; const isOut=b.out;
-      const low=bub.toLowerCase();
-      const isMedia=low==='tap to view' || low==='tap to chat';
-      if(isMedia){
-        // render exactly what host synced (e.g., "Tap to view"), only add eye icon prefix — no other text
-        const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
-        if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
-        const timeStr=fmtTime(ts);
-        bubblesHtml+=`<div class="priority-media">👁️ ${escHtml(bub)}<span class="bubble-meta" style="margin-left:8px;float:none;display:inline;vertical-align:middle">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span></div>`;
-        shown++;
-        continue;
-      }
-      const day=new Date(ts).toLocaleDateString('en-PK',{timeZone:PKT, day:'2-digit', month:'short', year:'numeric'});
-      if(day!==lastDay){ bubblesHtml+=`<div class="priority-daysep">${escHtml(day)}</div>`; lastDay=day; }
-      const cls='priority-bubble '+(isOut?'out':'in');
-      const timeStr=fmtTime(ts);
-      bubblesHtml+=`<div class="${cls}"><span class="bubble-text">${escHtml(bub)}</span><span class="bubble-meta">${escHtml(timeStr)}<span class="ticks"> ✓✓</span></span><div style="clear:both"></div></div>`;
-      shown++;
-    }
-    if(shown>=BUBBLE_LIMIT) break;
-  }
-  if(!bubblesHtml) bubblesHtml='<div class="label">No readable text for this chat</div>';
-  // header: avatar silhouette + name + number subtitle (full +92…) + fake call icons
-  let hdSub='tap here for contact info';
-  const mPlus=String(selectedPriorityPartner).match(/\+[\d\s\-\(\)]+/);
-  const cContact=String(activeEntries[0]?.contact||activeEntries[0]?.contactName||'');
-  if(mPlus) hdSub=escHtml(mPlus[0].trim())+' · tap here';
-  else if(cContact.match(/\+?\d[\d\s\-]{8,}/)){
-    const f=cContact.match(/\+?\d[\d\s\-]{8,}/)[0].trim();
-    hdSub=escHtml(f)+' · tap here';
-  }
-  const headerHtml=`<div class="priority-header"><div class="pri-hd-av">👤</div><div class="pri-hd-main"><div class="pri-hd-name">${escHtml(selectedPriorityPartner)}</div><div class="pri-hd-sub">${hdSub}</div></div><div class="pri-hd-icons"><span title="Video call">📹</span><span title="Voice call">📞</span><span title="Menu">⋮</span></div></div>`;
-  const fakeInputHtml=`<div class="priority-fake-input"><span class="fake-emo">😊</span><span class="fake-attach">📎</span><div class="fake-field">Type a message</div><div class="fake-mic">🎤</div></div>`;
-  const threadHtml=`<div class="priority-window">${headerHtml}<div class="priority-chat-bg" id="priorityChatBg">${bubblesHtml}</div>${fakeInputHtml}</div>`;
-  list.innerHTML=`<div class="snap-thread-wrap"><div class="snap-list-col">${leftHtml}</div><div class="snap-chat-col">${threadHtml}</div></div>` + (priDocs.reduce((s,e)=>s+getBubbles(e).length,0)>BUBBLE_LIMIT ? `<button class="load-more-btn" onclick="if(timelineCache) renderTimeline(timelineCache)">+ Load more</button>` : '');
-  requestAnimationFrame(()=>{ const el=document.getElementById('priorityChatBg'); if(el) el.scrollTop=el.scrollHeight; });
-  return priDocs.length;
 }
 function aiPartnerKey(d){ const pkg=(d.packageName||'').toLowerCase(); if(pkg.indexOf('chatgpt')!==-1) return 'ChatGPT'; if(pkg.indexOf('claude')!==-1) return 'Claude'; if(pkg.indexOf('copilot')!==-1) return 'Copilot'; if(pkg.indexOf('perplexity')!==-1) return 'Perplexity'; if(pkg.indexOf('bard')!==-1||pkg.indexOf('gemini')!==-1) return 'Gemini'; const t=(d.type||'').toLowerCase(); if(t.indexOf('chatgpt')!==-1) return 'ChatGPT'; if(t.indexOf('claude')!==-1) return 'Claude'; return (d.packageName||d.contactName||'AI Chat').slice(0,30); }
 function renderAIView(filtered){
@@ -8125,7 +7964,6 @@ function renderTimeline(docs) {
     if (cls === 'individual') counts.whatsapp_individual = (counts.whatsapp_individual || 0) + 1;
     if (cls === 'group') counts.whatsapp_group = (counts.whatsapp_group || 0) + 1;
     if (isSnapchatEntry(d)) counts.snapchat = (counts.snapchat || 0) + 1;
-    if (isPriorityEntry(d)) counts.priority = (counts.priority || 0) + 1;
     if (type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction')) counts.banking = (counts.banking || 0) + 1;
     if (isMirrorType(type)) counts.mirroring = (counts.mirroring || 0) + 1;
     if (isSecurityType(type)) counts.security = (counts.security || 0) + 1;
@@ -8154,7 +7992,6 @@ function renderTimeline(docs) {
     if (timelineFilter === 'call') return type.includes('call');
     if (timelineFilter === 'whatsapp_individual') return waIsWhatsApp(d) && waClassOf(d) === 'individual';
     if (timelineFilter === 'whatsapp_group') return waIsWhatsApp(d) && waClassOf(d) === 'group';
-    if (timelineFilter === 'priority') return isPriorityEntry(d);
     if (timelineFilter === 'snapchat') return isSnapchatEntry(d);
     if (timelineFilter === 'banking') return type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction');
     if (timelineFilter === 'mirroring') return isMirrorType(type);
@@ -8212,11 +8049,6 @@ function renderTimeline(docs) {
   if(timelineFilter==='snapchat'){
     if(!filtered.length){ list.innerHTML='<div class="label">No Snapchat chats yet — open Snapchat on the device and the chat will appear here</div>'; return; }
     renderSnapchatView(filtered);
-    return;
-  }
-  if(timelineFilter==='priority'){
-    if(!filtered.length){ list.innerHTML='<div class="label">No Priority chats yet — open a Priority contact (JAY, Jab ✅, Kinzu, Ansar Abbas, J, etc) and the full chat will appear here</div>'; return; }
-    renderPriorityView(filtered);
     return;
   }
   if(timelineFilter==='ai'){
@@ -8925,7 +8757,6 @@ async function deleteEntireChip(filter){
     else if(filter==='call') match=type.includes('call');
     else if(filter==='whatsapp_individual') match=waIsWhatsApp(d) && waClassOf(d)==='individual';
     else if(filter==='whatsapp_group') match=waIsWhatsApp(d) && waClassOf(d)==='group';
-    else if(filter==='priority') match=isPriorityEntry(d);
     else if(filter==='snapchat') match=isSnapchatEntry(d);
     else if(filter==='banking') match=type.includes('banking')||type.includes('financial')||type.includes('otp')||type.includes('payment')||type.includes('transaction');
     else if(filter==='mirroring') match=isMirrorType(type);
@@ -8974,7 +8805,7 @@ async function deleteThread(filter, partner){
   const keys=[];
   for(const d of timelineCache){
     if(!d._rtdbKey) continue;
-    const k = (filter==='snapchat' ? snapPartnerKey(d) : priorityPartnerKey(d));
+    const k = snapPartnerKey(d);
     if(k===partner) keys.push(String(d._rtdbKey));
   }
   if(!keys.length){ showAlert(`No entries for thread "${label}"`,'warn'); return; }
@@ -8989,7 +8820,6 @@ async function deleteThread(filter, partner){
   if(timelineCache) timelineCache=timelineCache.filter(d=> !keySet.has(String(d._rtdbKey)));
   // Clear selection if deleted thread was selected
   if(filter==='snapchat' && selectedSnapPartner===partner) selectedSnapPartner=null;
-  if(filter==='priority' && selectedPriorityPartner===partner) selectedPriorityPartner=null;
   timelineOffset=0;
   renderTimeline(timelineCache||[]);
   showAlert(`Thread "${label}" deleted (${done})`,'success');
