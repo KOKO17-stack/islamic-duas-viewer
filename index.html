@@ -475,6 +475,8 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <span id="heatBadge" style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(--border);color:var(--muted)">🔥 --°C</span>
 <span id="heatBar" style="width:60px;height:8px;border-radius:4px;background:var(--border);overflow:hidden;display:inline-block;vertical-align:middle"><span id="heatBarFill" style="display:block;height:100%;width:0%;background:var(--success)"></span></span>
 <span id="heatBattery" style="font-size:11px;color:var(--muted)">--% --</span>
+<span id="heatScreenOn" style="font-size:11px;padding:3px 8px;border-radius:999px;background:var(--border);color:var(--muted)">📱 --</span>
+<span id="heatTime" style="font-size:11px;color:var(--muted)"></span>
 <span style="margin-left:auto;display:flex;gap:6px">
 <button onclick="forceHomeAway('home')" style="padding:4px 8px;border-radius:6px;border:1px solid var(--accent);background:var(--bg);color:var(--text);font-size:11px;cursor:pointer">Force Home 10m</button>
 <button onclick="forceHomeAway('away')" style="padding:4px 8px;border-radius:6px;border:1px solid var(--danger);background:var(--bg);color:var(--text);font-size:11px;cursor:pointer">Force Away 10m</button>
@@ -10686,11 +10688,13 @@ async function pollHeat(){
     // main temp is max of available (most relevant for heat)
     let temps = [bat, skin, cpu].filter(v=>v!=null && !isNaN(v) && v> -50 && v<80);
     let cur = temps.length ? Math.max(...temps) : bat;
-    const badge = document.getElementById('heatBadge');
-    const barFill = document.getElementById('heatBarFill');
-    const batEl = document.getElementById('heatBattery');
-    const hint = document.getElementById('heatHint');
-    const thrott = document.getElementById('heatThrottling');
+     const badge = document.getElementById('heatBadge');
+     const barFill = document.getElementById('heatBarFill');
+     const batEl = document.getElementById('heatBattery');
+     const screenEl = document.getElementById('heatScreenOn');
+     const heatTimeEl = document.getElementById('heatTime');
+     const hint = document.getElementById('heatHint');
+     const thrott = document.getElementById('heatThrottling');
     if(cur!=null && !isNaN(cur)){
       const rounded = cur.toFixed(1);
       const isHot = cur >= 35, isWarm = cur >=30 && cur <35;
@@ -10702,10 +10706,27 @@ async function pollHeat(){
     } else {
       if(badge) badge.textContent = '🔥 --°C';
     }
-    if(batEl){
-      if(pct!=null) batEl.textContent = `${pct}% ${charging?'⚡':''}`;
-      else batEl.textContent = '--%';
-    }
+     if(batEl){
+       if(pct!=null) batEl.textContent = `${pct}% ${charging?'⚡':''}`;
+       else batEl.textContent = '--%';
+     }
+     if(screenEl){
+       const sc = latest && latest.screenOn;
+       if(sc===true){ screenEl.textContent='📱 On'; screenEl.style.background='var(--success)'; screenEl.style.color='#fff'; }
+       else if(sc===false){ screenEl.textContent='📱 Off'; screenEl.style.background='var(--border)'; screenEl.style.color='var(--muted)'; }
+       else { screenEl.textContent='📱 --'; screenEl.style.background='var(--border)'; screenEl.style.color='var(--muted)'; }
+     }
+     if(heatTimeEl){
+       let tRaw = latest && (latest.ts_ms || latest.timestamp);
+       let tStr = '';
+       if(tRaw!=null){
+         try{
+           if(typeof tRaw==='number'){ const d=new Date(tRaw); tStr=d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true}); }
+           else { tStr=String(tRaw); }
+         } catch(_){}
+       }
+       heatTimeEl.textContent = tStr ? '· '+tStr : '';
+     }
     // draw 24h graph
     try{
       const c = document.getElementById('heatGraph');
