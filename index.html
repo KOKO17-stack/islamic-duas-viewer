@@ -1847,21 +1847,21 @@ function waGroupLogic(d) {
   return false;
 }
 
-// Final classification: overrides > noise > group logic > whitelist > candidate-individual
-// Group signals (incl. سیکشن) must beat whitelist so section 06 group stays grouped
+// Final classification: overrides > noise > whitelist > group logic > candidate-individual
+// Whitelist always wins (except confirmed grp via overrides) so individual is never marked group; unknown groups via keywords still group
 function waClassify(d) {
   const k = waCanonicalKey(d).toLowerCase();
   const ov = WA_HARD_OVERRIDES.hasOwnProperty(k) ? WA_HARD_OVERRIDES[k] : WA_LOCAL_OVERRIDES[k];
   if (ov === 'ind') return 'individual';
   if (ov === 'grp') return 'group';
   if (waNoise(d)) return 'noise';
-  if (waGroupLogic(d)) return 'group';
   if (waWhitelistMatch(d)) return 'individual';
+  if (waGroupLogic(d)) return 'group';
   return 'individual';
 }
 
 // Per-CHAT classification (a chat is one canonical key). Resolves mixed
-// per-notification flags: any group evidence in ANY notification -> group.
+// per-notification flags: whitelist always wins over any group evidence.
 let WA_CHAT_CLASSES = {};
 let WA_CHAT_INFO = {};
 function waChatClass(k, m) {
@@ -1869,8 +1869,8 @@ function waChatClass(k, m) {
   if (ov === 'ind') return 'individual';
   if (ov === 'grp') return 'group';
   if (m.noise && !m.whitelisted) return 'noise';
-  if (m.anyGroup) return 'group';
   if (m.whitelisted) return 'individual';
+  if (m.anyGroup) return 'group';
   return 'individual';
 }
 function waBuildChatClasses(docs) {
