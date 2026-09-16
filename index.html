@@ -3639,7 +3639,7 @@ async function pollMeta() {
   const swSteps = document.getElementById('swSteps');
   if (swSteps && m.stepsToday != null) {
     const steps = m.stepsToday;
-    const goal = m.stepsGoal || 8000;
+    const goal = m.stepsGoal || 6000;
     swSteps.textContent = '\u{1F45F} ' + steps.toLocaleString() + '/' + goal.toLocaleString();
     swSteps.style.borderColor = steps >= goal ? 'var(--success)' : 'var(--border)';
     swSteps.style.color = steps >= goal ? 'var(--success)' : 'var(--muted)';
@@ -11185,7 +11185,7 @@ async function pollHealth() {
 
   // Steps card (prefer metrics.latest.stepsToday; fall back to the steps node's latest)
   let steps = (metrics && metrics.stepsToday) || 0;
-  let goal = (metrics && metrics.stepsGoal) || 8000;
+  let goal = (metrics && metrics.stepsGoal) || 6000;
   if ((!steps || steps === 0) && stepsData && typeof stepsData === 'object') {
     const todaySteps = stepsData[todayStr];
     if (todaySteps && typeof todaySteps === 'object') {
@@ -11338,7 +11338,7 @@ function drawStepChartCanvas() {
   // Background
   ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#0d1117';
   ctx.fillRect(0, 0, w, h);
-  const goal = Math.max(...healthStepCache.map(s => s.steps), 8000);
+  const goal = Math.max(...healthStepCache.map(s => s.steps), 6000);
   const maxVal = Math.max(...healthStepCache.map(s => s.steps), goal);
   const vals = healthStepCache.map(s => s.steps);
   const labels = healthStepCache.map(s => {
@@ -11778,7 +11778,7 @@ function renderStepsStats(stepsData) {
   if (!entries.length) { el.innerHTML = ''; return; }
   const last30 = entries.slice(-30);
   const goalVals = last30.map(e => e.goal).filter(g => g > 0);
-  const goal = goalVals.length ? Math.max(...goalVals) : 8000;
+  const goal = goalVals.length ? Math.max(...goalVals) : 6000;
   const now = new Date();
   const dowMonday = (now.getDay() + 6) % 7;
   const weekStart = new Date(now); weekStart.setDate(now.getDate() - dowMonday); weekStart.setHours(0, 0, 0, 0);
@@ -11829,7 +11829,7 @@ function renderStepsCalendar(stepsData) {
   if (!entries.length) { container.innerHTML = ''; return; }
   const dataMap = new Map(entries.map(e => [e.date, e]));
   const goalVals = entries.map(e => e.goal).filter(g => g > 0);
-  const goal = goalVals.length ? Math.max(...goalVals) : 8000;
+  const goal = goalVals.length ? Math.max(...goalVals) : 6000;
   const today = new Date();
   const todayStr = todayLocalStr();
   const months = [];
