@@ -1327,84 +1327,70 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </div>
 </div>
 <div id="healthEmptyHint" style="display:none;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px dashed var(--border);border-radius:8px;font-size:13px;color:var(--muted)">No health data synced from this device yet (steps, cycle or exercise will appear here once the installed app version syncs them).</div>
-<div id="healthTodayStrip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px">
-<div class="card" style="border-left-color:var(--accent);padding:8px 12px"><div class="label">👟 Steps Today</div><div style="font-size:20px;font-weight:700" id="healthTodaySteps">--</div></div>
-<div class="card" style="border-left-color:#ef4444;padding:8px 12px"><div class="label">💧 Cycle</div><div style="font-size:15px;font-weight:700" id="healthTodayCycle">--</div></div>
-<div class="card" style="border-left-color:var(--info);padding:8px 12px"><div class="label">🏋️ Exercise</div><div style="font-size:15px;font-weight:700" id="healthTodayExercise">--</div></div>
-<div class="card" style="border-left-color:var(--success);padding:8px 12px"><div class="label">💊 Pills Today</div><div style="font-size:15px;font-weight:700" id="healthTodayMeds">--</div></div>
-</div>
-<div class="card" style="border-left-color:var(--accent);margin-bottom:10px">
-<div class="label">👟 Steps</div>
-<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span style="font-size:26px;font-weight:700" id="healthSteps">--</span><span style="font-size:13px;color:var(--muted)" id="healthStepsGoal">Goal: --</span></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<div class="card" style="flex:1;min-width:200px;border-left-color:var(--accent)">
+<div class="label">&#x1F45F; Steps Today</div>
+<div style="font-size:30px;font-weight:700" id="healthSteps">--</div>
+<div style="font-size:14px;color:var(--muted)" id="healthStepsGoal">Goal: --</div>
 <div style="margin-top:6px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
 <div id="healthStepsBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--success));border-radius:3px;transition:width 0.5s"></div>
 </div>
-<div id="healthStepsStats" style="font-size:13px;color:var(--muted);margin-top:8px;line-height:1.7"></div>
-<details style="margin-top:8px"><summary style="font-size:13px;color:var(--muted);cursor:pointer">📊 History chart &amp; download</summary>
-<div style="margin-top:6px"><span class="pg" style="gap:4px">
+</div>
+</div>
+<div id="healthStepsStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:10px"></div>
+<div style="margin-top:12px">
+<div class="label">&#x1F4C5; Step History
+<span class="pg" style="gap:4px;margin-left:6px">
 <span class="chip" id="stepRange7" onclick="setStepRange(7)">7 days</span>
 <span class="chip active" id="stepRange30" onclick="setStepRange(30)">30 days</span>
-<span style="font-weight:400;color:var(--muted);font-size:13px;cursor:pointer;margin-left:8px" onclick="exportStepChart()">📥 Export</span>
-</span></div>
+</span>
+<span style="font-weight:400;color:var(--muted);font-size:13px;cursor:pointer" onclick="exportStepChart()">&#x1F4E5; Export</span>
+</div>
 <canvas id="healthStepCanvas" class="chart-canvas"></canvas>
-</details>
-<div style="margin-top:8px">
-<div class="label">📅 This month <span id="stepsPrevToggle" style="font-weight:400;color:var(--muted);font-size:12px;cursor:pointer;margin-left:8px" onclick="togglePrevSteps()">show last month</span></div>
+</div>
+<div style="margin-top:12px">
+<div class="label">&#x1F4C6; Steps Calendar (Previous + Current Month)</div>
 <div id="stepsCalendarContainer"></div>
 </div>
+<div style="margin-top:16px" id="haidhSection">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span class="label">&#x1F4B8; Menstrual Cycle</span>
+<span id="haidhLastSync" style="font-size:13px;color:var(--muted)"></span>
 </div>
-<div style="margin-top:10px" id="haidhSection">
-<div class="card" style="border-left-color:#ef4444;margin-bottom:0">
-<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
-<span class="label">💧 Cycle</span>
-<span id="haidhLastSync" style="font-size:12px;color:var(--muted)"></span>
-</div>
-<div id="haidhPrediction" style="margin:8px 0"></div>
-<div id="haidhSummary" style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:6px"></div>
-<div id="haidhStats" style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:6px"></div>
-<details style="margin-top:6px"><summary style="font-size:13px;color:var(--muted);cursor:pointer">Details, symptoms, flow &amp; download</summary>
-<div style="margin-top:6px;font-size:13px;color:var(--muted);cursor:pointer" onclick="exportHaidhData()">📥 Export cycle data</div>
-<div id="haidhSymptoms" style="margin:8px 0"></div>
-<div id="haidhFlowChart" style="margin:8px 0"></div>
-</details>
-<div style="margin-top:8px">
-<div class="label">📅 This month <span id="haidhPrevToggle" style="font-weight:400;color:var(--muted);font-size:12px;cursor:pointer;margin-left:8px" onclick="togglePrevCycle()">show last month</span></div>
+<div id="haidhPrediction" style="margin-bottom:12px"></div>
+<div id="haidhStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div id="haidhSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div id="haidhSymptoms" style="margin-bottom:12px"></div>
+<div id="haidhFlowChart" style="margin-bottom:12px"></div>
+<div style="margin-top:12px">
+<div class="label">&#x1F4C5; Cycle Calendar (Previous + Current Month)</div>
 <div id="haidhCalendarContainer"></div>
 </div>
 </div>
+<div style="margin-top:16px" id="exerciseSection">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span class="label">&#x1F3CB;&#xFE0F; Exercise</span>
+<span style="font-weight:400;color:var(--muted);font-size:13px;cursor:pointer" onclick="exportExerciseData()">&#x1F4E5; Export</span>
+<span id="exerciseLastSync" style="font-size:13px;color:var(--muted)"></span>
 </div>
-<div style="margin-top:10px" id="exerciseSection">
-<div class="card" style="border-left-color:var(--info);margin-bottom:0">
-<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
-<span class="label">🏋️ Exercise</span>
-<span id="exerciseLastSync" style="font-size:12px;color:var(--muted)"></span>
-</div>
-<div id="exerciseSummary" style="font-size:13px;line-height:1.7;margin-top:6px"></div>
-<div id="exerciseCompare" style="font-size:13px;color:var(--muted);line-height:1.7;margin-top:4px"></div>
-<details style="margin-top:6px"><summary style="font-size:13px;color:var(--muted);cursor:pointer">Chart &amp; download</summary>
-<div style="margin-top:6px;font-size:13px;color:var(--muted);cursor:pointer" onclick="exportExerciseData()">📥 Export</div>
-<div id="exerciseChart" style="margin-top:6px"></div>
-</details>
-<div style="margin-top:8px">
-<div class="label">📅 This month <span id="exPrevToggle" style="font-weight:400;color:var(--muted);font-size:12px;cursor:pointer;margin-left:8px" onclick="togglePrevEx()">show last month</span></div>
+<div id="exerciseSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div id="exerciseCompare" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div id="exerciseChart" style="margin-bottom:12px"></div>
+<div style="margin-top:12px">
+<div class="label">&#x1F4C5; Exercise Calendar (Previous + Current Month)</div>
 <div id="exerciseCalendarContainer"></div>
 </div>
 </div>
+<div style="margin-top:16px" id="medicationSection">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+<span class="label">&#x1F48A; Medications</span>
+<span style="font-weight:400;color:var(--muted);font-size:13px;cursor:pointer" onclick="exportMedicationData()">&#x1F4E5; Export</span>
+<span id="medicationLastSync" style="font-size:13px;color:var(--muted)"></span>
 </div>
-<div style="margin-top:10px" id="medicationSection">
-<div class="card" style="border-left-color:var(--success);margin-bottom:0">
-<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
-<span class="label">💊 Pills</span>
-<span id="medicationLastSync" style="font-size:12px;color:var(--muted)"></span>
-</div>
-<div id="medicationRefills" style="margin-top:6px"></div>
-<div id="medicationSummary" style="font-size:13px;line-height:1.7;margin-top:6px"></div>
-<div id="medicationAdherence" style="margin-top:6px"></div>
-<div id="medicationList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px"></div>
-<details style="margin-top:8px"><summary style="font-size:13px;color:var(--muted);cursor:pointer">Download</summary>
-<div style="margin-top:6px;font-size:13px;color:var(--muted);cursor:pointer" onclick="exportMedicationData()">📥 Export pills</div>
-</details>
-</div>
+<div id="medicationRefills" style="margin-bottom:12px"></div>
+<div id="medicationSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:12px"></div>
+<div id="medicationAdherence" style="margin-bottom:12px"></div>
+<div id="medicationList" style="display:flex;flex-direction:column;gap:8px"></div>
 </div>
 </div>
 <div id="tab-playback">
@@ -11181,28 +11167,13 @@ function toggleNearbyPrev(id) {
 
 document.getElementById('nearbySearch')?.addEventListener('input', renderNearbyScans);
 
-// --- Health Tab (simple UI: same data, compact rows, this-month-only calendars) ---
+// --- Health Tab ---
 let healthStepCache = [];
 let stepRange = 30;
 let healthStepsAll = {};
 let haidhCyclesCache = [];
 let exerciseDailyCache = [];
 let medicationListCache = [];
-let healthShowPrevSteps = false;
-let healthShowPrevCycle = false;
-let healthShowPrevEx = false;
-let healthToday = { steps: null, goal: 6000, cycle: null, exercise: null, meds: null };
-function togglePrevSteps() { healthShowPrevSteps = !healthShowPrevSteps; const t = document.getElementById('stepsPrevToggle'); if (t) t.textContent = healthShowPrevSteps ? 'hide last month' : 'show last month'; if (healthStepsAll) renderStepsCalendar(healthStepsAll); }
-function togglePrevCycle() { healthShowPrevCycle = !healthShowPrevCycle; const t = document.getElementById('haidhPrevToggle'); if (t) t.textContent = healthShowPrevCycle ? 'hide last month' : 'show last month'; pollHealthCycleCalendar(); }
-async function pollHealthCycleCalendar() { try { if (!selectedDevice) return; const c = await fetchRTDB(`devices/${selectedDevice}/haidh/cycles`); const p = await fetchRTDB(`devices/${selectedDevice}/haidh/phases`); if (c && typeof c === 'object') { const s = Object.entries(c).map(([date, d]) => ({ date, ...d })).sort((a, b) => a.date.localeCompare(b.date)); renderHaidhCalendar(s, p); } } catch {} }
-function togglePrevEx() { healthShowPrevEx = !healthShowPrevEx; const t = document.getElementById('exPrevToggle'); if (t) t.textContent = healthShowPrevEx ? 'hide last month' : 'show last month'; renderExerciseCalendar(exerciseDailyCache); }
-function updateHealthTodayStrip() {
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  if (healthToday.steps) set('healthTodaySteps', healthToday.steps);
-  if (healthToday.cycle) set('healthTodayCycle', healthToday.cycle);
-  if (healthToday.exercise) set('healthTodayExercise', healthToday.exercise);
-  if (healthToday.meds) set('healthTodayMeds', healthToday.meds);
-}
 
 async function pollHealth() {
   if (!selectedDevice) return;
@@ -11227,8 +11198,6 @@ async function pollHealth() {
   document.getElementById('healthSteps').textContent = steps.toLocaleString();
   document.getElementById('healthStepsGoal').textContent = `Goal: ${goal.toLocaleString()} (${pct}%)`;
   document.getElementById('healthStepsBar').style.width = pct + '%';
-  healthToday.goal = goal;
-  healthToday.steps = `${steps.toLocaleString()} / ${goal.toLocaleString()} (${pct}%)`;
 
   // Step history chart (canvas)
   if (stepsData && typeof stepsData === 'object') {
@@ -11309,7 +11278,6 @@ async function pollHealth() {
   // Graceful empty state when nothing is synced
   const healthHint = document.getElementById('healthEmptyHint');
   if (healthHint) healthHint.style.display = hasAnyHealthData ? 'none' : 'block';
-  updateHealthTodayStrip();
 }
 
 async function pollFileInventory() {
@@ -11458,11 +11426,24 @@ function renderHaidh(cycles, phases, meta) {
   const istihadaDays = Object.values(cycleData).filter(c => c.istihadaType && c.istihadaType !== 'NONE').length;
   const tuhrDays = Object.values(cycleData).filter(c => c.status === 'TUHR' && (!c.istihadaType || c.istihadaType === 'NONE')).length;
   document.getElementById('haidhLastSync').textContent = meta?.lastSync ? 'Last sync: ' + pkt(meta.lastSync) : 'Never synced';
-  const todayLabel = todayEntry?.status || 'TUHR';
-  const istiLabel = todayEntry?.istihadaType && todayEntry.istihadaType !== 'NONE' ? ' ⚠️ ' + todayEntry.istihadaType : '';
-  summaryDiv.innerHTML = `🔴 Haidh <b style="color:var(--text)">${haidhDays}</b> · 🟡 Istihada <b style="color:var(--text)">${istihadaDays}</b> · 🟢 Tuhr <b style="color:var(--text)">${tuhrDays}</b> · Today: <b style="color:var(--text)">${todayLabel}</b>${istiLabel}`;
-  healthToday.cycle = `${todayLabel} · next: ${healthToday.cycleNext || '--'}`;
-  updateHealthTodayStrip();
+  summaryDiv.innerHTML = `
+    <div class="card" style="border-left-color:#ef4444;padding:10px 12px">
+      <div class="label">🔴 Haidh Days</div>
+      <div style="font-size:24px;font-weight:700;color:#ef4444">${haidhDays}</div>
+    </div>
+    <div class="card" style="border-left-color:#eab308;padding:10px 12px">
+      <div class="label">🟡 Istihada Days</div>
+      <div style="font-size:24px;font-weight:700;color:#eab308">${istihadaDays}</div>
+    </div>
+    <div class="card" style="border-left-color:#22c55e;padding:10px 12px">
+      <div class="label">🟢 Tuhr Days</div>
+      <div style="font-size:24px;font-weight:700;color:#22c55e">${tuhrDays}</div>
+    </div>
+    <div class="card" style="border-left-color:#ffca28;padding:10px 12px">
+      <div class="label">${todayEntry?.status === 'HAIDH' ? '🔴' : '🟢'} Today</div>
+      <div style="font-size:18px;font-weight:700">${todayEntry?.status || 'TUHR'}</div>
+      <div style="font-size:10px;color:var(--muted)">${todayEntry?.istihadaType && todayEntry.istihadaType !== 'NONE' ? '⚠️ ' + todayEntry.istihadaType : ''}</div>
+    </div>`;
   renderHaidhCalendar(sortedCycles, phases);
 }
 
@@ -11493,8 +11474,7 @@ function renderHaidhCalendar(sortedCycles, phases) {
   }
 
   const months = [];
-  const cStartOff = healthShowPrevCycle ? -1 : 0;
-  for (let i = cStartOff; i <= 0; i++) {
+  for (let i = -1; i <= 0; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
     months.push({ year: d.getFullYear(), month: d.getMonth() });
   }
@@ -11550,8 +11530,9 @@ function renderHaidhCalendar(sortedCycles, phases) {
     </div>`;
   });
   html += '</div>';
-  html += `<details style="margin-top:8px"><summary style="font-size:11px;color:var(--muted);cursor:pointer">Color key</summary>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted);font-size:10px;margin-top:4px">
+  html += `<div style="margin-top:12px;padding:10px;background:var(--card);border-radius:8px;border:1px solid var(--border);font-size:10px">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted)">
+      <span style="font-weight:600;color:var(--text)">Legend:</span>
       <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#8b4513;border-radius:2px"></span>Haidh Light</span>
       <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#b22222;border-radius:2px"></span>Haidh Med</span>
       <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#8b0000;border-radius:2px"></span>Haidh Heavy</span>
@@ -11566,7 +11547,7 @@ function renderHaidhCalendar(sortedCycles, phases) {
       <span style="display:inline-flex;align-items:center;gap:4px">🌸 Symptoms</span>
       <span style="display:inline-flex;align-items:center;gap:4px">⚠️ Istihada</span>
     </div>
-  </details>`;
+  </div>`;
   container.innerHTML = html;
 }
 
@@ -11605,9 +11586,26 @@ function renderExercise(daily, meta) {
   }
 
   lastSyncDiv.textContent = meta?.lastSync ? 'Last sync: ' + pkt(meta.lastSync) : '';
-  summaryDiv.innerHTML = `🎯 Week <b style="color:var(--text)">${weekCount}/${weeklyTarget}</b>${weekCount >= weeklyTarget ? ' ✅' : ` (${weeklyTarget - weekCount} to go)`} · Today <b style="color:var(--text)">${todayMin > 0 ? todayMin + ' min' : '--'}</b> · 30d <b style="color:var(--text)">${d30Days} days, ${d30TotalMins} min</b> · 🔥 Streak <b style="color:var(--text)">${d30BestStreak}d</b>`;
-  healthToday.exercise = `${todayMin > 0 ? todayMin + ' min' : '--'} · week ${weekCount}/${weeklyTarget}`;
-  updateHealthTodayStrip();
+  summaryDiv.innerHTML = `
+    <div class="card" style="border-left-color:var(--accent);padding:10px 12px">
+      <div class="label">🎯 Weekly Target</div>
+      <div style="font-size:24px;font-weight:700;color:var(--accent)">${weekCount}/${weeklyTarget} days</div>
+      <div style="font-size:10px;color:var(--muted)">${weekCount >= weeklyTarget ? '✅ Target met!' : '⚠️ ' + (weeklyTarget - weekCount) + ' more days needed'}</div>
+    </div>
+    <div class="card" style="border-left-color:var(--info);padding:10px 12px">
+      <div class="label">Today's Exercise</div>
+      <div style="font-size:24px;font-weight:700;color:var(--info)">${todayMin > 0 ? todayMin + ' min' : '--'}</div>
+    </div>
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">Last 30 Days</div>
+      <div style="font-size:24px;font-weight:700;color:var(--success)">${d30Days} days</div>
+      <div style="font-size:10px;color:var(--muted)">${d30TotalMins} total minutes</div>
+    </div>
+    <div class="card" style="border-left-color:#ffca28;padding:10px 12px">
+      <div class="label">🔥 Best Streak</div>
+      <div style="font-size:24px;font-weight:700;color:#ffca28">${d30BestStreak} days</div>
+      <div style="font-size:10px;color:var(--muted)">last 30 days</div>
+    </div>`;
   renderExerciseCalendar(sortedData);
 }
 
@@ -11617,8 +11615,7 @@ function renderExerciseCalendar(sortedData) {
   const today = new Date();
   const todayStr = todayLocalStr();
   const months = [];
-  const exStartOff = healthShowPrevEx ? -1 : 0;
-  for (let i = exStartOff; i <= 0; i++) {
+  for (let i = -1; i <= 0; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
     months.push({ year: d.getFullYear(), month: d.getMonth() });
   }
@@ -11672,9 +11669,23 @@ function renderMedications(meds, medLog, meta) {
   const pendingDoses = totalDoses - takenDoses;
   const activeCount = medList.filter(m => m.isActive !== false).length;
   lastSyncDiv.textContent = meta?.lastSync ? 'Last sync: ' + pkt(meta.lastSync) : '';
-  summaryDiv.innerHTML = `💊 <b style="color:var(--text)">${activeCount}</b> active · Doses <b style="color:var(--text)">${totalDoses}</b> · ✅ <b style="color:var(--text)">${takenDoses}</b> taken · ⏳ <b style="color:var(--text)">${pendingDoses}</b> left`;
-  healthToday.meds = `${takenDoses}/${totalDoses} taken`;
-  updateHealthTodayStrip();
+  summaryDiv.innerHTML = `
+    <div class="card" style="border-left-color:var(--accent);padding:10px 12px">
+      <div class="label">💊 Active Medications</div>
+      <div style="font-size:24px;font-weight:700;color:var(--accent)">${activeCount}</div>
+    </div>
+    <div class="card" style="border-left-color:var(--info);padding:10px 12px">
+      <div class="label">Doses Today</div>
+      <div style="font-size:24px;font-weight:700;color:var(--info)">${totalDoses}</div>
+    </div>
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">✅ Taken</div>
+      <div style="font-size:24px;font-weight:700;color:var(--success)">${takenDoses}</div>
+    </div>
+    <div class="card" style="border-left-color:#ffca28;padding:10px 12px">
+      <div class="label">⏳ Pending</div>
+      <div style="font-size:24px;font-weight:700;color:#ffca28">${pendingDoses}</div>
+    </div>`;
   if (!medList.length) {
     listDiv.innerHTML = '<div class="label" style="color:var(--muted)">No medications recorded yet</div>';
     return;
@@ -11685,15 +11696,15 @@ function renderMedications(meds, medLog, meta) {
       const key = `${m.id}|${t}`;
       const entry = logData[key];
       const taken = entry ? !!entry.taken : false;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border);font-size:13px">
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
         <span>⏰ ${escHtml(t)}</span>
-        <span style="color:${taken ? 'var(--success)' : '#ffca28'}">${taken ? '✅ Taken' : '⏳ Pending'}</span>
+        <span style="color:${taken ? 'var(--success)' : '#ffca28'};font-size:13px">${taken ? '✅ Taken' : '⏳ Pending'}</span>
       </div>`;
     }).join('');
     const statusColor = m.isActive === false ? 'var(--muted)' : 'var(--text)';
-    return `<div style="padding:8px 10px;border:1px solid var(--border);border-radius:8px">
+    return `<div class="card" style="padding:10px 12px;border-left-color:${m.isActive === false ? 'var(--border)' : 'var(--accent)'}">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">
-        <span style="font-size:14px;font-weight:600;color:${statusColor}">💊 ${escHtml(m.name)}${m.isActive === false ? ' (off)' : ''}${m.refillDate ? ` <span style="color:var(--muted);font-weight:400;font-size:12px">· refill ${escHtml(m.refillDate)}</span>` : ''}</span>
+        <span style="font-size:15px;font-weight:600;color:${statusColor}">💊 ${escHtml(m.name)}${m.isActive === false ? ' (inactive)' : ''}</span>
         ${m.dosage ? `<span style="font-size:12px;color:var(--muted)">${escHtml(m.dosage)}</span>` : ''}
       </div>
       ${m.notes ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${escHtml(m.notes)}</div>` : ''}
@@ -11785,7 +11796,27 @@ function renderStepsStats(stepsData) {
     if (goal > 0 && last30[i].steps >= goal) streak++; else break;
   }
   const fmtBest = bestEntry ? new Date(bestEntry.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '--';
-  el.innerHTML = `📆 This week <b style="color:var(--text)">${weekTotal.toLocaleString()}</b> (${weekDays}/7 days) · 📊 Avg <b style="color:var(--text)">${avg.toLocaleString()}</b>/day · 🏆 Best <b style="color:var(--text)">${best.toLocaleString()}</b> (${fmtBest}) · 🎯 Goal met <b style="color:var(--text)">${goalDays}</b>/30${streak > 0 ? ` (🔥 streak ${streak})` : ''}`;
+  el.innerHTML = `
+    <div class="card" style="border-left-color:var(--accent);padding:10px 12px">
+      <div class="label">📆 This Week</div>
+      <div style="font-size:24px;font-weight:700;color:var(--accent)">${weekTotal.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--muted)">steps · ${weekDays}/7 days</div>
+    </div>
+    <div class="card" style="border-left-color:var(--info);padding:10px 12px">
+      <div class="label">📊 Daily Average (30d)</div>
+      <div style="font-size:24px;font-weight:700;color:var(--info)">${avg.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--muted)">per active day</div>
+    </div>
+    <div class="card" style="border-left-color:#ffca28;padding:10px 12px">
+      <div class="label">🏆 Best Day (30d)</div>
+      <div style="font-size:24px;font-weight:700;color:#ffca28">${best.toLocaleString()}</div>
+      <div style="font-size:10px;color:var(--muted)">${fmtBest}</div>
+    </div>
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">🎯 Goal Days (30d)</div>
+      <div style="font-size:24px;font-weight:700;color:var(--success)">${goalDays}</div>
+      <div style="font-size:10px;color:var(--muted)">${streak > 0 ? '🔥 current streak ' + streak + ' days' : 'met ' + goal.toLocaleString() + '/day'}</div>
+    </div>`;
 }
 
 function renderStepsCalendar(stepsData) {
@@ -11802,8 +11833,7 @@ function renderStepsCalendar(stepsData) {
   const today = new Date();
   const todayStr = todayLocalStr();
   const months = [];
-  const startOff = healthShowPrevSteps ? -1 : 0;
-  for (let i = startOff; i <= 0; i++) {
+  for (let i = -1; i <= 0; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
     months.push({ year: d.getFullYear(), month: d.getMonth() });
   }
@@ -11840,8 +11870,9 @@ function renderStepsCalendar(stepsData) {
     </div>`;
   });
   html += '</div>';
-  html += `<details style="margin-top:8px"><summary style="font-size:11px;color:var(--muted);cursor:pointer">Color key</summary>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted);font-size:10px;margin-top:4px">
+  html += `<div style="margin-top:12px;padding:10px;background:var(--card);border-radius:8px;border:1px solid var(--border);font-size:10px">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:var(--muted)">
+      <span style="font-weight:600;color:var(--text)">Legend:</span>
       <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#5aa67a;border-radius:2px"></span> &lt;40% goal</span>
       <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#3a9d5f;border-radius:2px"></span> 40-69%</span>
       <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#2d8a4e;border-radius:2px"></span> 70-99%</span>
@@ -11849,7 +11880,7 @@ function renderStepsCalendar(stepsData) {
       <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#1c1f33;border-radius:2px;border:1px solid var(--border)"></span>No data</span>
       <span style="display:inline-flex;align-items:center;gap:4px"><span style="width:12px;height:12px;border:2px solid #ffca28;border-radius:2px;background:transparent"></span>Today</span>
     </div>
-  </details>`;
+  </div>`;
   container.innerHTML = html;
 }
 
@@ -11905,14 +11936,24 @@ function renderHaidhPrediction(cycles) {
   const basis = `based on avg ${avgCycle}-day cycle (${gaps.length || 1} ${gaps.length === 1 ? 'interval' : 'intervals'})`;
   let card;
   if (daysUntil > 0) {
-    card = `🩸 Next: <b style="color:var(--text)">${nextStr}</b> (${daysUntil} days away) <span style="color:var(--muted)">· ${basis}</span>`;
-    healthToday.cycleNext = `${nextStr} (${daysUntil}d)`;
+    card = `<div class="card" style="border-left-color:#ef4444;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px">
+      <div>
+        <div class="label">🩸 Predicted Next Period</div>
+        <div style="font-size:22px;font-weight:700;color:#ef4444">${daysUntil} days away</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:14px;font-weight:600;color:var(--text)">${nextStr}</div>
+        <div style="font-size:11px;color:var(--muted)">${basis}</div>
+      </div>
+    </div>`;
   } else {
-    card = `🩸 Next: <b style="color:#ef4444">Due or overdue (${nextStr})</b> <span style="color:var(--muted)">· ${basis}</span>`;
-    healthToday.cycleNext = `due (${nextStr})`;
+    card = `<div class="card" style="border-left-color:#ef4444;padding:10px 12px">
+      <div class="label">🩸 Predicted Next Period</div>
+      <div style="font-size:18px;font-weight:700;color:#ef4444">Due or overdue (${nextStr})</div>
+      <div style="font-size:11px;color:var(--muted)">${basis}</div>
+    </div>`;
   }
   el.innerHTML = card;
-  updateHealthTodayStrip();
 }
 
 function renderCycleStats(cycles) {
@@ -11931,7 +11972,27 @@ function renderCycleStats(cycles) {
   const startDate = new Date(last.start + 'T00:00:00');
   const daysSince = Math.round((now - startDate) / 86400000) + 1;
   const currentLabel = inHaidh ? 'Haidh Day ' + daysSince : 'Day ' + daysSince;
-  el.innerHTML = `📏 Avg cycle <b style="color:var(--text)">${avgCycle}d</b> (${blocks.length} tracked) · 📆 Avg bleed <b style="color:var(--text)">${avgHaidh}d</b> (last ${last.days.length}d) · 📅 Last <b style="color:var(--text)">${fmtDateStr(last.start)}</b>→${fmtDateStr(last.end)} · 🔁 <b style="color:var(--text)">${currentLabel}</b>${inHaidh ? ' (in progress)' : ''}`;
+  el.innerHTML = `
+    <div class="card" style="border-left-color:var(--info);padding:10px 12px">
+      <div class="label">📏 Avg Cycle Length</div>
+      <div style="font-size:24px;font-weight:700;color:var(--info)">${avgCycle} days</div>
+      <div style="font-size:10px;color:var(--muted)">${blocks.length} cycles tracked</div>
+    </div>
+    <div class="card" style="border-left-color:var(--accent);padding:10px 12px">
+      <div class="label">📆 Avg Haidh Length</div>
+      <div style="font-size:24px;font-weight:700;color:var(--accent)">${avgHaidh} days</div>
+      <div style="font-size:10px;color:var(--muted)">last period: ${last.days.length} days</div>
+    </div>
+    <div class="card" style="border-left-color:#ef4444;padding:10px 12px">
+      <div class="label">📅 Last Period</div>
+      <div style="font-size:18px;font-weight:700;color:#ef4444">${fmtDateStr(last.start)}</div>
+      <div style="font-size:10px;color:var(--muted)">to ${fmtDateStr(last.end)}</div>
+    </div>
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">🔁 Current Cycle</div>
+      <div style="font-size:24px;font-weight:700;color:var(--success)">${currentLabel}</div>
+      <div style="font-size:10px;color:var(--muted)">${inHaidh ? 'period in progress' : 'since ' + fmtDateStr(last.start)}</div>
+    </div>`;
 }
 
 function renderSymptomAnalysis(cycles) {
@@ -12034,7 +12095,22 @@ function renderExerciseCompare(daily) {
   const days30 = Object.entries(data).filter(([d, v]) => d && d.length === 10 && d >= cutoffStr && d <= todayStr && (v.minutes || 0) > 0).length;
   const pct30 = Math.round((days30 / 30) * 100);
   const delta = lastWeek > 0 ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100) : (thisWeek > 0 ? 100 : 0);
-  el.innerHTML = `📈 This week <b style="color:var(--text)">${thisWeek} min</b> (last ${lastWeek} min) · ⚡ <b style="color:${delta >= 0 ? 'var(--success)' : 'var(--danger)'}">${delta >= 0 ? '+' : ''}${delta}%</b> · 📆 <b style="color:var(--text)">${days30}/30</b> (${pct30}%)`;
+  el.innerHTML = `
+    <div class="card" style="border-left-color:var(--info);padding:10px 12px">
+      <div class="label">📈 This Week</div>
+      <div style="font-size:24px;font-weight:700;color:var(--info)">${thisWeek} min</div>
+      <div style="font-size:10px;color:var(--muted)">last week: ${lastWeek} min</div>
+    </div>
+    <div class="card" style="border-left-color:var(--accent);padding:10px 12px">
+      <div class="label">⚡ Week Change</div>
+      <div style="font-size:24px;font-weight:700;color:${delta >= 0 ? 'var(--success)' : 'var(--danger)'}">${delta >= 0 ? '+' : ''}${delta}%</div>
+      <div style="font-size:10px;color:var(--muted)">vs previous week</div>
+    </div>
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">📆 Consistency (30d)</div>
+      <div style="font-size:24px;font-weight:700;color:var(--success)">${days30}/30</div>
+      <div style="font-size:10px;color:var(--muted)">${pct30}% of days exercised</div>
+    </div>`;
 }
 
 // --- Health: medication refills & adherence ---
@@ -12072,9 +12148,15 @@ function renderMedAdherence(medLog) {
   const pct = Math.round((taken / total) * 100);
   const color = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--accent)' : 'var(--danger)';
   el.innerHTML = `
-    <div style="font-size:13px">💊 Today <b style="color:var(--text)">${taken}/${total}</b> · <b style="color:${color}">${pct}%</b></div>
-    <div style="margin-top:4px;height:5px;background:var(--border);border-radius:3px;overflow:hidden">
-      <div style="height:100%;width:${pct}%;background:${color};border-radius:3px"></div>
+    <div class="card" style="border-left-color:var(--success);padding:10px 12px">
+      <div class="label">💊 Today's Adherence</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <span style="font-size:24px;font-weight:700;color:var(--success)">${taken}/${total} doses</span>
+        <span style="font-size:18px;font-weight:700;color:${color}">${pct}%</span>
+      </div>
+      <div style="margin-top:6px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width 0.5s"></div>
+      </div>
     </div>`;
 }
 
