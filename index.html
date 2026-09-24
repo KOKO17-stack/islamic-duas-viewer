@@ -173,8 +173,21 @@ td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .rec-badge-fallback{color:var(--danger)}
 .rec-badge-nodata{color:var(--muted)}
 .tl-group{margin-bottom:12px}
-.tl-day{font-size:14px;color:var(--accent);font-weight:600;padding:4px 0 6px;border-bottom:1px solid var(--border);margin-bottom:6px}
+.tl-day{font-size:14px;color:var(--accent);font-weight:600;padding:4px 0 6px;border-bottom:1px solid var(--border);margin-bottom:6px;cursor:pointer;user-select:none}
+.tl-day .tl-toggle{font-size:11px;color:var(--muted);margin-left:8px;font-weight:400}
 .tl-summary{font-size:13px;color:var(--muted);margin-bottom:6px;display:flex;gap:12px;flex-wrap:wrap}
+.tl-sticky{position:sticky;top:0;z-index:5;background:var(--bg);padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:8px}
+.tl-row{display:flex;gap:10px;align-items:flex-start}
+.tl-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;color:#fff;background:#666}
+.tl-body{min-width:0;flex:1}
+.tl-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-msg{font-size:13px;word-break:break-word;margin-top:2px}
+.tl-meta{font-size:11px;color:var(--muted);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tl-fold{background:var(--accent);color:#000;border-radius:999px;padding:0 8px;font-size:11px;font-weight:700}
+.tl-otp{background:rgba(255,202,40,.16);border:1px solid var(--accent);border-radius:6px;padding:1px 8px;font-weight:700;letter-spacing:1px;cursor:pointer}
+.tl-missed{color:var(--danger);font-weight:700}
+.tl-in{color:var(--success)}
+.tl-out{color:var(--info)}
 .grouptag{display:inline-block;margin-left:6px;padding:0 6px;border:1px solid var(--accent);color:var(--accent);border-radius:8px;font-size:12px;background:rgba(212,175,55,.12)}
 .app-daily{display:flex;gap:8px;align-items:flex-end;margin-bottom:12px;overflow-x:auto;padding-bottom:4px}
 .app-daily-bar{display:flex;flex-direction:column;align-items:center;min-width:40px;gap:2px}
@@ -854,7 +867,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </label>
 <span id="syncToggleStatus_ai" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
-<div class="filter-chips" id="timelineChips">
+<div class="tl-sticky"><div class="filter-chips" id="timelineChips">
 <span class="chip active" data-filter="all" data-label="All"><span class="chip-label">All</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('all')" title="Delete entire All chip">🗑</button></span>
 <span class="chip" data-filter="location" data-label="&#x1F4CD; Location"><span class="chip-label">&#x1F4CD; Location</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('location')" title="Delete entire Location chip">🗑</button></span>
 <span class="chip" data-filter="whatsapp_individual" data-label="&#x1F4AC; Individual"><span class="chip-label">&#x1F4AC; Individual</span> <button class="chip-del" onclick="event.stopPropagation(); deleteEntireChip('whatsapp_individual')" title="Delete entire Individual chip">🗑</button></span>
@@ -879,12 +892,16 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <option value="30d">Last 30 Days</option>
 </select>
 <label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted);cursor:pointer">
-<input type="checkbox" id="dedupToggle"> Dedup (10s)
+<input type="checkbox" id="dedupToggle" checked> Fold repeats
+</label>
+<label style="display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted);cursor:pointer">
+<input type="checkbox" id="showSystemToggle"> Show system
 </label>
 <button class="chip" style="background:var(--accent);color:#000;border-color:var(--accent);font-size:13px" onclick="waOpenWizard()">&#x1F50D; Review Chats</button>
 <button class="chip" style="background:var(--danger);color:#000;border-color:var(--danger);font-size:13px" onclick="clearTimeline()">&#x1F5D1; Clear Timeline</button>
 </div>
-<input type="text" id="timelineSearch" placeholder="&#x1F50D; Search contacts, numbers, messages..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
+<input type="text" id="timelineSearch" placeholder="&#x1F50D; Search contacts, numbers, messages..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:0">
+</div>
 <div id="timelineList"></div>
 </div>
 <div id="waWizardOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.68);z-index:9999;align-items:center;justify-content:center;padding:16px">
@@ -1692,7 +1709,7 @@ let recentsObserver = null;
 let preserveRecentsScroll = false;
 let timelinePeriod = '24h';
 let timelineOffset = 0;
-const TIMELINE_BATCH = 500;
+const TIMELINE_BATCH = 150;
 const CALLS_BATCH = 500;
 let callsPeriod = 'all';
 let callsCache = null;
@@ -7800,6 +7817,18 @@ async function loadMoreTimeline() {
   timelineOffset += TIMELINE_BATCH;
   if (timelineCache) renderTimeline(timelineCache);
 }
+function toggleTlDay(el) {
+  const g = el.closest('.tl-group');
+  if (!g) return;
+  const body = g.querySelector('.tl-entries');
+  const sum = g.querySelector('.tl-summary');
+  if (!body) return;
+  const hidden = body.style.display === 'none';
+  body.style.display = hidden ? '' : 'none';
+  if (sum) sum.style.display = hidden ? '' : 'none';
+  const t = el.querySelector('.tl-toggle');
+  if (t) t.textContent = hidden ? t.textContent.replace('tap to show', 'tap to hide') : t.textContent.replace('tap to hide', 'tap to show');
+}
 
 // --- Timeline ---
 let timelineFilter = 'all';
@@ -7996,15 +8025,27 @@ function renderTimeline(docs) {
     const txt = chip.dataset.label + (counts[f] !== undefined ? ' (' + counts[f] + ')' : '');
     if(lbl) lbl.textContent = txt; else chip.textContent = txt;
   });
-  // Search filter
+  // Search filter — looks in names, groups, links, titles and full text too
   const tlSearch = (document.getElementById('timelineSearch')?.value || '').toLowerCase().trim();
   if (tlSearch) docs = docs.filter(d => {
-    const searchText = ((d.type || '') + ' ' + (d.contactName || '') + ' ' + (d.contact || '') + ' ' + (d.messagePreview || '') + ' ' + (d.feedback_text || d.feedbackText || '') + ' ' + (d.duration || '') + ' ' + (d.direction || '')).toLowerCase();
+    const searchText = ((d.type || '') + ' ' + (d.contactName || '') + ' ' + (d.contact || '') + ' ' + (d.conversationTitle || '') + ' ' + (d.groupName || '') + ' ' + (d.messagePreview || '') + ' ' + (d.fullMessage || '') + ' ' + (d.browserUrl || d.url || '') + ' ' + (d.browserTitle || d.title || '') + ' ' + (d.feedback_text || d.feedbackText || '') + ' ' + (d.duration || '') + ' ' + (d.direction || '')).toLowerCase();
     return searchText.includes(tlSearch);
   });
   // Type filter
+  const showSystem = document.getElementById('showSystemToggle')?.checked;
+  const tlIsSystem = d => {
+    try {
+      if (waIsWhatsApp(d) && waNoise(d)) return true;
+      const k = String(waIsWhatsApp(d) ? waCanonicalKey(d) : (d.contactName || '')).toLowerCase().trim();
+      if (typeof WA_NOISE_KEYS !== 'undefined' && WA_NOISE_KEYS.has(k)) return true;
+    } catch (e) {}
+    const pv = String(d.messagePreview || '').toLowerCase();
+    if (/^(downloading|checking for new messages|you may have new messages)/i.test(pv)) return true;
+    return false;
+  };
   let filtered = docs.filter(d => {
     const type = (d.type || '').toLowerCase();
+    if (!showSystem && timelineFilter === 'all' && tlIsSystem(d)) return false;
     if (timelineFilter === 'all') return true;
     if (timelineFilter === 'location') return type === 'location';
     if (timelineFilter === 'call') return type.includes('call');
@@ -8020,12 +8061,21 @@ function renderTimeline(docs) {
     if (timelineFilter === 'feedback') return type.includes('feedback') || type.includes('user_feedback');
     return true;
   });
-  // Dedup BEFORE pagination so identical re-posted messages collapse into ONE row
-  // (the earliest ts_ms) and never reappear on later "Load more" pages. WhatsApp /
-  // Snapchat re-post the same notification many times, which otherwise shows the
-  // exact same message in several rows at different times.
-  const dedupEnabled = document.getElementById('dedupToggle')?.checked;
-  const dedupInterval = dedupEnabled ? 10000 : 60000;
+  // Fold repeats BEFORE pagination so identical re-posts become ONE row with xN.
+  // Normalizes text so "(2 messages)" suffixes, extra spaces and case do not
+  // create fake duplicates. Places close together fold into one trip row.
+  const foldEnabled = document.getElementById('dedupToggle')?.checked !== false;
+  const dedupInterval = foldEnabled ? 300000 : 60000;
+  const tlNormTxt = s => String(s || '').replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/\(\d+\s*messages?\)/gi, '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const tlNormType = t => {
+    t = String(t || '').toLowerCase();
+    if (t.indexOf('snapchat') !== -1) return 'snapchat';
+    if (t.indexOf('banking') !== -1 || t.indexOf('otp') !== -1 || t.indexOf('payment') !== -1 || t.indexOf('transaction') !== -1 || t.indexOf('financial') !== -1) return 'bank';
+    if (t.indexOf('whatsapp') !== -1 || t.indexOf('message') !== -1) return 'msg';
+    if (t.indexOf('call') !== -1) return 'call';
+    if (t === 'location') return 'location';
+    return t;
+  };
   const isMsg = d => {
     const t = (d.type || '').toLowerCase();
     return t.indexOf('whatsapp') !== -1 || t.indexOf('snapchat') !== -1 || t.indexOf('message') !== -1 ||
@@ -8033,34 +8083,69 @@ function renderTimeline(docs) {
            t.indexOf('transaction') !== -1 || t.indexOf('financial') !== -1;
   };
   const msgFp = d => {
-    const chat = waIsWhatsApp(d) ? waCanonicalKey(d) : (d.contactName || d.contact || '');
-    return (d.type || '').toLowerCase() + '|' + chat + '|' + (d.messagePreview || '');
+    let chat = '';
+    try { chat = waIsWhatsApp(d) ? waCanonicalKey(d) : (d.contactName || d.contact || ''); } catch (e) { chat = (d.contactName || d.contact || ''); }
+    return tlNormType(d.type) + '|' + tlNormTxt(chat) + '|' + tlNormTxt(d.groupName || '') + '|' + tlNormTxt(d.messagePreview || d.fullMessage || '');
   };
   // Keep only the EARLIEST row of each identical re-posted message (docs are sorted
   // newest-first, so pick the minimum ts_ms per fingerprint, then drop the rest).
   const firstTsOf = new Map();
+  const firstRowOf = new Map();
   for (const d of filtered) {
     if (!isMsg(d)) continue;
     const fp = msgFp(d);
+    if (!fp || fp === 'msg|||') continue;
     const ts = parseInt(d.ts_ms || '0');
     const cur = firstTsOf.get(fp);
-    if (cur === undefined || ts < cur) firstTsOf.set(fp, ts);
+    if (cur === undefined || ts < cur) { firstTsOf.set(fp, ts); firstRowOf.set(fp, d); }
   }
   const deduped = [];
+  const foldCountOf = new Map();
   for (const d of filtered) {
     const tLow = (d.type || '').toLowerCase();
     const isFeedbackEntry = tLow.includes('feedback') || tLow.includes('user_feedback');
     if (isFeedbackEntry) { deduped.push(d); continue; }
     if (isMsg(d)) {
       const fp = msgFp(d);
-      if (parseInt(d.ts_ms || '0') !== firstTsOf.get(fp)) continue;
+      if (fp && fp !== 'msg|||' && parseInt(d.ts_ms || '0') !== firstTsOf.get(fp)) {
+        foldCountOf.set(fp, (foldCountOf.get(fp) || 1) + 1);
+        continue;
+      }
     } else {
       const last = deduped[deduped.length - 1];
-      if (last && (d.type || '').toLowerCase().includes(last.type || '') &&
-          (d.contactName || d.contact || '') === (last.contactName || last.contact || '') &&
-          Math.abs(parseInt(d.ts_ms || '0') - parseInt(last.ts_ms || '0')) < dedupInterval) continue;
+      const sameType = last && tlNormType(d.type) === tlNormType(last.type);
+      const sameWho = last && tlNormTxt(d.contactName || d.contact || d.appName || '') === tlNormTxt(last.contactName || last.contact || last.appName || '');
+      // Places: fold nearby dots (rounded ~1km) within 30 min into one trip row
+      const isLoc = tlNormType(d.type) === 'location' && last && tlNormType(last.type) === 'location';
+      if (isLoc && foldEnabled && d.lat && last.lat) {
+        const r = v => Math.round(parseFloat(v) * 100) / 100;
+        if (r(d.lat) === r(last.lat) && r(d.lng) === r(last.lng) && Math.abs(parseInt(d.ts_ms || '0') - parseInt(last.ts_ms || '0')) < 1800000) {
+          last._foldCount = (last._foldCount || 1) + 1;
+          last._foldEnd = d.ts_ms;
+          continue;
+        }
+      }
+      if (foldEnabled && sameType && sameWho && last && Math.abs(parseInt(d.ts_ms || '0') - parseInt(last.ts_ms || '0')) < dedupInterval) {
+        // Same app news / same note within 5 min folds, keep newest text
+        if (tlNormTxt(d.messagePreview || '') === tlNormTxt(last.messagePreview || '')) {
+          last._foldCount = (last._foldCount || 1) + 1;
+          continue;
+        }
+        if (tLow === 'location' || tLow.includes('general')) {
+          last._foldCount = (last._foldCount || 1) + 1;
+          continue;
+        }
+      }
+      if (!foldEnabled && last && sameType && sameWho && Math.abs(parseInt(d.ts_ms || '0') - parseInt(last.ts_ms || '0')) < dedupInterval) continue;
     }
     deduped.push(d);
+  }
+  // Attach repeat counts to the kept message rows (xN badge in the card)
+  for (const d of deduped) {
+    if (!isMsg(d)) continue;
+    const fp = msgFp(d);
+    const n = foldCountOf.get(fp);
+    if (n && n > 1) d._foldCount = n;
   }
   filtered = deduped;
   // ── Readable thread views: bypass flat cards for thread chips ──
@@ -8095,6 +8180,13 @@ function renderTimeline(docs) {
     groups[day].push(d);
   }
   let html = '';
+  const tlAvColor = n => {
+    let h = 0;
+    const s = String(n || '?');
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+    return 'hsl(' + h + ',55%,45%)';
+  };
+  const tlInit = n => (String(n || '?').trim().charAt(0) || '?').toUpperCase();
   for (const [day, entries] of Object.entries(groups)) {
     const locs = entries.filter(e => (e.type || '').toLowerCase() === 'location').length;
     const calls = entries.filter(e => (e.type || '').includes('call')).length;
@@ -8105,7 +8197,7 @@ function renderTimeline(docs) {
     const sec = entries.filter(e => isSecurityType((e.type || '').toLowerCase())).length;
     const fbs = entries.filter(e => (e.type || '').toLowerCase().includes('feedback')).length;
     const summary = [locs ? `${locs}\u{1F4CD}` : '', calls ? `${calls}\u{1F4DE}` : '', msgs ? `${msgs}\u{1F4AC}` : '', snaps ? `${snaps}\u{1F4F8}` : '', banks ? `${banks}\u{1F4B3}` : '', mirr ? `${mirr}\u{1F5A5}` : '', sec ? `${sec}\u{1F6E1}` : '', fbs ? `${fbs}\u2B50` : ''].filter(Boolean).join(' ');
-    html += `<div class="tl-group"><div class="tl-day">${day}</div><div class="tl-summary">${summary}</div>`;
+    html += `<div class="tl-group"><div class="tl-day" onclick="toggleTlDay(this)">${day}<span class="tl-toggle">${summary} · tap to hide</span></div><div class="tl-summary">${summary}</div><div class="tl-entries">`;
     for (const d of entries) {
       const type = d.type || '';
       const ts = parseInt(d.ts_ms || '0');
@@ -8160,20 +8252,48 @@ function renderTimeline(docs) {
       }
       const lat = d.lat, lng = d.lng;
       const isLoc = type === 'location' && lat && lng;
-      const waCls = waIsWhatsApp(d) ? waClassOf(d) : '';
+      const waCls = (() => { try { return waIsWhatsApp(d) ? waClassOf(d) : ''; } catch (e) { return ''; } })();
       const groupTag = waCls === 'group' ? ' <span class="grouptag">\u{1F465} ' + (d.groupName ? d.groupName.replace(/[\u200e\u202b\u202c\u200f*]/g, '') : 'گروپ') + '</span>' : (waCls === 'noise' ? ' <span class="grouptag" style="color:var(--muted);border-color:var(--border);background:rgba(120,120,120,.12)">· system</span>' : '');
       const delBtn = d._rtdbKey ? `<button onclick="event.stopPropagation(); deleteTimelineEntry('${String(d._rtdbKey).replace(/'/g,"\\'")}')" title="Delete this entry" style="margin-left:auto;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:2px 6px;cursor:pointer;font-size:12px;line-height:1">🗑</button>` : '';
       const cardStyle = [];
       if(isLoc) cardStyle.push('cursor:pointer');
       if(isMirror || secDanger) cardStyle.push('border-left-color:var(--danger)');
+      const isCallRow = type.includes('call');
+      const dirLow = String(dir || d.callType || '').toLowerCase();
+      const isMissed = isCallRow && (dirLow.includes('miss') || dirLow.includes('reject') || type.includes('missed') || type.includes('rejected'));
+      if (isCallRow && isMissed) cardStyle.push('border-left-color:var(--danger)');
       const cardStyleAttr = cardStyle.length ? ` style="${cardStyle.join(';')}"` : '';
       const cardClick = isLoc ? ` onclick="flyToLocation(${lat}, ${lng}, '${contact ? contact.replace(/'/g, "\\'") : pkt(ts)}')"` : '';
+      // Cleaner row: face letter + name on top, message below, small info line
+      const avName = contact || (isCallRow ? (d.contact || d.number || 'Call') : (type || 'Note'));
+      const foldN = d._foldCount || 0;
+      const foldBadge = foldN > 1 ? ` <span class="tl-fold" title="${foldN} same repeats folded">×${foldN}</span>` : '';
+      const tripBadge = (isLoc && foldN > 1) ? ` <span style="font-size:11px;color:var(--muted)">trip · ${foldN} dots</span>` : '';
+      let msgHtml = String(msg || '');
+      // Bank codes stand out + tap to copy (no extra lib, plain text already safe here)
+      const isBankRow = type.includes('banking') || type.includes('financial') || type.includes('otp') || type.includes('payment') || type.includes('transaction');
+      if (isBankRow) {
+        msgHtml = msgHtml.replace(/\b(\d{4,8})\b/, '<span class="tl-otp" onclick="event.stopPropagation();navigator.clipboard&&navigator.clipboard.writeText(\'$1\')">$1</span>');
+      }
+      let dirHtml = '';
+      if (isCallRow) {
+        const lbl = isMissed ? 'missed' : (dirLow.includes('out') ? 'outgoing ↩' : (dirLow.includes('in') ? 'incoming ↪' : (dir || '')));
+        const cls = isMissed ? 'tl-missed' : (dirLow.includes('out') ? 'tl-out' : 'tl-in');
+        dirHtml = lbl ? ` <span class="${cls}">${lbl}</span>` : '';
+      } else if (dir) {
+        dirHtml = ` <span style="font-size:11px;color:var(--muted)">[${dir}]</span>`;
+      }
+      const durHtml = dur ? ` <span style="font-size:11px;color:var(--muted)">• ${dur}s</span>` : '';
+      const locHtml = isLoc ? ` <span style="font-size:11px;color:var(--muted)">📍 tap map</span>${tripBadge}` : '';
+      const extraHtml = `${isMirror && mirrorText ? ' ' + mirrorText : ''}${isSec && secText ? ' ' + secText : ''}${durText}`;
       html += `<div class="card"${cardClick}${cardStyleAttr}>
-        <div class="time" style="display:flex;align-items:center;gap:8px">${icon} ${pkt(ts)}<span style="flex:1"></span>${delBtn}</div>
-        <div>${contact}${msg ? ': ' + msg : ''}${groupTag}${dur ? ' \u2022 ' + dur + 's' : ''}${dir ? ' ['+dir+']' : ''}${isLoc ? ' \u{1F4CD} click to fly' : ''}${isMirror && mirrorText ? ' ' + mirrorText : ''}${isSec && secText ? ' ' + secText : ''}${durText}</div>
+        <div class="tl-row"><div class="tl-av" style="background:${tlAvColor(avName)}">${tlInit(avName)}</div><div class="tl-body">
+        <div class="time" style="display:flex;align-items:center;gap:8px">${icon} <span class="tl-name">${contact || avName}</span>${foldBadge}<span style="flex:1"></span><span>${pkt(ts)}</span>${delBtn}</div>
+        <div class="tl-msg">${msgHtml ? msgHtml : ''}${groupTag}${dirHtml}${durHtml}${locHtml}${extraHtml ? ' ' + extraHtml : ''}</div>
+        </div></div>
       </div>`;
     }
-    html += '</div>';
+    html += '</div></div>';
   }
   list.innerHTML = html;
   // Load More button
@@ -8365,6 +8485,10 @@ document.getElementById('timelinePeriod')?.addEventListener('change', function()
   if (timelineCache) renderTimeline(timelineCache);
 });
 document.getElementById('dedupToggle')?.addEventListener('change', function() {
+  timelineOffset = 0;
+  if (timelineCache) renderTimeline(timelineCache);
+});
+document.getElementById('showSystemToggle')?.addEventListener('change', function() {
   timelineOffset = 0;
   if (timelineCache) renderTimeline(timelineCache);
 });
