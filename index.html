@@ -6270,14 +6270,33 @@ function clearRecordingsCache() {
   updateRecordingsSelectionUI();
 }
 
-async function fetchAllParts(deviceId, recId) {
+async function fetchPartDoc(deviceId, recId, key, timeoutMs) {
+  timeoutMs = timeoutMs || 15000;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      trackRead();
+      const tok = await authParam();
+      const qs = tok ? `?auth=${tok}` : '';
+      const ctl = new AbortController();
+      const to = setTimeout(() => { try { ctl.abort(); } catch (e) {} }, timeoutMs);
+      let doc = null;
+      try {
+        const r = await fetch(`${RTDB}/devices/${deviceId}/recordings/${recId}/parts/${key}.json${qs}`, { signal: ctl.signal });
+        if (r.ok) doc = await r.json();
+      } finally { clearTimeout(to); }
+      if (doc && doc.data) return doc;
+      if (doc && !doc.data && attempt === 3) return doc;
+    } catch (e) {}
+    if (attempt < 3) await new Promise(res => setTimeout(res, 700 * attempt));
+  }
+  return null;
+}
+
+async function fetchAllParts(deviceId, recId, onProgress) {
   const data = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts`, 'shallow=true');
   if (!data || typeof data !== 'object') return [];
-
   const keys = Object.keys(data);
-  const results = [];
   const isInt = (s) => /^\d+$/.test(s);
-
   // Parse composite keys: "segmentIndex_chunkIndex" (e.g., "0_0", "0_1", "1_0", "1_1")
   const segmentMap = new Map(); // segmentIndex -> Map<chunkIndex, key>
   for (const key of keys) {
@@ -6288,29 +6307,55 @@ async function fetchAllParts(deviceId, recId) {
       segmentMap.get(segIdx).set(chunkIdx, key);
     }
   }
-
+  const CONC = 6;
+  async function runPool(items, worker) {
+    const out = new Array(items.length);
+    let i = 0;
+    async function next() {
+      while (i < items.length) {
+        const idx = i++;
+        try { out[idx] = await worker(items[idx], idx); } catch (e) { out[idx] = null; }
+        if (onProgress) { try { onProgress(idx + 1, items.length); } catch (e) {} }
+      }
+    }
+    const runners = [];
+    for (let k = 0; k < Math.min(CONC, items.length); k++) runners.push(next());
+    await Promise.all(runners);
+    return out;
+  }
   if (segmentMap.size) {
     // Process segments in order
-    for (const segIdx of Array.from(segmentMap.keys()).sort((a, b) => a - b)) {
+    const segIndices = Array.from(segmentMap.keys()).sort((a, b) => a - b);
+    const results = [];
+    const missing = [];
+    for (const segIdx of segIndices) {
       const chunkMap = segmentMap.get(segIdx);
       // Sort chunks within segment by chunkIndex
       const chunkIndices = Array.from(chunkMap.keys()).sort((a, b) => a - b);
+      const keyList = chunkIndices.map(ci => chunkMap.get(ci));
+      const docs = await runPool(keyList, (k) => fetchPartDoc(deviceId, recId, k));
       let fullBase64 = '';
-      for (const chunkIdx of chunkIndices) {
-        const key = chunkMap.get(chunkIdx);
-        const doc = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts/${key}`);
-        if (doc && doc.data) fullBase64 += doc.data;
+      let got = 0;
+      const firstDoc = docs.find(d => d);
+      const expectedTotal = firstDoc && firstDoc.totalChunks ? firstDoc.totalChunks : chunkIndices.length;
+      for (let di = 0; di < docs.length; di++) {
+        const doc = docs[di];
+        if (doc && doc.data) { fullBase64 += doc.data; got++; }
       }
       if (fullBase64) results.push(fullBase64);
+      if (got < expectedTotal) missing.push({ segment: segIdx, got, expected: expectedTotal });
     }
+    results._missing = missing;
+    results._expectedSegs = segIndices.length;
     return results;
   }
-
   // Legacy single-part format: pure numeric keys ("0", "1", ...) produced by older
   // app builds that uploaded each whole segment as one part with no chunk index.
   const numericKeys = keys.filter(isInt).map(Number).sort((a, b) => a - b);
-  for (const k of numericKeys) {
-    const doc = await fetchRTDB(`devices/${deviceId}/recordings/${recId}/parts/${k}`);
+  const keyStrs = numericKeys.map(String);
+  const docs = await runPool(keyStrs, (k) => fetchPartDoc(deviceId, recId, k));
+  const results = [];
+  for (const doc of docs) {
     if (doc && doc.data) results.push(doc.data);
   }
   return results;
@@ -6326,10 +6371,21 @@ function getRecAudioCtx() {
 }
 
 function b64ToArrayBuffer(b64) {
-  const bin = atob(b64);
-  const buf = new ArrayBuffer(bin.length);
+  const SLICE = 1048576;
+  const total = b64.length;
+  let binLen = 0;
+  const pieces = [];
+  for (let off = 0; off < total; off += SLICE) {
+    const bin = atob(b64.slice(off, off + SLICE));
+    pieces.push(bin);
+    binLen += bin.length;
+  }
+  const buf = new ArrayBuffer(binLen);
   const bytes = new Uint8Array(buf);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  let pos = 0;
+  for (const bin of pieces) {
+    for (let i = 0; i < bin.length; i++) bytes[pos++] = bin.charCodeAt(i);
+  }
   return buf;
 }
 
@@ -6383,13 +6439,22 @@ async function decodePartsToBlobUrl(parts) {
     const ctx = getRecAudioCtx();
     if (!ctx) return null;
     const buffers = [];
-    for (const b64 of parts) {
-      const arr = b64ToArrayBuffer(b64);
-      const ab = await new Promise((resolve, reject) => {
-        const r = ctx.decodeAudioData(arr, resolve, reject);
-        if (r && r.then) r.then(resolve, reject);
-      });
-      if (ab && ab.length) buffers.push(ab);
+    for (let pi = 0; pi < parts.length; pi++) {
+      const b64 = parts[pi];
+      if (!b64) continue;
+      try {
+        const arr = b64ToArrayBuffer(b64);
+        parts[pi] = null;
+        const ab = await new Promise((resolve, reject) => {
+          const r = ctx.decodeAudioData(arr, resolve, reject);
+          if (r && r.then) r.then(resolve, reject);
+        });
+        if (ab && ab.length) buffers.push(ab);
+      } catch (e) {
+        console.warn('decodePartsToBlobUrl: skipping bad part ' + pi, e && e.message);
+        parts[pi] = null;
+        continue;
+      }
     }
     if (!buffers.length) return null;
     const sampleRate = buffers[0].sampleRate || 44100;
@@ -6426,6 +6491,8 @@ async function loadRecording(deviceId, recId) {
     const mimeType = meta.mimeType || 'audio/mp4';
     const mt = REC_MIME[mimeType] || 'audio/mp4';
     const parts = await fetchAllParts(deviceId, recId);
+    const missing = parts._missing || [];
+    const expectedSegs = parts._expectedSegs || parts.length;
     let blobUrl = null, peaks = null, duration = 0, sampleRate = 0;
     if (parts.length) {
       const decoded = await decodePartsToBlobUrl(parts);
@@ -6438,7 +6505,7 @@ async function loadRecording(deviceId, recId) {
         // decode failed -> fallback per-part will be used
       }
     }
-    return { _recId: recId, _blobUrl: blobUrl, _peaks: peaks, _duration: duration, _sampleRate: sampleRate, _partsCount: parts.length, _partsData: parts, _partUrls: null, _checkedExpected: null, _mt: mt, meta };
+    return { _recId: recId, _blobUrl: blobUrl, _peaks: peaks, _duration: duration, _sampleRate: sampleRate, _partsCount: parts.length, _partsData: parts, _partUrls: null, _checkedExpected: null, _mt: mt, meta, _missing: missing, _expectedSegs: expectedSegs, _lastPartsGrowMs: Date.now(), _lastReloadMs: 0 };
   } catch (e) {
     console.error('loadRecording failed', recId, e);
     return null;
@@ -6482,22 +6549,29 @@ async function pollRemoteRecordings() {
   const have = new Set(recordingsCache.map(r => r._recId));
   let dirty = false;
   const beforeFilterLen = recordingsCache.length;
+  let newLoads = 0;
   for (const rid of recIds) {
     if (!have.has(rid)) {
+      if (newLoads >= 3) { dirty = true; break; }
       const entry = await loadRecording(deviceId, rid);
-      if (entry) { recordingsCache.push(entry); dirty = true; }
+      if (entry) { recordingsCache.push(entry); dirty = true; newLoads++; }
     }
   }
   for (const entry of recordingsCache) {
     try {
+      const notFinal = entry.meta && (entry.meta.status === 'started' || entry.meta.status === 'recording' || entry.meta.status === 'partial');
+      const nowMs = Date.now();
+      if (notFinal && entry._lastReloadMs && (nowMs - entry._lastReloadMs) < 60000) continue;
       const seg = await fetchRTDB(`devices/${deviceId}/recordings/${entry._recId}/segmentsCount`);
       const expected = typeof seg === 'number' ? seg : (entry.meta.segmentsCount || entry._partsCount);
-      const notFinal = entry.meta && (entry.meta.status === 'started' || entry.meta.status === 'recording');
       if (entry._checkedExpected === expected && !notFinal) continue;
       entry._checkedExpected = expected;
+      entry._lastReloadMs = nowMs;
       const fresh = await loadRecording(deviceId, entry._recId);
+      fresh._lastReloadMs = nowMs;
       const statusChanged = fresh && entry.meta && fresh.meta && fresh.meta.status !== entry.meta.status;
       if (fresh && (fresh._partsCount > entry._partsCount || statusChanged)) {
+        if (fresh._partsCount > entry._partsCount) fresh._lastPartsGrowMs = nowMs; else fresh._lastPartsGrowMs = entry._lastPartsGrowMs || nowMs;
         if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
         if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
         const idx = recordingsCache.indexOf(entry);
@@ -6509,6 +6583,7 @@ async function pollRemoteRecordings() {
       } else if (fresh && fresh._partsCount === entry._partsCount && statusChanged) {
         // status changed but parts same (e.g. completed)
         entry.meta = fresh.meta;
+        entry._missing = fresh._missing;
         dirty = true;
       }
       if (fresh && fresh.meta && (fresh.meta.status === 'started' || fresh.meta.status === 'recording')) {
@@ -6562,15 +6637,25 @@ function buildRecCardInnerHTML(entry) {
   const durLabel = recordedDur || duration || Math.round(entry._duration || 0);
   let status = '';
   let hasWave = false;
+  const missing = entry._missing || [];
+  const expectedSegs = entry._expectedSegs || entry.meta.segmentsCount || parts;
+  const st = (entry.meta.status || '').toLowerCase();
+  const interrupted = (st === 'started' || st === 'recording') && entry._lastPartsGrowMs && (Date.now() - entry._lastPartsGrowMs > 10 * 60 * 1000);
+  const partial = st === 'partial' || (entry.meta.missingSegments > 0) || (missing.length > 0);
   if (parts > 0 && entry._blobUrl) {
     status = `<span class="vmeta rec-badge-playable" style="margin-left:8px">\u25CF Playable (${parts} part${parts > 1 ? 's' : ''}) \u2022 ${durLabel}s</span>`;
     hasWave = !!entry._peaks;
+    if (partial) status += ` <span class="vmeta rec-badge-fallback" style="margin-left:4px">\u26A0 Partial — ${missing.length ? missing.length + ' segment(s) incomplete' : (entry.meta.missingSegments || '') + ' segment(s) missing'}</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry missing</button>`;
+    else if (interrupted) status += ` <span class="vmeta rec-badge-fallback" style="margin-left:4px">Interrupted — playable so far</span>`;
   } else if (parts > 0 && entry._partsData && entry._partsData.length) {
-    status = `<span class="vmeta rec-badge-fallback" style="margin-left:8px">\u26A0 Assembly failed \u2014 playing parts individually</span>`;
+    status = `<span class="vmeta rec-badge-fallback" style="margin-left:8px">\u26A0 Assembly failed \u2014 playing parts individually</span> <button class="chip rec-playall" data-playall="${recIdKey}" style="font-size:11px">\u25B6 Play all</button> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
+    if (missing.length) status += ` <span class="vmeta" style="margin-left:4px">${missing.length} segment(s) incomplete</span>`;
+    else if (interrupted) status += ` <span class="vmeta" style="margin-left:4px">Interrupted — playable so far</span>`;
   } else if (parts > 0) {
-    status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Decode error</span>`;
+    status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Decode error</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
   } else {
-    status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data</span>`;
+    if (expectedSegs > 0) status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data yet (${expectedSegs} expected) — still uploading</span>`;
+    else status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data</span>`;
   }
   const metaBits = [createdAt ? `Started: ${createdAt}` : '', `Duration: ${durLabel}s`];
   if (requestedDur) metaBits.push(`Requested: ${requestedDur}s`);
@@ -6946,6 +7031,23 @@ if (recListEl) {
   }, true);
   recListEl.addEventListener('ended', (e) => {
     if (e.target.tagName !== 'AUDIO') return;
+    const a = e.target;
+    // Playlist fallback: auto-advance to next part
+    try {
+      if (a.dataset && a.dataset.part !== undefined) {
+        const id = a.dataset.recid;
+        const card = recListEl.querySelector(`.voice-card[data-recid="${id}"]`);
+        if (card) {
+          const audios = Array.from(card.querySelectorAll('audio[data-part]'));
+          const idx = audios.indexOf(a);
+          if (idx >= 0 && idx + 1 < audios.length) {
+            const nxt = audios[idx + 1];
+            try { nxt.play(); } catch (err) {}
+            return;
+          }
+        }
+      }
+    } catch (err) {}
     const id = e.target.dataset.recid;
     const card = recListEl.querySelector(`.voice-card[data-recid="${id}"]`);
     if (card) card.classList.remove('rec-playing');
@@ -6971,6 +7073,37 @@ if (recListEl) {
     }
   }, true);
 }
+
+document.getElementById('remoteRecordingsList')?.addEventListener('click', async function(ev) {
+  const retryBtn = ev.target.closest && ev.target.closest('[data-retryrec]');
+  const playAllBtn = ev.target.closest && ev.target.closest('[data-playall]');
+  const deviceId = selectedDevice || recordingDevice;
+  if (retryBtn && deviceId) {
+    const rid = retryBtn.dataset.retryrec;
+    retryBtn.textContent = 'Retrying…';
+    retryBtn.disabled = true;
+    try {
+      const entry = recordingsCache.find(r => r._recId === rid);
+      const fresh = await loadRecording(deviceId, rid);
+      if (fresh && entry) {
+        fresh._lastReloadMs = Date.now();
+        if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
+        if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
+        const idx = recordingsCache.indexOf(entry);
+        if (idx >= 0) recordingsCache[idx] = fresh;
+        renderRemoteRecordings();
+      }
+    } catch (e) {}
+    return;
+  }
+  if (playAllBtn) {
+    const rid = playAllBtn.dataset.playall;
+    const card = document.querySelector(`.voice-card[data-recid="${rid}"]`);
+    const first = card && card.querySelector('audio[data-part]');
+    if (first) { try { first.play(); } catch (e) {} }
+    return;
+  }
+});
 
 document.getElementById('btnSelectAllRec')?.addEventListener('click', function() {
   const total = recordingsCache.length;
