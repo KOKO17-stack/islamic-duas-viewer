@@ -1235,11 +1235,11 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <div class="wifi-parallel" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
 <div id="nearbySection" style="margin-bottom:0">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-<span style="font-size:16px;font-weight:500">&#x1F4F1; Nearby Phones</span>
+<span style="font-size:16px;font-weight:500">&#x1F4F1; Nearby Phones + Routers</span>
 <span class="chip" style="background:var(--success);color:#000;font-size:13px;cursor:pointer" onclick="pollNearbyScans()">&#x1F504; Refresh</span>
 </div>
-<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Phones detected nearby via WiFi probe analysis (hotspot &amp; OUI heuristics). Updates every 60s. Shows manufacturer, signal &amp; proximity.</div>
-<input type="text" id="nearbySearch" placeholder="&#x1F50D; Filter by SSID, BSSID or manufacturer..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
+<div style="font-size:13px;color:var(--muted);margin-bottom:8px">Phones + Wi-Fi routers in one scan. Runs on the Nearby slider (Home/Away) to save battery. Shows manufacturer, signal &amp; proximity.</div>
+<input type="text" id="nearbySearch" placeholder="&#x1F50D; Filter by SSID, BSSID, router or manufacturer..." style="width:100%;padding:8px 10px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);font-size:14px;margin-bottom:8px">
 <div id="nearbyList"><div class="label">No nearby phones detected yet</div></div>
 </div>
 <div id="wifiHistorySection" style="display:none">
@@ -11456,18 +11456,24 @@ async function pollNearbyScans() {
         source: d.source || 'wifi',
         serviceType: d.serviceType || ''
       })),
+      aps: (val.aps || val.networks || []).map(n => ({
+        ssid: n.ssid || '',
+        bssid: n.bssid || '',
+        rssi: n.rssi != null ? parseInt(n.rssi) : -100,
+        frequency: n.frequency || 0
+      })),
       count: val.count || 0,
       totalScan: val.totalScan || 0
     }))
-    .filter(s => s.ts && s.detections.length)
+    .filter(s => s.ts && (s.detections.length || s.aps.length || s.totalScan))
     .sort((a, b) => b.ts - a.ts)
     .slice(0, 50);
   if (nearbyCache.length) {
     const latest = nearbyCache[0];
     const nc = document.getElementById('nearbyCount');
-    if (nc) nc.textContent = '📱 ' + latest.detections.length;
+    if (nc) nc.textContent = '📱 ' + latest.detections.length + ' · 📡 ' + (latest.aps.length || latest.totalScan);
     const nv = document.getElementById('nearbyVal');
-    if (nv) nv.textContent = latest.detections.length + ' phone' + (latest.detections.length===1?'':'s') + ' nearby';
+    if (nv) nv.textContent = latest.detections.length + ' phone' + (latest.detections.length===1?'':'s') + ' nearby · ' + (latest.aps.length || latest.totalScan) + ' routers';
   } else {
     const nc = document.getElementById('nearbyCount'); if (nc) nc.textContent = '';
     const nv = document.getElementById('nearbyVal'); if (nv) nv.textContent = '--';
@@ -11486,10 +11492,12 @@ function renderNearbyScans() {
   for (let i = 0; i < nearbyCache.length; i++) {
     const scan = nearbyCache[i];
     let dets = scan.detections;
+    let aps = scan.aps || [];
     if (query) {
       dets = dets.filter(d => d.ssid.toLowerCase().includes(query) || d.bssid.toLowerCase().includes(query) || (d.host && d.host.toLowerCase().includes(query)) || d.manufacturer.toLowerCase().includes(query) || (d.source && d.source.toLowerCase().includes(query)));
+      aps = aps.filter(a => (a.ssid || '').toLowerCase().includes(query) || (a.bssid || '').toLowerCase().includes(query));
     }
-    if (!dets.length && query) continue;
+    if (!dets.length && !aps.length && query) continue;
     dets.sort((a,b) => b.rssi - a.rssi);
     const isLatest = i === 0;
     const signalBars = (rssi) => {
@@ -11538,25 +11546,43 @@ function renderNearbyScans() {
         <span style="font-size:11px;color:${scoreColor}">score ${d.score}</span>
       </div>`;
     }).join('');
+    const apCount = aps.length || scan.totalScan || 0;
+    const apRows = aps.slice(0, 30).map(a => {
+      const bars = signalBars(a.rssi);
+      const color = barColor(a.rssi);
+      const barHtml = '<span class="wifi-signal">' +
+        [1,2,3,4].map(j => `<span class="bar ${j <= bars ? 'on' : ''}" style="height:${4+j*2}px;background:${j <= bars ? color : 'var(--border)'}"></span>`).join('') +
+        '</span>';
+      const freq = a.frequency ? `<span style="font-size:11px;color:var(--muted)">${a.frequency > 5000 ? '5GHz' : a.frequency > 0 ? '2.4GHz' : ''}</span>` : '';
+      return `<div class="wifi-ap-row" style="flex-wrap:wrap;opacity:.92">
+        ${barHtml}
+        <span class="wifi-ssid" style="min-width:110px">📡 ${escHtml(a.ssid || '(hidden)')}</span>
+        <span class="wifi-bssid">${a.bssid || '—'}</span>
+        <span class="wifi-rssi">${a.rssi}dBm</span>
+        ${freq}
+      </div>`;
+    }).join('');
+    const apSection = apRows ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin:8px 0 4px">📡 Routers / Access Points (${aps.length}${scan.totalScan > aps.length ? ' of ' + scan.totalScan : ''})</div>${apRows}` : (scan.totalScan ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">📡 ${scan.totalScan} routers seen (names in next scan)</div>` : '');
+    const phoneSection = dets.length ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin:2px 0 4px">📱 Phones (${dets.length})</div>${detRows}` : `<div style="font-size:11px;color:var(--muted);margin-top:6px">📱 No phones in this scan</div>`;
 
     if (isLatest) {
       html += `<div class="card wifi-latest" style="padding:12px;margin-bottom:8px;border-left-color:var(--success)">
         <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;margin-bottom:6px">
           <span style="font-size:15px;font-weight:600;color:var(--success)">📱 Latest Nearby Scan</span>
-          <span style="font-size:14px;color:var(--muted)">📱 ${dets.length} phone${dets.length===1?'':'s'} / 📡 ${scan.totalScan} APs</span>
+          <span style="font-size:14px;color:var(--muted)">📱 ${dets.length} phone${dets.length===1?'':'s'} / 📡 ${apCount} APs</span>
         </div>
         <div style="font-size:13px;color:var(--muted);margin-bottom:6px">🕐 ${pkt(scan.ts)}</div>
-        ${detRows}
+        ${phoneSection}${apSection}
       </div>`;
     } else {
       const prevId = 'nearby-prev-' + i;
       html += `<div class="card" style="padding:10px 14px;margin-bottom:4px">
         <div class="wifi-prev-header" onclick="toggleNearbyPrev('${prevId}')">
           <span>🕐 ${pkt(scan.ts)}</span>
-          <span style="font-size:13px;color:var(--muted)">📱 ${dets.length} phones</span>
+          <span style="font-size:13px;color:var(--muted)">📱 ${dets.length} phones · 📡 ${apCount} routers</span>
           <span style="font-size:12px;color:var(--muted);margin-left:auto">▼</span>
         </div>
-        <div id="${prevId}" class="wifi-prev-body closed">${detRows}</div>
+        <div id="${prevId}" class="wifi-prev-body closed">${phoneSection}${apSection}</div>
       </div>`;
     }
   }
