@@ -11511,33 +11511,58 @@ document.getElementById('wifiSearch')?.addEventListener('input', renderWifiScans
 
 // --- Nearby Phones ---
 let nearbyCache = [];
-let nearbyQuietOpen = false;
 
-function nearbyDedupe(dets, aps) {
-  const seenD = new Set();
-  const outD = [];
-  for (const d of dets) {
-    const k = (d.bssid || '') + '|' + (d.host || '') + '|' + (d.ssid || '');
-    if (seenD.has(k)) continue;
-    seenD.add(k);
-    outD.push(d);
-  }
-  const phoneBssids = new Set(outD.map(d => (d.bssid || '').toLowerCase()).filter(Boolean));
-  const seenA = new Set();
-  const outA = [];
-  for (const a of aps) {
-    const b = (a.bssid || '').toLowerCase();
-    const k = b + '|' + (a.ssid || '');
-    if ((b && phoneBssids.has(b)) || seenA.has(k)) continue;
-    seenA.add(k);
-    outA.push(a);
-  }
-  return { dets: outD, aps: outA };
+function nearbyMergeByName(dets, aps) {
+  const norm = s => (s || '').trim().toLowerCase();
+  const build = (items, kind) => {
+    const map = new Map();
+    const list = [];
+    for (const item of items) {
+      let key = norm(item.ssid);
+      if (!key) key = 'b:' + norm(item.bssid) + '|h:' + norm(item.host || '');
+      let e = map.get(key);
+      if (!e) {
+        e = {
+          key, kind, name: item.ssid || '(hidden)', rssi: item.rssi, frequency: item.frequency || 0,
+          bands: [], bssids: [], hosts: [], manufacturer: item.manufacturer || '', source: item.source || '',
+          score: item.score || 0, proximityM: item.proximityM != null ? item.proximityM : null, count: 0
+        };
+        map.set(key, e);
+        list.push(e);
+      }
+      e.count++;
+      if (item.rssi > e.rssi) {
+        e.rssi = item.rssi;
+        if (item.frequency) e.frequency = item.frequency;
+        if (item.proximityM != null) e.proximityM = item.proximityM;
+      }
+      if (item.bssid && !e.bssids.includes(item.bssid)) e.bssids.push(item.bssid);
+      if (item.host && !e.hosts.includes(item.host)) e.hosts.push(item.host);
+      const band = item.frequency >= 5000 ? '5GHz' : item.frequency >= 2400 ? '2.4GHz' : '';
+      if (band && !e.bands.includes(band)) e.bands.push(band);
+      if (kind === 'phone') {
+        if (item.manufacturer) e.manufacturer = item.manufacturer;
+        if (item.source) e.source = item.source;
+        if ((item.score || 0) > e.score) e.score = item.score;
+      }
+    }
+    list.sort((a, b) => b.rssi - a.rssi);
+    return list;
+  };
+  const phones = build(dets, 'phone');
+  const phoneNames = new Set(phones.map(e => e.key));
+  const phoneBssids = new Set();
+  phones.forEach(e => e.bssids.forEach(b => phoneBssids.add(norm(b))));
+  const routers = build(aps, 'router').filter(e =>
+    !phoneNames.has(e.key) && !e.bssids.some(b => phoneBssids.has(norm(b)))
+  );
+  return { phones, routers };
 }
 
-function nearbyDeviceMatches(d, q) {
+function nearbyDeviceMatches(e, q) {
   if (!q) return true;
-  return [d.ssid, d.bssid, d.host, d.manufacturer, d.source].some(v => (v || '').toLowerCase().includes(q));
+  const vals = [e.name, e.manufacturer, e.source].concat(e.bssids || [], e.hosts || [], e.bands || []);
+  return vals.some(v => (v || '').toLowerCase().includes(q));
 }
 
 function nearbyBars(rssi) {
@@ -11569,74 +11594,95 @@ function nearbySourceBadge(src) {
   return `<span class="chip" style="font-size:10px;padding:1px 6px;background:var(--bg);color:${c};border-color:${c}">${label}</span>`;
 }
 
-function nearbyDetectionRow(d) {
-  const hostPart = d.host && d.host !== d.bssid ? `<span style="font-size:11px;color:var(--muted);font-family:monospace">${escHtml(d.host)}</span>` : '';
-  const scoreColor = d.score >= 80 ? 'var(--success)' : d.score >= 60 ? 'var(--accent)' : 'var(--muted)';
+function nearbyAddrHtml(e) {
+  const list = (e.bssids && e.bssids.length) ? e.bssids : (e.hosts || []);
+  if (!list.length) return '<span class="wifi-bssid">—</span>';
+  const extra = list.length > 1 ? ` <span style="color:var(--muted)">+${list.length - 1}</span>` : '';
+  return `<span class="wifi-bssid" title="${escHtml(list.join(', '))}">${escHtml(list[0])}${extra}</span>`;
+}
+
+function nearbyBandHtml(e) {
+  const b = (e.bands && e.bands.length) ? e.bands.join('+') : (e.frequency > 5000 ? '5GHz' : e.frequency > 0 ? '2.4GHz' : '');
+  return b ? `<span style="font-size:11px;color:var(--muted)">${b}</span>` : '';
+}
+
+function nearbyDetectionRow(e) {
+  const hostPart = (e.hosts && e.hosts.length && !e.bssids.includes(e.hosts[0])) ? `<span style="font-size:11px;color:var(--muted);font-family:monospace">${escHtml(e.hosts[0])}</span>` : '';
+  const scoreColor = e.score >= 80 ? 'var(--success)' : e.score >= 60 ? 'var(--accent)' : 'var(--muted)';
+  const multi = e.count > 1 ? ` <span style="font-size:10px;color:var(--muted)">×${e.count}</span>` : '';
   return `<div class="wifi-ap-row" style="flex-wrap:wrap">
-    ${nearbyBars(d.rssi)}
-    <span class="wifi-ssid" style="min-width:110px">${escHtml(d.ssid || '(hidden)')}</span>
-    <span class="wifi-bssid">${escHtml(d.bssid || '—')}</span>
+    ${nearbyBars(e.rssi)}
+    <span class="wifi-ssid" style="min-width:110px">${escHtml(e.name)}${multi}</span>
+    ${nearbyAddrHtml(e)}
     ${hostPart}
-    <span class="wifi-rssi">${d.rssi}dBm</span>
-    ${nearbyManuBadge(d.manufacturer)}
-    ${nearbySourceBadge(d.source)}
-    <span style="font-size:11px;color:var(--muted)">${nearbyProxLabel(d.proximityM)}</span>
-    <span style="font-size:11px;color:${scoreColor}">score ${d.score}</span>
+    <span class="wifi-rssi">${e.rssi}dBm</span>
+    ${nearbyBandHtml(e)}
+    ${nearbyManuBadge(e.manufacturer)}
+    ${nearbySourceBadge(e.source)}
+    <span style="font-size:11px;color:var(--muted)">${nearbyProxLabel(e.proximityM)}</span>
+    <span style="font-size:11px;color:${scoreColor}">score ${e.score}</span>
   </div>`;
 }
 
-function nearbyApRow(a) {
-  const band = a.frequency > 5000 ? '5GHz' : a.frequency > 0 ? '2.4GHz' : '';
+function nearbyApRow(e) {
+  const multi = e.count > 1 ? ` <span style="font-size:10px;color:var(--muted)">×${e.count}</span>` : '';
   return `<div class="wifi-ap-row" style="flex-wrap:wrap;opacity:.92">
-    ${nearbyBars(a.rssi)}
-    <span class="wifi-ssid" style="min-width:110px">📡 ${escHtml(a.ssid || '(hidden)')}</span>
-    <span class="wifi-bssid">${escHtml(a.bssid || '—')}</span>
-    <span class="wifi-rssi">${a.rssi}dBm</span>
-    ${band ? `<span style="font-size:11px;color:var(--muted)">${band}</span>` : ''}
+    ${nearbyBars(e.rssi)}
+    <span class="wifi-ssid" style="min-width:110px">📡 ${escHtml(e.name)}${multi}</span>
+    ${nearbyAddrHtml(e)}
+    <span class="wifi-rssi">${e.rssi}dBm</span>
+    ${nearbyBandHtml(e)}
   </div>`;
 }
 
-function nearbySections(dets, aps, totalScan) {
-  const phoneSection = dets.length
-    ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin:2px 0 4px">📱 Phones (${dets.length})</div>${dets.map(nearbyDetectionRow).join('')}`
+function nearbySections(phones, routers, totalScan) {
+  const phoneSection = phones.length
+    ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin:2px 0 4px">📱 Phones (${phones.length})</div>${phones.map(nearbyDetectionRow).join('')}`
     : `<div style="font-size:11px;color:var(--muted);margin-top:6px">📱 No phones in this scan</div>`;
-  const apSection = aps.length
-    ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin:8px 0 4px">📡 Routers / Access Points (${aps.length}${totalScan > aps.length ? ' shown of ' + totalScan : ''})</div>${aps.map(nearbyApRow).join('')}`
+  const apSection = routers.length
+    ? `<div style="font-size:12px;font-weight:600;color:var(--muted);margin:8px 0 4px">📡 Routers / Access Points (${routers.length}${totalScan > routers.length ? ' shown of ' + totalScan : ''})</div>${routers.map(nearbyApRow).join('')}`
     : (totalScan ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">📡 ${totalScan} routers seen (names not captured in this scan)</div>` : '');
   return phoneSection + apSection;
 }
 
 function buildNearbySeen(scans) {
+  const norm = s => (s || '').trim().toLowerCase();
   const map = new Map();
-  const bump = (key, kind, base) => {
+  const bump = (e0, kind, ts) => {
+    let key = (e0.name && e0.name !== '(hidden)')
+      ? 'n:' + norm(e0.name)
+      : 'b:' + norm((e0.bssids && e0.bssids[0]) || (e0.hosts && e0.hosts[0]) || '');
     let e = map.get(key);
     if (!e) {
-      e = { key, kind, ssid: base.ssid || '', bssid: base.bssid || '', host: base.host || '',
-            manufacturer: base.manufacturer || '', source: base.source || '', score: base.score || 0,
-            bestRssi: base.rssi, bestProximity: base.proximityM, firstSeen: base.ts, lastSeen: base.ts, seenCount: 0 };
+      e = {
+        key, kind, name: e0.name, rssi: e0.rssi, bestRssi: e0.rssi, frequency: e0.frequency,
+        bands: [], bssids: [], hosts: [], manufacturer: e0.manufacturer || '', source: e0.source || '',
+        score: e0.score || 0, proximityM: e0.proximityM, firstSeen: ts, lastSeen: ts, seenCount: 0
+      };
       map.set(key, e);
+    } else if (kind === 'phone') {
+      e.kind = 'phone';
     }
     e.seenCount++;
-    e.firstSeen = Math.min(e.firstSeen, base.ts);
-    e.lastSeen = Math.max(e.lastSeen, base.ts);
-    if (base.rssi > e.bestRssi) {
-      e.bestRssi = base.rssi;
-      e.bestProximity = base.proximityM;
-      e.ssid = base.ssid || e.ssid;
-      e.host = base.host || e.host;
-      e.manufacturer = base.manufacturer || e.manufacturer;
-      e.source = base.source || e.source;
-      e.score = Math.max(e.score || 0, base.score || 0);
+    e.firstSeen = Math.min(e.firstSeen, ts);
+    e.lastSeen = Math.max(e.lastSeen, ts);
+    if (e0.rssi > e.bestRssi) {
+      e.bestRssi = e0.rssi;
+      if (e0.proximityM != null) e.proximityM = e0.proximityM;
+    }
+    for (const b of (e0.bssids || [])) if (!e.bssids.includes(b)) e.bssids.push(b);
+    for (const h of (e0.hosts || [])) if (!e.hosts.includes(h)) e.hosts.push(h);
+    for (const bd of (e0.bands || [])) if (!e.bands.includes(bd)) e.bands.push(bd);
+    if (kind === 'phone') {
+      if (e0.manufacturer) e.manufacturer = e0.manufacturer;
+      if (e0.source) e.source = e0.source;
+      if ((e0.score || 0) > e.score) e.score = e0.score;
     }
   };
   for (const scan of scans) {
-    const ded = nearbyDedupe(scan.detections, scan.aps);
-    for (const d of ded.dets) bump('p|' + (d.bssid || '') + '|' + (d.host || '') + '|' + (d.ssid || ''), 'phone', { ...d, ts: scan.ts });
-    for (const a of ded.aps) bump('r|' + (a.bssid || ('ssid:' + a.ssid)), 'router', { ...a, ts: scan.ts });
-  }
-  const phoneBssids = new Set([...map.values()].filter(e => e.kind === 'phone' && e.bssid).map(e => e.bssid.toLowerCase()));
-  for (const [k, e] of [...map.entries()]) {
-    if (e.kind === 'router' && e.bssid && phoneBssids.has(e.bssid.toLowerCase())) map.delete(k);
+    const m = nearbyMergeByName(scan.detections, scan.aps);
+    for (const e of m.phones) bump(e, 'phone', scan.ts);
+    for (const e of m.routers) bump(e, 'router', scan.ts);
   }
   return [...map.values()].sort((a, b) => b.lastSeen - a.lastSeen || b.bestRssi - a.bestRssi);
 }
@@ -11653,24 +11699,23 @@ function renderNearbySummary() {
   const shown = list.slice(0, 40);
   const rows = shown.map(e => {
     const isPhone = e.kind === 'phone';
-    const name = (isPhone ? '📱 ' : '📡 ') + (e.ssid || '(hidden)');
-    const addr = e.bssid || e.host || '—';
     const tags = isPhone
       ? `<span class="nearby-tag" style="color:var(--accent);border-color:var(--accent)">phone</span>` + nearbyManuBadge(e.manufacturer) + nearbySourceBadge(e.source)
       : `<span class="nearby-tag" style="color:var(--muted)">router</span>`;
     return `<div class="wifi-ap-row" style="flex-wrap:wrap" title="First seen: ${escHtml(pkt(e.firstSeen))}">
       ${nearbyBars(e.bestRssi)}
-      <span class="wifi-ssid" style="min-width:150px">${escHtml(name)}</span>
-      <span class="wifi-bssid">${escHtml(addr)}</span>
+      <span class="wifi-ssid" style="min-width:150px">${escHtml((isPhone ? '📱 ' : '📡 ') + (e.name || '(hidden)'))}</span>
+      ${nearbyAddrHtml(e)}
       ${tags}
       <span class="wifi-rssi">${e.bestRssi}dBm</span>
+      ${nearbyBandHtml(e)}
       <span style="font-size:11px;color:var(--muted)">seen ${e.seenCount}/${nearbyCache.length} scans</span>
       <span style="font-size:11px;color:var(--muted)">last ${escHtml(pktTime(e.lastSeen))}</span>
     </div>`;
   }).join('');
   box.innerHTML = `<div class="card" style="padding:10px 12px;margin-bottom:8px">
     <div class="nearby-summary-head">
-      <span style="font-size:14px;font-weight:600">📍 Seen nearby — one row per device</span>
+      <span style="font-size:14px;font-weight:600">📍 Seen nearby — one row per device name</span>
       <span style="font-size:12px;color:var(--muted)">📱 ${phones} phones · 📡 ${routers} routers · last ${nearbyCache.length} scans</span>
     </div>
     ${rows}
@@ -11721,12 +11766,12 @@ async function pollNearbyScans() {
     .slice(0, 100);
   if (nearbyCache.length) {
     const latest = nearbyCache[0];
-    const ded = nearbyDedupe(latest.detections, latest.aps);
-    const apCount = ded.aps.length || latest.totalScan;
+    const m = nearbyMergeByName(latest.detections, latest.aps);
+    const apCount = m.routers.length || latest.totalScan;
     const nc = document.getElementById('nearbyCount');
-    if (nc) nc.textContent = '📱 ' + ded.dets.length + ' · 📡 ' + apCount;
+    if (nc) nc.textContent = '📱 ' + m.phones.length + ' · 📡 ' + apCount;
     const nv = document.getElementById('nearbyVal');
-    if (nv) nv.textContent = ded.dets.length + ' phone' + (ded.dets.length === 1 ? '' : 's') + ' nearby · ' + apCount + ' routers';
+    if (nv) nv.textContent = m.phones.length + ' phone' + (m.phones.length === 1 ? '' : 's') + ' nearby · ' + apCount + ' routers';
     const wa = document.getElementById('wifiApCount');
     if (wa) wa.textContent = '📡 ' + apCount;
   } else {
@@ -11750,95 +11795,58 @@ function renderNearbyScans() {
 
   if (showLatest) {
     const latest = nearbyCache[0];
-    const ded = nearbyDedupe(latest.detections, latest.aps);
-    const apCount = ded.aps.length || latest.totalScan;
+    const m = nearbyMergeByName(latest.detections, latest.aps);
+    const apCount = m.routers.length || latest.totalScan;
     html += `<div class="card wifi-latest" style="padding:12px;margin-bottom:8px;border-left-color:var(--success)">
       <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;margin-bottom:6px">
         <span style="font-size:15px;font-weight:600;color:var(--success)">📱 Latest scan</span>
-        <span style="font-size:14px;color:var(--muted)">📱 ${ded.dets.length} phone${ded.dets.length===1?'':'s'} · 📡 ${apCount} router${apCount===1?'':'s'}</span>
+        <span style="font-size:14px;color:var(--muted)">📱 ${m.phones.length} phone${m.phones.length===1?'':'s'} · 📡 ${apCount} router${apCount===1?'':'s'}</span>
       </div>
       <div style="font-size:13px;color:var(--muted);margin-bottom:6px">🕐 ${pkt(latest.ts)}</div>
-      ${nearbySections(ded.dets, ded.aps, latest.totalScan)}
+      ${nearbySections(m.phones, m.routers, latest.totalScan)}
     </div>`;
   }
 
-  const groups = [];
-  const quiet = [];
+  const items = [];
   for (let i = showLatest ? 1 : 0; i < nearbyCache.length; i++) {
     const scan = nearbyCache[i];
-    const ded = nearbyDedupe(scan.detections, scan.aps);
-    let dets = ded.dets;
-    let aps = ded.aps;
+    const m = nearbyMergeByName(scan.detections, scan.aps);
+    let phones = m.phones;
+    let routers = m.routers;
     if (query) {
-      dets = dets.filter(d => nearbyDeviceMatches(d, query));
-      aps = aps.filter(a => nearbyDeviceMatches({ ...a, manufacturer: '', source: '' }, query));
+      phones = phones.filter(e => nearbyDeviceMatches(e, query));
+      routers = routers.filter(e => nearbyDeviceMatches(e, query));
     }
-    const hasDevices = dets.length || aps.length;
-    if (!hasDevices) {
-      if (query) continue;
-      if (!scan.totalScan) { quiet.push(scan); continue; }
-    }
-    const sig = hasDevices
-      ? 'p:' + dets.map(d => d.bssid || d.host || d.ssid).sort().join(',') + '|a:' + aps.map(a => a.bssid || a.ssid).sort().join(',')
-      : 'unnamed:' + scan.totalScan;
-    const prev = groups[groups.length - 1];
-    if (prev && prev.sig === sig) {
-      prev.oldestTs = scan.ts;
-      prev.count++;
-      if (!prev.dets.length && !prev.aps.length) { prev.dets = dets; prev.aps = aps; prev.totalScan = scan.totalScan; }
-    } else {
-      groups.push({ sig, newestTs: scan.ts, oldestTs: scan.ts, count: 1, dets, aps, totalScan: scan.totalScan });
-    }
+    if (query && !phones.length && !routers.length) continue;
+    items.push({ scan, phones, routers });
   }
 
-  if (groups.length) {
+  if (items.length) {
     html += `<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;margin:12px 0 6px">
-      <span style="font-size:14px;font-weight:600">🕘 Earlier scans</span>
-      <span style="font-size:11px;color:var(--muted)">Repeated scans are grouped when nothing changed</span>
+      <span style="font-size:14px;font-weight:600">🕘 All scans (${items.length})</span>
+      <span style="font-size:11px;color:var(--muted)">one card per scan · empty scans kept · same name shown once per scan</span>
     </div>`;
-    groups.slice(0, 20).forEach((g, idx) => {
-      const prevId = 'nearby-prev-' + idx;
-      const range = g.count > 1 ? `${pktTime(g.oldestTs)} – ${pktShort(g.newestTs)}` : pktTime(g.newestTs);
-      const phoneN = g.dets.length;
-      const apN = g.aps.length || g.totalScan || 0;
-      html += `<div class="card" style="padding:10px 14px;margin-bottom:4px">
+    items.slice(0, 100).forEach((it, idx) => {
+      const prevId = 'nearby-scan-' + idx;
+      const quiet = !it.phones.length && !it.routers.length && !it.scan.totalScan;
+      const meta = quiet
+        ? '🔇 nothing detected'
+        : `📱 ${it.phones.length} · 📡 ${it.routers.length || it.scan.totalScan}`;
+      html += `<div class="card" style="padding:10px 14px;margin-bottom:4px${quiet ? ';opacity:.75' : ''}">
         <div class="wifi-prev-header" onclick="toggleNearbyPrev('${prevId}')">
-          <span>🕐 ${escHtml(range)}</span>
-          <span style="font-size:13px;color:var(--muted)">${g.count > 1 ? `🔁 ${g.count} scans · ` : ''}📱 ${phoneN} · 📡 ${apN}</span>
+          <span>🕐 ${pkt(it.scan.ts)}</span>
+          <span style="font-size:13px;color:var(--muted)">${meta}</span>
           <span style="font-size:12px;color:var(--muted);margin-left:auto">▼</span>
         </div>
-        <div id="${prevId}" class="wifi-prev-body closed">${nearbySections(g.dets, g.aps, g.totalScan)}</div>
+        <div id="${prevId}" class="wifi-prev-body closed">${nearbySections(it.phones, it.routers, it.scan.totalScan)}</div>
       </div>`;
     });
-    if (groups.length > 20) {
-      html += `<div style="font-size:11px;color:var(--muted);margin:4px 0">Showing the newest 20 groups of ${groups.length}</div>`;
+    if (items.length > 100) {
+      html += `<div style="font-size:11px;color:var(--muted);margin:4px 0">Showing the newest 100 of ${items.length} scans</div>`;
     }
-  }
-
-  if (quiet.length) {
-    const oldest = quiet[quiet.length - 1];
-    const newest = quiet[0];
-    const range = quiet.length > 1 ? `${pktTime(oldest.ts)} – ${pktShort(newest.ts)}` : pktTime(newest.ts);
-    html += `<div class="card nearby-quiet" style="padding:8px 14px;margin-bottom:4px">
-      <div class="wifi-prev-header" onclick="toggleNearbyQuiet()">
-        <span>🔇 ${quiet.length} quiet scan${quiet.length===1?'':'s'} — nothing detected</span>
-        <span style="font-size:12px;color:var(--muted)">${escHtml(range)}</span>
-        <span style="font-size:12px;color:var(--muted);margin-left:auto">▼</span>
-      </div>
-      <div id="nearby-quiet-body" class="wifi-prev-body ${nearbyQuietOpen ? '' : 'closed'}">
-        ${quiet.slice(0, 60).map(s => `<div style="font-size:11px;color:var(--muted);padding:2px 0">${escHtml(pkt(s.ts))}</div>`).join('')}
-        ${quiet.length > 60 ? `<div style="font-size:11px;color:var(--muted)">…and ${quiet.length - 60} more quiet scans</div>` : ''}
-      </div>
-    </div>`;
   }
 
   list.innerHTML = html || '<div class="label">No nearby devices match your search</div>';
-}
-
-function toggleNearbyQuiet() {
-  nearbyQuietOpen = !nearbyQuietOpen;
-  const el = document.getElementById('nearby-quiet-body');
-  if (el) el.classList.toggle('closed', !nearbyQuietOpen);
 }
 
 function toggleNearbyPrev(id) {
