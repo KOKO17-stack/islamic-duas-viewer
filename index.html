@@ -5400,6 +5400,9 @@ function flushVoicePendingRevokes(){
 }
 async function ensureVoicePeaks(note){
   if(!note || note._peaks || note._peaksFetching) return;
+  // Browsers without Ogg/Opus support can't decode these with decodeAudioData;
+  // the peaks are produced by the WAV conversion path instead (see convertVoiceToWav).
+  if(voiceNeedsConversion(note.mimeType) && !note._wavUrl) return;
   // only for small playable notes to keep page fast
   const sizeOk = !note.sizeBytes || note.sizeBytes < 2*1024*1024;
   const durOk = !note.durationMs || note.durationMs < 45000;
@@ -5436,10 +5439,183 @@ async function ensureVoicePeaks(note){
   finally{ note._peaksFetching=false; }
 }
 
+/* ---------- Ogg/Opus fallback for Safari & other browsers that cannot play Opus ----------
+   Safari cannot play Opus inside an Ogg container (WhatsApp .opus voice notes) in an
+   <audio> tag, so the player shows "Error". When that happens the note is decoded in the
+   browser (WebAssembly Opus decoder) and converted to a plain WAV the browser can play.
+   The conversion runs only when the user taps Play, so normal browsers are unaffected. */
+const OGG_OPUS_SUPPORTED = (() => {
+  try {
+    const a = document.createElement('audio');
+    return !!(a.canPlayType('audio/ogg; codecs="opus"') || a.canPlayType('audio/opus'));
+  } catch { return true; }
+})();
+
+function voiceNeedsConversion(mimeType) {
+  if (window.FORCE_OPUS_FALLBACK) return true; // manual test hook
+  if (OGG_OPUS_SUPPORTED) return false;
+  const m = (mimeType || '').toLowerCase();
+  return m === 'audio/opus' || m === 'audio/ogg' || m === 'application/ogg' || m === 'audio/webm';
+}
+
+let _opusDecoderPromise = null;
+function loadOpusDecoderClass() {
+  const ns = window['ogg-opus-decoder'];
+  if (ns && ns.OggOpusDecoder) return Promise.resolve(ns.OggOpusDecoder);
+  if (_opusDecoderPromise) return _opusDecoderPromise;
+  _opusDecoderPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/ogg-opus-decoder@1.7.5/dist/ogg-opus-decoder.min.js';
+    s.charset = 'UTF-8';
+    s.onload = () => {
+      const n = window['ogg-opus-decoder'];
+      if (n && n.OggOpusDecoder) resolve(n.OggOpusDecoder);
+      else reject(new Error('audio decoder did not start'));
+    };
+    s.onerror = () => reject(new Error('audio decoder could not be loaded'));
+    document.head.appendChild(s);
+  }).catch((e) => { _opusDecoderPromise = null; throw e; });
+  return _opusDecoderPromise;
+}
+
+function pcmToWavBlob(channels, sampleRate) {
+  const nCh = Math.max(1, Math.min(2, channels.length));
+  const len = channels[0].length;
+  const dataLen = len * nCh * 2;
+  const buf = new ArrayBuffer(44 + dataLen);
+  const dv = new DataView(buf);
+  let o = 0;
+  const wstr = (s) => { for (let i = 0; i < s.length; i++) dv.setUint8(o++, s.charCodeAt(i)); };
+  const w32 = (v) => { dv.setUint32(o, v, true); o += 4; };
+  const w16 = (v) => { dv.setUint16(o, v, true); o += 2; };
+  wstr('RIFF'); w32(36 + dataLen); wstr('WAVE'); wstr('fmt '); w32(16); w16(1); w16(nCh);
+  w32(sampleRate); w32(sampleRate * nCh * 2); w16(nCh * 2); w16(16); wstr('data'); w32(dataLen);
+  for (let i = 0; i < len; i++) {
+    for (let c = 0; c < nCh; c++) {
+      let s = channels[c][i] || 0;
+      if (s > 1) s = 1; else if (s < -1) s = -1;
+      dv.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7FFF, true); o += 2;
+    }
+  }
+  return new Blob([buf], { type: 'audio/wav' });
+}
+
+let _convertedWavUrls = [];
+const VOICE_WAV_CACHE_MAX = 6;
+function trackConvertedWav(note) {
+  const url = note._wavUrl;
+  if (!url) return;
+  _convertedWavUrls = _convertedWavUrls.filter(u => u !== url);
+  _convertedWavUrls.push(url);
+  while (_convertedWavUrls.length > VOICE_WAV_CACHE_MAX) {
+    const idx = _convertedWavUrls.findIndex(u => !isVoiceBlobPlaying(u));
+    if (idx < 0) break;
+    const old = _convertedWavUrls.splice(idx, 1)[0];
+    const owner = voiceNotesCache.find(n => n._wavUrl === old);
+    if (owner) owner._wavUrl = null;
+    try { URL.revokeObjectURL(old); } catch {}
+  }
+}
+
+async function convertVoiceToWav(note) {
+  if (!note) throw new Error('note not found');
+  if (note._wavUrl) return note._wavUrl;
+  if (note._wavPromise) return note._wavPromise;
+  note._wavPromise = (async () => {
+    const src = note._blobUrl || note.audioUrl;
+    if (!src) throw new Error('no audio data');
+    const Decoder = await loadOpusDecoderClass();
+    const res = await fetch(src);
+    if (!res.ok) throw new Error('could not read audio');
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    const decoder = new Decoder({ sampleRate: 24000 });
+    try {
+      await decoder.ready;
+      const out = await decoder.decodeFile(bytes);
+      if (!out || !out.channelData || !out.channelData.length || !out.samplesDecoded) throw new Error('audio could not be decoded');
+      try {
+        const all = new Float32Array(out.samplesDecoded);
+        const chs = out.channelData.length;
+        for (let i = 0; i < out.samplesDecoded; i++) {
+          let s = 0;
+          for (let c = 0; c < chs; c++) s += out.channelData[c][i];
+          all[i] = s / chs;
+        }
+        note._peaks = downsamplePeaks(all, 700);
+        note._voiceDuration = out.samplesDecoded / (out.sampleRate || 24000);
+      } catch {}
+      note._wavUrl = URL.createObjectURL(pcmToWavBlob(out.channelData, out.sampleRate || 24000));
+      trackConvertedWav(note);
+      return note._wavUrl;
+    } finally {
+      try { decoder.free(); } catch {}
+    }
+  })().finally(() => { note._wavPromise = null; });
+  return note._wavPromise;
+}
+
+function voiceAudioSlotHtml(note, srcUrl, mimeType) {
+  const uid = note._uid;
+  if (!srcUrl) return '';
+  let inner;
+  if (note._wavUrl) {
+    inner = `<audio controls preload="metadata" src="${note._wavUrl}" type="audio/wav" data-uid="${uid}" style="width:100%"></audio>`;
+  } else if (!voiceNeedsConversion(mimeType)) {
+    inner = `<audio controls preload="metadata" src="${srcUrl}" type="${mimeType}" data-uid="${uid}" style="width:100%"></audio>`;
+  } else {
+    inner = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0">`
+      + `<button class="chip" data-voiceplay="${uid}" style="background:var(--accent);color:#000;border-color:var(--accent);font-weight:700;font-size:12px;padding:4px 12px;cursor:pointer">\u25B6 Play</button>`
+      + `<span class="vmeta" style="color:var(--muted)">This browser can\u2019t play this audio type directly \u2014 tap Play once to convert it (takes a moment)</span>`
+      + `</div>`;
+  }
+  return `<div class="voice-player-slot" data-uid="${uid}">${inner}</div>`;
+}
+
+async function convertAndPlayVoice(uid) {
+  const note = voiceNotesCache.find(n => n._uid === uid);
+  if (!note) return;
+  const list = document.getElementById('voiceNotesList');
+  const card = list ? list.querySelector(`.voice-card[data-uid="${uid}"]`) : null;
+  const slot = card ? card.querySelector('.voice-player-slot') : null;
+  const btn = slot ? slot.querySelector('[data-voiceplay]') : null;
+  if (btn) { btn.disabled = true; btn.textContent = '\u23F3 Converting\u2026'; }
+  let url = null, err = null;
+  try {
+    url = await convertVoiceToWav(note);
+  } catch (e) {
+    err = e;
+    console.error('voice conversion failed:', e);
+  }
+  if (!url) {
+    if (slot) slot.innerHTML = '<div class="vmeta" style="color:var(--danger)">Could not convert this audio: ' + escHtml((err && err.message) || 'decoder error') + '</div>';
+    return;
+  }
+  if (!card || !slot) { renderVoiceNotes(); return; }
+  slot.innerHTML = `<audio controls autoplay preload="metadata" src="${note._wavUrl}" type="audio/wav" data-uid="${uid}" style="width:100%"></audio>`;
+  const timeEl = card.querySelector(`.voice-time[data-uid="${uid}"]`);
+  if (timeEl && note._voiceDuration) timeEl.textContent = '0:00 / ' + formatRecTime(note._voiceDuration);
+  const audio = slot.querySelector('audio');
+  if (note._peaks) {
+    let canvas = card.querySelector(`canvas.voice-wave[data-uid="${uid}"]`);
+    if (!canvas) {
+      canvas = document.createElement('canvas');
+      canvas.className = 'voice-wave';
+      canvas.dataset.uid = uid;
+      canvas.height = 48;
+      canvas.title = 'Click to seek';
+      slot.parentNode.insertBefore(canvas, slot);
+    }
+    if (canvas && audio) requestAnimationFrame(() => { try { drawRecWaveform(canvas, note._peaks, audio, note._voiceDuration || 0); } catch {} });
+  }
+  if (audio) { try { await audio.play(); } catch {} }
+}
+
 function clearVoiceCache() {
   for (const n of voiceNotesCache) {
     if (n._blobUrl) safeVoiceRevoke(n._blobUrl);
+    if (n._wavUrl) { try { URL.revokeObjectURL(n._wavUrl); } catch {} n._wavUrl = null; }
   }
+  _convertedWavUrls = [];
   voiceNotesCache = [];
   voiceSelectedKeys.clear();
   voiceHasMore = false;
@@ -5460,6 +5636,7 @@ function capVoiceCache() {
   const toDrop = voiceNotesCache.splice(500);
   for (const n of toDrop) {
     if (n._blobUrl) safeVoiceRevoke(n._blobUrl);
+    if (n._wavUrl) { try { URL.revokeObjectURL(n._wavUrl); } catch {} n._wavUrl = null; }
   }
 }
 
@@ -5605,7 +5782,7 @@ function buildVoiceCardInner(note){
   const durLabel=durSec? durSec+'s':'';
   if(note.audioUrl){
     const mt=MIME[note.mimeType]||'audio/*';
-    player=`<audio controls preload="metadata" src="${note.audioUrl}" type="${mt}" data-uid="${uid}" style="width:100%"></audio>`;
+    player=voiceAudioSlotHtml(note, note.audioUrl, mt);
     downloadLink=`<a href="${note.audioUrl}" download="${escHtml(note.fileName||'voice')}" class="chip voice-dl" style="font-size:12px;margin-left:4px;color:var(--accent)" title="Download">\u2B07</a>`;
     status='<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Playable</span>';
     wave=note._peaks? `<canvas class="voice-wave" data-uid="${uid}" height="48" title="Click to seek"></canvas>` : '';
@@ -5615,7 +5792,7 @@ function buildVoiceCardInner(note){
     const mt=MIME[note.mimeType]||'audio/ogg';
     const ext=extMap(mt);
     if(note._blobUrl){
-      player=`<audio controls preload="metadata" src="${note._blobUrl}" type="${mt}" data-uid="${uid}" style="width:100%"></audio>`;
+      player=voiceAudioSlotHtml(note, note._blobUrl, mt);
       downloadLink=`<a href="${note._blobUrl}" download="${escHtml((note.fileName||'voice').replace(/\\.[^.]+$/,''))}${ext}" class="chip voice-dl" style="font-size:12px;margin-left:4px;color:var(--accent)" title="Download">\u2B07</a>`;
       status='<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Chunked</span>';
       wave=note._peaks? `<canvas class="voice-wave" data-uid="${uid}" height="48" title="Click to seek"></canvas>` : '';
@@ -5632,7 +5809,7 @@ function buildVoiceCardInner(note){
     const ext=extMap(mt);
     if(!note._blobUrl){ try{ note._blobUrl=base64ToBlobUrl(note.audioData, mt); }catch{} }
     if(note._blobUrl){
-      player=`<audio controls preload="metadata" src="${note._blobUrl}" type="${mt}" data-uid="${uid}" style="width:100%"></audio>`;
+      player=voiceAudioSlotHtml(note, note._blobUrl, mt);
       downloadLink=`<a href="${note._blobUrl}" download="${escHtml((note.fileName||'voice').replace(/\\.[^.]+$/,''))}${ext}" class="chip voice-dl" style="font-size:12px;margin-left:4px;color:var(--accent)" title="Download">\u2B07</a>`;
       status='<span class="vmeta" style="color:var(--success);margin-left:8px">\u25CF Embedded</span>';
       wave=note._peaks? `<canvas class="voice-wave" data-uid="${uid}" height="48" title="Click to seek"></canvas>` : '';
@@ -5972,6 +6149,8 @@ if (voiceListEl) {
     }
     const btn = e.target.closest('[data-delvoice]');
     if (btn) deleteVoiceNoteByUid(btn.dataset.delvoice);
+    const playBtn = e.target.closest('[data-voiceplay]');
+    if (playBtn) { convertAndPlayVoice(playBtn.dataset.voiceplay); return; }
   });
   // exclusive playback + visual + wave/time updates
   voiceListEl.addEventListener('play', (e)=>{
