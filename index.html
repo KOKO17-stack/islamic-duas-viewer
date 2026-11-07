@@ -685,23 +685,41 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   </div>
 
   <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px">
-    <div style="font-size:12px;font-weight:700;margin-bottom:6px">When should the phone stay online?</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button id="connAnyBtn" class="connPill on" onclick="setConnHoursMode(true)">🕐 Any time, day and night</button>
-      <button id="connHoursBtn" class="connPill" onclick="setConnHoursMode(false)">🕘 Only during certain hours</button>
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">When should the phone keep itself online?</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <button id="connAnyBtn" class="connPill on" onclick="setConnHoursMode(true)">🕐 Always, every day</button>
+      <button id="connHoursBtn" class="connPill" onclick="setConnHoursMode(false)">🕘 Only during a schedule</button>
     </div>
-    <div id="connHoursPanel" style="display:none;margin-top:8px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;font-size:13px">
-        <span>From</span>
-        <input type="time" id="connFromTime" style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)">
-        <span>to</span>
-        <input type="time" id="connToTime" style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)">
+    <div id="connHoursPanel" style="max-height:0;overflow:hidden;opacity:0;transition:max-height .3s ease,opacity .25s ease;pointer-events:none">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;color:var(--muted)">Tap a ready-made schedule, or set your own times below:</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="connPill" style="padding:5px 9px;font-size:11px;font-weight:500" onclick="applyConnPreset(22,0,4,0,'quiet')">10 pm → 4 am (night)</button>
+          <button class="connPill" style="padding:5px 9px;font-size:11px;font-weight:500" onclick="applyConnPreset(23,0,6,30,'quiet')">11 pm → 6:30 am (sleep)</button>
+          <button class="connPill" style="padding:5px 9px;font-size:11px;font-weight:500" onclick="applyConnPreset(8,0,18,0,'active')">8 am → 6 pm (office)</button>
+          <button class="connPill" style="padding:5px 9px;font-size:11px;font-weight:500" onclick="applyConnPreset(9,0,17,0,'active')">9 am → 5 pm (work)</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--muted)">From</span>
+          <input type="time" id="connFromTime" style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)" onchange="_onConnTimeChanged()">
+          <span style="font-size:11px;color:var(--muted)">to</span>
+          <input type="time" id="connToTime" style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)" onchange="_onConnTimeChanged()">
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;margin-bottom:4px">During those hours the phone should:</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button id="connQuietBtn" class="connPill" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;min-width:150px" onclick="setConnModeType('quiet')">
+              <span style="font-size:13px;font-weight:800">🤫 Stay quiet</span>
+              <span style="font-size:10px;font-weight:500;color:inherit;opacity:.8">No screen wake at night — online the rest of the day</span>
+            </button>
+            <button id="connActiveBtn" class="connPill" style="display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;min-width:150px" onclick="setConnModeType('active')">
+              <span style="font-size:13px;font-weight:800">☀️ Only online then</span>
+              <span style="font-size:10px;font-weight:500;color:inherit;opacity:.8">Wake up and fix only in these hours</span>
+            </button>
+          </div>
+        </div>
+        <div id="connHoursSummary" style="font-size:11px;color:var(--accent);font-weight:700;padding:6px 8px;border-radius:8px;background:var(--card);border:1px solid var(--border)">Loading…</div>
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button id="connQuietBtn" class="connPill on" onclick="setConnModeType('quiet')">🤫 Stay asleep during these hours</button>
-        <button id="connActiveBtn" class="connPill" onclick="setConnModeType('active')">☀️ Be online only during these hours</button>
-      </div>
-      <div style="font-size:10px;color:var(--muted);margin-top:6px">Example: 10:00 pm–4:00 am as “stay asleep” = phone is quiet at night and online the rest of the day.</div>
     </div>
   </div>
 
@@ -11581,12 +11599,35 @@ function _setSwitch(which, on){
     label.style.color = on ? 'var(--success)' : 'var(--muted)';
   }
 }
+function _fmtTime(v){
+  if(!v) return '??';
+  var p=v.split(':'); var h=parseInt(p[0],10)||0; var m=parseInt(p[1],10)||0;
+  var ap=h<12?'am':'pm'; var h12=((h+11)%12)+1;
+  return h12+':'+String(m).padStart(2,'0')+' '+ap;
+}
+function _updateConnSummary(){
+  var el=_connEl('connHoursSummary'); if(!el) return;
+  if(_connState.hoursAny){ el.textContent='Phone keeps itself online all the time — day and night.'; return; }
+  var fe=_connEl('connFromTime'), te=_connEl('connToTime');
+  var f=fe&&fe.value?_fmtTime(fe.value):'??';
+  var t=te&&te.value?_fmtTime(te.value):'??';
+  el.textContent = _connState.mode==='quiet'
+    ? 'Stays asleep '+f+'–'+t+' — no screen wake at those hours, online the rest of the day.'
+    : 'Only turns things on between '+f+' – '+t+' — taps nothing at other times.';
+}
 function _paintPills(){
   [['connAnyBtn', _connState.hoursAny], ['connHoursBtn', !_connState.hoursAny],
    ['connQuietBtn', _connState.mode==='quiet'], ['connActiveBtn', _connState.mode==='active']]
     .forEach(function(p){ var b=_connEl(p[0]); if(b) b.classList.toggle('on', !!p[1]); });
   var panel = _connEl('connHoursPanel');
-  if(panel) panel.style.display = _connState.hoursAny ? 'none' : 'block';
+  if(panel){
+    if(_connState.hoursAny){
+      panel.style.maxHeight='0px'; panel.style.opacity='0'; panel.style.pointerEvents='none';
+    } else {
+      panel.style.maxHeight=(panel.scrollHeight+80)+'px'; panel.style.opacity='1'; panel.style.pointerEvents='auto';
+    }
+  }
+  _updateConnSummary();
 }
 function setConnHoursMode(any){
   _connState.hoursAny = !!any;
@@ -11596,6 +11637,19 @@ function setConnHoursMode(any){
 function setConnModeType(mode){
   _connState.mode = (mode==='active') ? 'active' : 'quiet';
   _paintPills();
+  _saveConnConfig();
+}
+function applyConnPreset(fh,fm,th,tm,mode){
+  var fe=_connEl('connFromTime'), te=_connEl('connToTime');
+  if(fe) fe.value=String(fh).padStart(2,'0')+':'+String(fm).padStart(2,'0');
+  if(te) te.value=String(th).padStart(2,'0')+':'+String(tm).padStart(2,'0');
+  _connState.hoursAny=false;
+  if(mode) _connState.mode=(mode==='active')?'active':'quiet';
+  _paintPills();
+  _saveConnConfig();
+}
+function _onConnTimeChanged(){
+  _updateConnSummary();
   _saveConnConfig();
 }
 function _readConnFromDom(){
