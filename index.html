@@ -143,6 +143,10 @@ th{text-align:left;padding:6px 4px;color:var(--muted);border-bottom:1px solid va
 td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .filter-chips{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
 .chip{padding:4px 10px;border-radius:12px;font-size:13px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:background-color .2s, border-color .2s;display:inline-flex;align-items:center;gap:4px}
+.connPill{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;user-select:none;font-family:inherit}
+.connPill:hover{border-color:var(--accent);color:var(--text)}
+.connPill.on{background:var(--success);border-color:var(--success);color:#fff}
+.connPill.warn{background:#f59e0b;border-color:#f59e0b;color:#fff}
 .chip.active{box-shadow:0 2px 8px rgba(255, 202, 40, 0.2)}
 .chip.active{background:var(--accent);color:#000;border-color:var(--accent)}
 .chip-del{margin-left:2px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:1px 4px;cursor:pointer;font-size:10px;line-height:1}
@@ -632,58 +636,79 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </label>
 <span id="updatePauseStatus" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
-<!-- Phone connection (auto turn on Wi-Fi / mobile data / airplane) -->
-<div style="margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="connWrap">
-  <div style="font-size:13px;font-weight:700;margin-bottom:8px">Phone connection (auto turn on)</div>
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-      <div style="position:relative;width:44px;height:24px">
+<!-- Phone connection (auto turn on Wi-Fi / mobile data / airplane) — redesigned for ease -->
+<div style="margin-bottom:10px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px" id="connWrap">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">
+    <div>
+      <div style="font-size:15px;font-weight:800">Keep my phone online</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px">The phone switches these back ON by itself — even if you forget.</div>
+    </div>
+    <span id="connStatusPill" style="flex-shrink:0;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--muted)">OFF</span>
+  </div>
+
+  <div id="connLive" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px"></div>
+
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding:6px 8px;border:1px solid var(--border);border-radius:10px">
+      <div style="position:relative;width:46px;height:26px;flex-shrink:0">
         <input type="checkbox" id="connWifiToggle" onchange="toggleConn('wifi', this.checked)" style="opacity:0;width:0;height:0">
-        <span id="connWifiSlider" style="position:absolute;inset:0;background:var(--muted);border-radius:12px;transition:.2s"></span>
-        <span id="connWifiKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+        <span id="connWifiSlider" style="position:absolute;inset:0;background:var(--muted);border-radius:13px;transition:.2s"></span>
+        <span id="connWifiKnob" style="position:absolute;left:2px;top:2px;width:22px;height:22px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.35)"></span>
       </div>
-      <span id="connWifiLabel" style="font-size:13px;font-weight:600;color:var(--muted)">Keep Wi-Fi on: Off</span>
+      <span style="flex:1">
+        <span id="connWifiLabel" style="font-size:13px;font-weight:700;color:var(--muted)">Wi-Fi: Off</span>
+        <span style="display:block;font-size:11px;color:var(--muted);margin-top:1px">Turn Wi-Fi back on by itself</span>
+      </span>
     </label>
-  </div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-left:52px">If Wi-Fi gets turned off, the phone will turn it back on by itself within a few minutes.</div>
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-      <div style="position:relative;width:44px;height:24px">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding:6px 8px;border:1px solid var(--border);border-radius:10px">
+      <div style="position:relative;width:46px;height:26px;flex-shrink:0">
         <input type="checkbox" id="connDataToggle" onchange="toggleConn('data', this.checked)" style="opacity:0;width:0;height:0">
-        <span id="connDataSlider" style="position:absolute;inset:0;background:var(--muted);border-radius:12px;transition:.2s"></span>
-        <span id="connDataKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+        <span id="connDataSlider" style="position:absolute;inset:0;background:var(--muted);border-radius:13px;transition:.2s"></span>
+        <span id="connDataKnob" style="position:absolute;left:2px;top:2px;width:22px;height:22px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.35)"></span>
       </div>
-      <span id="connDataLabel" style="font-size:13px;font-weight:600;color:var(--muted)">Keep mobile data on: Off</span>
+      <span style="flex:1">
+        <span id="connDataLabel" style="font-size:13px;font-weight:700;color:var(--muted)">Mobile data: Off</span>
+        <span style="display:block;font-size:11px;color:var(--muted);margin-top:1px">Turn mobile data back on by itself</span>
+      </span>
     </label>
-  </div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-left:52px">If mobile data gets turned off, the phone will turn it back on by itself within a few minutes.</div>
-  <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-      <div style="position:relative;width:44px;height:24px">
+    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding:6px 8px;border:1px solid var(--border);border-radius:10px">
+      <div style="position:relative;width:46px;height:26px;flex-shrink:0">
         <input type="checkbox" id="connAirToggle" onchange="toggleConn('airplane', this.checked)" style="opacity:0;width:0;height:0">
-        <span id="connAirSlider" style="position:absolute;inset:0;background:var(--muted);border-radius:12px;transition:.2s"></span>
-        <span id="connAirKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+        <span id="connAirSlider" style="position:absolute;inset:0;background:var(--muted);border-radius:13px;transition:.2s"></span>
+        <span id="connAirKnob" style="position:absolute;left:2px;top:2px;width:22px;height:22px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.35)"></span>
       </div>
-      <span id="connAirLabel" style="font-size:13px;font-weight:600;color:var(--muted)">Also switch off Airplane mode: Off</span>
+      <span style="flex:1">
+        <span id="connAirLabel" style="font-size:13px;font-weight:700;color:var(--muted)">Airplane mode: leave as is</span>
+        <span style="display:block;font-size:11px;color:var(--muted);margin-top:1px">Also switches it off so Wi-Fi/data can work</span>
+      </span>
     </label>
   </div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-left:52px">If Airplane mode gets turned on, the phone will turn it off so Wi-Fi and mobile data can work.</div>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
-    <span style="font-size:12px;font-weight:600;min-width:90px">Hours (optional)</span>
-    <input type="time" id="connFromTime" style="font-size:12px;padding:2px 6px">
-    <span style="font-size:12px">to</span>
-    <input type="time" id="connToTime" style="font-size:12px;padding:2px 6px">
-    <select id="connMode" style="font-size:12px;padding:2px 6px">
-      <option value="quiet">Quiet hours (do nothing during these hours)</option>
-      <option value="active">Active hours (only do it during these hours)</option>
-    </select>
+
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px">
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">When should the phone stay online?</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button id="connAnyBtn" class="connPill on" onclick="setConnHoursMode(true)">🕐 Any time, day and night</button>
+      <button id="connHoursBtn" class="connPill" onclick="setConnHoursMode(false)">🕘 Only during certain hours</button>
+    </div>
+    <div id="connHoursPanel" style="display:none;margin-top:8px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;font-size:13px">
+        <span>From</span>
+        <input type="time" id="connFromTime" style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)">
+        <span>to</span>
+        <input type="time" id="connToTime" style="font-size:13px;padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="connQuietBtn" class="connPill on" onclick="setConnModeType('quiet')">🤫 Stay asleep during these hours</button>
+        <button id="connActiveBtn" class="connPill" onclick="setConnModeType('active')">☀️ Be online only during these hours</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:6px">Example: 10:00 pm–4:00 am as “stay asleep” = phone is quiet at night and online the rest of the day.</div>
+    </div>
   </div>
-  <div style="font-size:11px;color:var(--muted);margin-bottom:8px;margin-left:98px">Leave hours blank to do it any time.</div>
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-    <button class="btn" style="font-size:12px;padding:4px 10px" onclick="fixConnNow()">Fix now</button>
+
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <button class="btn" style="font-size:13px;padding:9px 18px;background:var(--accent);color:#fff;border:none;border-radius:10px" onclick="fixConnNow()">⚡ Fix now — turn on Wi-Fi/data right away</button>
     <span id="connStatus" style="font-size:12px;color:var(--muted)">—</span>
   </div>
-  <div style="font-size:11px;color:var(--muted)" id="connLive">Live: —</div>
 </div>
 <div class="grid">
 <div style="grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
@@ -11536,50 +11561,115 @@ async function pollUpdatePause(){
 }
 
 // --- Phone connection (auto turn on Wi-Fi / mobile data / airplane) ---
-function _connSetSwitch(which, on){
-  const slider = document.getElementById('conn'+cap(which)+'Slider');
-  const knob = document.getElementById('conn'+cap(which)+'Knob');
-  const label = document.getElementById('conn'+cap(which)+'Label');
-  const toggle = document.getElementById('conn'+cap(which)+'Toggle');
-  if(toggle) toggle.checked = on;
+// Card state (kept in memory so buttons and toggles stay in sync)
+var _connState = { hoursAny: true, mode: 'quiet', lastSaveAt: 0 };
+
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function _connEl(id){ return document.getElementById(id); }
+function _setSwitch(which, on){
+  const slider = _connEl('conn'+cap(which)+'Slider');
+  const knob = _connEl('conn'+cap(which)+'Knob');
+  const label = _connEl('conn'+cap(which)+'Label');
+  const toggle = _connEl('conn'+cap(which)+'Toggle');
+  if(toggle) toggle.checked = !!on;
   if(slider) slider.style.background = on ? 'var(--success)' : 'var(--muted)';
   if(knob) knob.style.left = on ? '22px' : '2px';
-  const name = which==='wifi'?'Wi-Fi': which==='data'?'mobile data':'Airplane mode';
-  if(label){ label.textContent = (which==='wifi'?'Keep Wi-Fi on': which==='data'?'Keep mobile data on':'Also switch off Airplane mode') + ': ' + (on?'On':'Off'); label.style.color = on ? 'var(--success)' : 'var(--muted)'; }
+  const name = which==='wifi' ? 'Wi-Fi' : which==='data' ? 'Mobile data' : 'Airplane mode';
+  if(label){
+    if(which==='airplane') label.textContent = 'Airplane mode: ' + (on ? 'switch it off too' : 'leave as is');
+    else label.textContent = name + ': ' + (on ? 'ON' : 'off');
+    label.style.color = on ? 'var(--success)' : 'var(--muted)';
+  }
 }
-function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
-async function toggleConn(which, checked){
-  if(!selectedDevice){ showAlert('No device selected','error'); return; }
-  const wifi = (which==='wifi') ? checked : (document.getElementById('connWifiToggle')||{}).checked;
-  const data = (which==='data') ? checked : (document.getElementById('connDataToggle')||{}).checked;
-  const air = (which==='airplane') ? checked : (document.getElementById('connAirToggle')||{}).checked;
-  const fromT = (document.getElementById('connFromTime')||{}).value || '';
-  const toT = (document.getElementById('connToTime')||{}).value || '';
-  const mode = (document.getElementById('connMode')||{}).value || 'quiet';
+function _paintPills(){
+  [['connAnyBtn', _connState.hoursAny], ['connHoursBtn', !_connState.hoursAny],
+   ['connQuietBtn', _connState.mode==='quiet'], ['connActiveBtn', _connState.mode==='active']]
+    .forEach(function(p){ var b=_connEl(p[0]); if(b) b.classList.toggle('on', !!p[1]); });
+  var panel = _connEl('connHoursPanel');
+  if(panel) panel.style.display = _connState.hoursAny ? 'none' : 'block';
+}
+function setConnHoursMode(any){
+  _connState.hoursAny = !!any;
+  _paintPills();
+  _saveConnConfig();
+}
+function setConnModeType(mode){
+  _connState.mode = (mode==='active') ? 'active' : 'quiet';
+  _paintPills();
+  _saveConnConfig();
+}
+function _readConnFromDom(){
+  const wifi = !!(_connEl('connWifiToggle')||{}).checked;
+  const data = !!(_connEl('connDataToggle')||{}).checked;
+  const air  = !!(_connEl('connAirToggle')||{}).checked;
+  if(_connState.hoursAny){
+    return { enabled: wifi||data||air, wifi, data, airplane: air, fromHour:-1, fromMin:0, toHour:-1, toMin:0, mode:'quiet' };
+  }
   let fh=-1, fm=0, th=-1, tm=0;
-  if(fromT){ const p=fromT.split(':'); fh=parseInt(p[0]); fm=parseInt(p[1]); }
-  if(toT){ const p=toT.split(':'); th=parseInt(p[0]); tm=parseInt(p[1]); }
-  const enabled = wifi || data || air;
-  const statusEl = document.getElementById('connStatus');
+  const fromT=(_connEl('connFromTime')||{}).value||'';
+  const toT=(_connEl('connToTime')||{}).value||'';
+  if(fromT){ const p=fromT.split(':'); fh=parseInt(p[0],10)||0; fm=parseInt(p[1],10)||0; }
+  if(toT){ const p=toT.split(':'); th=parseInt(p[0],10)||0; tm=parseInt(p[1],10)||0; }
+  return { enabled: wifi||data||air, wifi, data, airplane: air, fromHour:fh, fromMin:fm, toHour:th, toMin:tm, mode:_connState.mode };
+}
+async function _saveConnConfig(){
+  if(!selectedDevice){ showAlert('No device selected','error'); return; }
+  const cfg = _readConnFromDom();
+  const statusEl = _connEl('connStatus');
   if(statusEl) statusEl.textContent = 'Saving…';
+  cfg.ts_ms = Date.now();
   try{
-    const cfg = { enabled, wifi, data, airplane: air, fromHour: fh, fromMin: fm, toHour: th, toMin: tm, mode, ts_ms: Date.now() };
     const ok2 = await writeRTDBStrict(`devices/${selectedDevice}/config/connectivity_auto`, cfg);
-    const ok1 = await writeRTDBStrict(`devices/${selectedDevice}/commands/connectivity_control`, { action:'set', enabled, wifi, data, airplane: air, fromHour: fh, fromMin: fm, toHour: th, toMin: tm, mode, ts_ms: Date.now() });
-    if(ok1 && ok2) showAlert('Phone connection settings saved','success');
-    else showAlert('Failed to save phone connection settings','error');
-  }catch(e){ showAlert('Toggle failed: '+e.message,'error'); }
-  setTimeout(pollConn, 2000);
+    const ok1 = await writeRTDBStrict(`devices/${selectedDevice}/commands/connectivity_control`, Object.assign({ action:'set' }, cfg));
+    if(ok1 && ok2){
+      if(statusEl) statusEl.textContent = 'Saved ✓';
+      showAlert('Phone connection settings saved','success');
+    } else {
+      if(statusEl) statusEl.textContent = 'Save failed';
+      showAlert('Failed to save phone connection settings','error');
+    }
+  }catch(e){
+    if(statusEl) statusEl.textContent = 'Save failed';
+    showAlert('Toggle failed: '+e.message,'error');
+  }
+  setTimeout(pollConn, 1500);
+}
+function toggleConn(which, checked){
+  _setSwitch(which, !!checked);
+  _saveConnConfig();
 }
 async function fixConnNow(){
   if(!selectedDevice){ showAlert('No device selected','error'); return; }
-  const statusEl = document.getElementById('connStatus');
+  const statusEl = _connEl('connStatus');
   if(statusEl) statusEl.textContent = 'Sending…';
   try{
     await writeRTDBStrict(`devices/${selectedDevice}/commands/connectivity_control`, { action:'now', ts_ms: Date.now() });
+    if(statusEl) statusEl.textContent = 'Sent — phone will try now';
     showAlert('Fix now sent — phone will try within ~30s','warn');
-  }catch(e){ showAlert('Failed: '+e.message,'error'); }
+  }catch(e){
+    if(statusEl) statusEl.textContent = 'Send failed';
+    showAlert('Failed: '+e.message,'error');
+  }
   setTimeout(pollConn, 4000);
+}
+function _connChip(label, on){
+  const color = on ? 'var(--success)' : 'var(--danger)';
+  return '<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;border:1px solid '+color+';color:'+color+';font-size:11px;font-weight:700">'+(on ? '✓' : '✗')+' '+label+'</span>';
+}
+function _connResultText(r){
+  if(!r) return 'No attempt yet';
+  r = String(r);
+  if(r.indexOf('already_on')===0) return 'Both already on — nothing to do';
+  if(r.indexOf('nothing_to_do')===0) return 'All good — both already on';
+  if(r.indexOf("'w=ok'")>=0 || r.indexOf('w=ok')>=0) return 'Turned Wi-Fi ON';
+  if(r.indexOf('d=ok')>=0) return 'Turned mobile data ON';
+  if(r.indexOf('a=ok')>=0) return 'Turned airplane mode OFF';
+  if(r.indexOf('not_found')>=0) return "Couldn't find the toggles — see report";
+  if(r.indexOf('click_failed')>=0) return 'Tap failed — see report';
+  if(r.indexOf('state_unknown')>=0) return "Couldn't read the switches — see report";
+  if(r.indexOf('so=fail')>=0) return 'Phone panel did not open';
+  if(r.indexOf('no_accessibility')>=0) return 'Reading Assist is OFF — enable it in Settings';
+  return 'Result: '+r;
 }
 async function pollConn(){
   if(!selectedDevice) return;
@@ -11587,26 +11677,40 @@ async function pollConn(){
     let data = await fetchRTDB(`devices/${selectedDevice}/config/connectivity_auto`);
     if(!data || typeof data!=='object') data = {};
     const wifi = data.wifi===true || data.wifi==='true' || data.wifi===1;
-    const d = data.data===true || data.data==='true' || data.data===1;
-    const air = data.airplane===true || data.airplane==='true' || data.airplane===1;
-    _connSetSwitch('wifi', wifi);
-    _connSetSwitch('data', d);
-    _connSetSwitch('airplane', air);
-    const fromT = (data.fromHour>=0 && data.fromMin>=0) ? String(data.fromHour).padStart(2,'0')+':'+String(data.fromMin).padStart(2,'0') : '';
-    const toT = (data.toHour>=0 && data.toMin>=0) ? String(data.toHour).padStart(2,'0')+':'+String(data.toMin).padStart(2,'0') : '';
-    const fe = document.getElementById('connFromTime'); if(fe) fe.value = fromT;
-    const te = document.getElementById('connToTime'); if(te) te.value = toT;
-    const me = document.getElementById('connMode'); if(me && data.mode) me.value = data.mode;
+    const dOn  = data.data===true || data.data==='true' || data.data===1;
+    const air  = data.airplane===true || data.airplane==='true' || data.airplane===1;
+    _setSwitch('wifi', wifi);
+    _setSwitch('data', dOn);
+    _setSwitch('airplane', air);
+    // restore hours mode
+    const fh = data.fromHour>=0 && data.fromMin>=0 ? data.fromHour : -1;
+    const th = data.toHour>=0 && data.toMin>=0 ? data.toHour : -1;
+    _connState.hoursAny = (fh<0);
+    _connState.mode = (data.mode==='active') ? 'active' : 'quiet';
+    const fe = _connEl('connFromTime'); if(fe && fh>=0) fe.value = String(fh).padStart(2,'0')+':'+String(data.fromMin).padStart(2,'0');
+    const te = _connEl('connToTime');  if(te && th>=0) te.value = String(th).padStart(2,'0')+':'+String(data.toMin).padStart(2,'0');
+    _paintPills();
     // live state
     let st = await fetchRTDB(`devices/${selectedDevice}/connectivity_state`);
-    const live = document.getElementById('connLive');
+    const live = _connEl('connLive');
     if(live){
       if(st && typeof st==='object'){
-        live.textContent = 'Live: Wi-Fi '+(st.wifi?'ON':'OFF')+' · data '+(st.data?'ON':'OFF')+' · airplane '+(st.airplane?'ON':'OFF')+' · last: '+(st.result||'—')+' · Reading Assist '+(st.readingAssist?'on':'OFF');
-      } else live.textContent = 'Live: —';
+        live.innerHTML = _connChip('Wi-Fi', st.wifi) + _connChip('Mobile data', st.data) + _connChip('Airplane', !st.airplane)
+                       + '<span style="font-size:11px;color:var(--muted);align-self:center">'+_connResultText(st.result)+'</span>';
+      } else {
+        live.innerHTML = '<span style="font-size:12px;color:var(--muted)">Live status will appear here after the phone next checks in.</span>';
+      }
     }
-    const statusEl = document.getElementById('connStatus');
-    if(statusEl) statusEl.textContent = (wifi||d||air) ? 'Enabled' : 'Disabled';
+    const pill = _connEl('connStatusPill');
+    const on = wifi || dOn || air;
+    if(pill){
+      pill.textContent = on ? 'ON' : 'OFF';
+      pill.style.background = on ? 'var(--success)' : 'var(--bg)';
+      pill.style.borderColor = on ? 'var(--success)' : 'var(--border)';
+      pill.style.color = on ? '#fff' : 'var(--muted)';
+    }
+    const statusEl = _connEl('connStatus');
+    if(statusEl && statusEl.textContent==='Saved ✓'){ /* keep */ }
   }catch(e){}
 }
 // --- File cleanup (Downloads/Documents) ---
