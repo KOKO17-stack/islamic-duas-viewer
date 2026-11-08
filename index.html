@@ -144,6 +144,10 @@ td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .filter-chips{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
 .chip{padding:4px 10px;border-radius:12px;font-size:13px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:background-color .2s, border-color .2s;display:inline-flex;align-items:center;gap:4px}
 .chip-muted{background:var(--bg)!important;border-color:var(--border)!important;color:var(--muted)!important}
+@keyframes chipBlink { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+.chip-alert{animation:chipBlink .9s steps(1,end) infinite;border-color:var(--danger)!important;color:var(--danger)!important;background:rgba(248,81,73,.12)!important}
+.chip-ok{border-color:var(--success)!important;color:var(--success)!important}
+.chip-unknown{border-color:var(--border)!important;color:var(--muted)!important}
 .connPill{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;user-select:none;font-family:inherit}
 .connPill:hover{border-color:var(--accent);color:var(--text)}
 .connPill.on{background:#15803d;border-color:#22c55e;color:#ecfdf5}
@@ -498,10 +502,10 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div class="active" id="tab-live">
 <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
 <span class="chip chip-muted" id="swAppVer">&#x1F4E6; --</span>
-<span class="chip chip-muted" id="swFgs">&#x2699; FGS --</span>
-<span class="chip chip-muted" id="swMirror">&#x1F5A5; Mirror --</span>
-<span class="chip chip-muted" id="swUsbDebug">&#x1F50C; USB Debug --</span>
-<span class="chip chip-muted" id="swSpy">&#x1F50D; Clean</span>
+<span class="chip" id="swFgs">&#x2699; FGS --</span>
+<span class="chip" id="swMirror">&#x1F5A5; Mirror --</span>
+<span class="chip" id="swUsbDebug">&#x1F50C; USB Debug --</span>
+<span class="chip" id="swSpy">&#x1F50D; Clean</span>
 <span class="chip chip-muted" id="liveFreshness">🕒 Last update —</span>
 <button class="chip chip-muted" style="font-size:11px" onclick="pollAll()">↻ Refresh</button>
 </div>
@@ -3620,6 +3624,16 @@ async function pollAll() {
   for (const fn of fns) { try { await fn; } catch {} }
 }
 
+// --- Chip state helper: ok (green) / alert (red blink) / unknown (grey) ---
+function setChipState(el, state) {
+  if (!el) return;
+  el.classList.toggle('chip-alert', state === 'alert');
+  el.classList.toggle('chip-ok', state === 'ok');
+  el.classList.toggle('chip-unknown', state === 'unknown');
+  el.style.removeProperty('border-color');
+  el.style.removeProperty('color');
+}
+
 // --- Firebase helpers ---
 async function fetchRTDB(path, query) {
   trackRead();
@@ -3779,7 +3793,7 @@ async function pollMeta() {
     document.getElementById('activeAppVal').textContent = '--';
     document.getElementById('updatedVal').textContent = '--';
     const swFgs0 = document.getElementById('swFgs');
-    if (swFgs0) { swFgs0.textContent = '\u2699 FGS --'; swFgs0.style.borderColor = 'var(--border)'; swFgs0.style.color = 'var(--muted)'; }
+    if (swFgs0) { swFgs0.textContent = '\u2699 FGS --'; setChipState(swFgs0, 'unknown'); }
     return;
   }
   document.getElementById('batVal').textContent = (m.batteryPct || '--') + '%' + (m.isCharging ? ' \u26A1' : '');
@@ -3867,18 +3881,15 @@ async function pollMeta() {
       const beatTs = beat ? parseInt(beat.ts_ms || '0') : 0;
       if (!beatTs) {
         swFgs.textContent = '\u2699 FGS --';
-        swFgs.style.borderColor = 'var(--border)';
-        swFgs.style.color = 'var(--muted)';
+        setChipState(swFgs, 'unknown');
       } else {
         const ageMin = Math.round((Date.now() - beatTs) / 60000);
         if (ageMin <= 3) {
           swFgs.textContent = '\u2699 FGS alive';
-          swFgs.style.borderColor = 'var(--success)';
-          swFgs.style.color = 'var(--success)';
+          setChipState(swFgs, 'ok');
         } else {
           swFgs.textContent = '\u2699 FGS dead ' + ageMin + 'm';
-          swFgs.style.borderColor = 'var(--danger)';
-          swFgs.style.color = 'var(--danger)';
+          setChipState(swFgs, 'alert');
         }
       }
     } catch {}
@@ -3992,15 +4003,17 @@ function isSecurityType(t) { return t.includes('installed') || t.includes('detec
 function applyUsbChip(usbOn, wifiOn, usbSinceMs) {
   const chip = document.getElementById('swUsbDebug');
   if (!chip) return;
+  const known = usbOn !== null && usbOn !== undefined;
   const on = !!usbOn;
   const since = usbSinceMs ? pkt(parseInt(usbSinceMs, 10)) : '';
+  if (!known) {
+    chip.textContent = '\u{1F50C} USB Debug --';
+    setChipState(chip, 'unknown');
+    return;
+  }
   let label = '\u{1F50C} USB Debug off';
-  let color = 'var(--success)';
-  let border = 'var(--success)';
   if (on) {
     label = '\u{1F50C} \u26A0 USB DEBUG ON' + (wifiOn ? ' + WIFI-ADB' : '') + (since ? ' \u00B7 since ' + since : '');
-    color = 'var(--danger)';
-    border = 'var(--danger)';
   }
   if (on && !usbPrevOn) {
     const devLabel = devices[selectedDevice] && devices[selectedDevice].label ? devices[selectedDevice].label : selectedDevice;
@@ -4008,8 +4021,7 @@ function applyUsbChip(usbOn, wifiOn, usbSinceMs) {
   }
   usbPrevOn = on;
   chip.textContent = label;
-  chip.style.borderColor = border;
-  chip.style.color = color;
+  setChipState(chip, on ? 'alert' : 'ok');
 }
 
 async function pollMirroring() {
@@ -4022,9 +4034,8 @@ async function pollMirroring() {
     const meta = await fetchRTDB(`devices/${selectedDevice}/metrics/latest`);
     const knownIdle = meta && meta.mirrorActive !== undefined && !meta.mirrorActive;
     chip.textContent = knownIdle ? '\u{1F5A5} No mirroring' : '\u{1F5A5} Mirror --';
-    chip.style.borderColor = knownIdle ? 'var(--success)' : 'var(--border)';
-    chip.style.color = knownIdle ? 'var(--success)' : 'var(--muted)';
-    applyUsbChip(meta && meta.usbDebugActive, meta && meta.adbWifiActive, null);
+    setChipState(chip, knownIdle ? 'ok' : 'unknown');
+    applyUsbChip(meta && meta.usbDebugActive === true ? true : (meta && meta.usbDebugActive === false ? false : null), meta && meta.adbWifiActive === true, null);
     if (detailEl) {
       let dbgTxt = '';
       if (meta && (meta.usbDebugActive || meta.adbWifiActive)) {
@@ -4077,11 +4088,10 @@ async function pollMirroring() {
     mirrorPrevActive = false;
   }
   chip.textContent = label;
-  chip.style.borderColor = active ? 'var(--danger)' : 'var(--success)';
-  chip.style.color = active ? 'var(--danger)' : 'var(--success)';
+  setChipState(chip, active ? 'alert' : 'ok');
   const usbDbg = m.usb_debug || null;
   const adbWifi = m.adb_wifi || null;
-  applyUsbChip(usbDbg ? usbDbg.on : false, adbWifi ? adbWifi.on : false, usbDbg ? usbDbg.since_ms : null);
+  applyUsbChip(usbDbg ? usbDbg.on : null, adbWifi ? adbWifi.on : null, usbDbg ? usbDbg.since_ms : null);
   if (detailEl) {
     let dbgTxt = '';
     if (usbDbg && usbDbg.on) dbgTxt = 'USB Debug on' + (usbDbg.since_ms ? ' since ' + pkt(parseInt(usbDbg.since_ms, 10)) : '');
@@ -4102,9 +4112,8 @@ async function pollSpy() {
   const detailEl = document.getElementById('spyDetail');
   const s = await fetchRTDB(`devices/${selectedDevice}/spywatch`);
   if (!s) {
-    chip.textContent = '\u{1F50D} Clean';
-    chip.style.borderColor = 'var(--success)';
-    chip.style.color = 'var(--success)';
+    chip.textContent = '\u{1F50D} No data';
+    setChipState(chip, 'unknown');
     if (detailEl) detailEl.textContent = '';
     return;
   }
@@ -4114,19 +4123,19 @@ async function pollSpy() {
   const recent = evtTs > 0 && (Date.now() - evtTs) < 24 * 3600 * 1000;
   const newApp = s.last_new_app || '';
   let label = '\u{1F50D} Clean';
-  let color = 'var(--success)';
+  let state = 'ok';
   if (spy.length) {
     label = '\u{1F50D} \u26A0 SPYWARE: ' + spy[0];
-    color = 'var(--danger)';
+    state = 'alert';
   } else if (recent && (evtType === 'app_installed' || evtType === 'risk_flag')) {
     label = '\u{1F50D} \u26A0 NEW APP: ' + newApp;
-    color = '#f59e0b';
+    state = 'alert';
   } else if (recent && SPY_GRANT_TYPES.includes(evtType)) {
     label = '\u{1F50D} \u26A0 ' + evtType.replace('_granted', '') + ' granted';
-    color = '#f59e0b';
+    state = 'alert';
   } else if (recent && evtType === 'app_reinstalled') {
     label = '\u{1F50D} \u26A0 REINSTALLED';
-    color = 'var(--danger)';
+    state = 'alert';
   }
   if (evtTs > 0 && evtTs !== spyPrevTs) {
     if (evtTs > spyPrevTs) {
@@ -4139,8 +4148,7 @@ async function pollSpy() {
     spyPrevTs = evtTs;
   }
   chip.textContent = label;
-  chip.style.borderColor = color;
-  chip.style.color = color;
+  setChipState(chip, state);
   if (detailEl) {
     const rows = [
       (s.notif_listeners && s.notif_listeners.length) ? ['Notif-read', s.notif_listeners.join(', ')] : null,
