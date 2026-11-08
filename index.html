@@ -143,6 +143,7 @@ th{text-align:left;padding:6px 4px;color:var(--muted);border-bottom:1px solid va
 td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .filter-chips{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
 .chip{padding:4px 10px;border-radius:12px;font-size:13px;border:1px solid var(--border);background:var(--bg);color:var(--muted);cursor:pointer;transition:background-color .2s, border-color .2s;display:inline-flex;align-items:center;gap:4px}
+.chip-muted{background:var(--bg)!important;border-color:var(--border)!important;color:var(--muted)!important}
 .connPill{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--bg);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;user-select:none;font-family:inherit}
 .connPill:hover{border-color:var(--accent);color:var(--text)}
 .connPill.on{background:#15803d;border-color:#22c55e;color:#ecfdf5}
@@ -495,12 +496,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
+<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px">
+<span id="liveFreshness" style="font-size:11px;color:var(--muted)">Waiting for first update…</span>
+<button class="chip" style="font-size:11px" onclick="pollAll()">↻ Refresh</button>
+</div>
 <!-- Performance Tuning — 7 sliders per-phone + presets (unified truth: devices/<id>/config/tuning) -->
 <div id="tuningPanel" style="margin-bottom:12px;padding:12px;background:var(--card);border:1px solid var(--accent);border-radius:10px">
-<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+<details>
+<summary style="cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap;user-select:none">
 <b style="font-size:13px;color:var(--text)">⚡ Performance — how hard the phone works</b>
 <span id="tuningStatus" style="font-size:11px;color:var(--muted);margin-left:auto">—</span>
-</div>
+</summary>
 <div style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap">
 <button onclick="applyTuningPreset('cool')" style="padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:12px;font-weight:600;cursor:pointer" title="Coolest — longest intervals, lowest heat">❄️ Cool</button>
 <button onclick="applyTuningPreset('normal')" style="padding:6px 12px;border-radius:20px;border:1px solid var(--accent);background:var(--accent);color:#000;font-size:12px;font-weight:600;cursor:pointer" title="Balanced — default">⚖️ Normal</button>
@@ -613,6 +619,7 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 </div>
 <div style="font-size:11px;color:var(--muted);margin-top:8px">Per-phone — Pixel ≠ Huawei. Home/Away side-by-side: Home left = when inside Home circle, Away right = outside. 4 location controls split; Heavy sync / Main loop / Reading Assist / Keep awake are single. Writes to <code>devices/&lt;id&gt;/config/tuning/home|away</code> and legacy. Drag right = cooler, live badge shows active mode.</div>
+</details>
 </div>
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_location">
 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
@@ -730,11 +737,11 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div class="grid">
 <div style="grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swAppVer">&#x1F4E6; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swFgs">&#x2699; FGS --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swMirror">&#x1F5A5; Mirror --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUsbDebug">&#x1F50C; USB Debug --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSpy">&#x1F50D; Clean</span>
+  <span class="chip chip-muted" id="swAppVer">&#x1F4E6; --</span>
+  <span class="chip chip-muted" id="swFgs">&#x2699; FGS --</span>
+  <span class="chip chip-muted" id="swMirror">&#x1F5A5; Mirror --</span>
+  <span class="chip chip-muted" id="swUsbDebug">&#x1F50C; USB Debug --</span>
+  <span class="chip chip-muted" id="swSpy">&#x1F50D; Clean</span>
 </div>
 <div style="grid-column:1 / -1">
   <div id="mirrorDetail" style="font-size:11px;color:var(--muted)"></div>
@@ -781,19 +788,19 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div id="liveActivityHistory" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
 </div>
 <div id="statusWidget" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swBattery">&#x1F50B; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swStorage">&#x1F4BE; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSteps">&#x1F45F; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swWifi">&#x1F4E1; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swSignal"><span class="wifi-signal"></span> --</span>
+  <span class="chip chip-muted" id="swBattery">&#x1F50B; --</span>
+  <span class="chip chip-muted" id="swStorage">&#x1F4BE; --</span>
+  <span class="chip chip-muted" id="swSteps">&#x1F45F; --</span>
+  <span class="chip chip-muted" id="swWifi">&#x1F4E1; --</span>
+  <span class="chip chip-muted" id="swSignal"><span class="wifi-signal"></span> --</span>
 </div>
 <div id="silentStateRow" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swRinger">&#x1F50A; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swDnd">&#x1F514; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swBrightness">&#x2600; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUptime">&#x23F1; --</span>
-   <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swUnlocks">&#x1F513; --</span>
-  <span class="chip" style="background:var(--bg);border-color:var(--border);color:var(--muted)" id="swScreen">&#x1F4F1; --</span>
+  <span class="chip chip-muted" id="swRinger">&#x1F50A; --</span>
+  <span class="chip chip-muted" id="swDnd">&#x1F514; --</span>
+  <span class="chip chip-muted" id="swBrightness">&#x2600; --</span>
+  <span class="chip chip-muted" id="swUptime">&#x23F1; --</span>
+   <span class="chip chip-muted" id="swUnlocks">&#x1F513; --</span>
+  <span class="chip chip-muted" id="swScreen">&#x1F4F1; --</span>
 </div>
 <div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_system">
 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
@@ -1782,6 +1789,14 @@ function renderGeofenceAlertLog() {
   el.innerHTML = geofenceAlertLog.length ? geofenceAlertLog.map(e =>
     `<div style="padding:3px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--accent)">${pktShort(e.ts)}</span> \u{1F514} ${escHtml(e.msg)}</div>`
   ).join('') : '<div class="label">No alerts yet</div>';
+}
+let lastUpdateTs = 0;
+function updateFreshnessLabel() {
+  const el = document.getElementById('liveFreshness');
+  if (!el) return;
+  if (!lastUpdateTs) { el.textContent = 'Waiting for first update…'; return; }
+  const d = Math.max(0, Math.floor((Date.now() - lastUpdateTs) / 1000));
+  el.textContent = d < 5 ? 'Updated just now' : (d < 60 ? ('Updated ' + d + 's ago') : ('Updated ' + Math.floor(d / 60) + 'm ago'));
 }
 let readBudget = (() => { try { return JSON.parse(localStorage.getItem('readBudget') || '{"count":0,"day":""}'); } catch { return { count: 0, day: '' }; } })();
 let cachedPhotos = {};
@@ -3593,6 +3608,7 @@ function startPolling() {
 
 function schedulePoll(name, interval, fn) {
   async function run() {
+    if (document.hidden) { pollTimers.push(setTimeout(run, interval)); return; }
     try { await fn(); } catch (e) { console.error('poll [' + name + '] error:', e); }
     if (!document.hidden) pollTimers.push(setTimeout(run, interval));
   }
@@ -7676,6 +7692,8 @@ document.getElementById('contactsSearch')?.addEventListener('input', renderConta
 
 // --- Update UI ---
 function updateLocationUI(loc) {
+  lastUpdateTs = Date.now();
+  updateFreshnessLabel();
   document.getElementById('accVal').textContent = loc.accuracy != null ? loc.accuracy + 'm' : '--';
   document.getElementById('spdVal').textContent = loc.speed != null ? (loc.speed * 3.6).toFixed(1) + ' km/h' : '--';
   document.getElementById('seenVal').textContent = pkt(loc.ts_ms || Date.now());
@@ -13258,6 +13276,7 @@ async function init() {
     try { await fetchDevices(); if (selectedDevice) break; } catch {}
     if (!selectedDevice) await new Promise(r => setTimeout(r, 2000));
   }
+  setInterval(updateFreshnessLabel, 1000);
   startPolling();
   setTimeout(initFCM, 2000);
   if (geofences.length === 0) {
