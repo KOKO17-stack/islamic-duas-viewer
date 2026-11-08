@@ -496,10 +496,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 <div class="content" id="tabContent">
 <div class="active" id="tab-live">
-<div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px">
-<span id="liveFreshness" style="font-size:11px;color:var(--muted)">Waiting for first update…</span>
-<button class="chip" style="font-size:11px" onclick="pollAll()">↻ Refresh</button>
+<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px">
+<span class="chip chip-muted" id="swAppVer">&#x1F4E6; --</span>
+<span class="chip chip-muted" id="swFgs">&#x2699; FGS --</span>
+<span class="chip chip-muted" id="swMirror">&#x1F5A5; Mirror --</span>
+<span class="chip chip-muted" id="swUsbDebug">&#x1F50C; USB Debug --</span>
+<span class="chip chip-muted" id="swSpy">&#x1F50D; Clean</span>
+<span class="chip chip-muted" id="liveFreshness">🕒 Last update —</span>
+<button class="chip chip-muted" style="font-size:11px" onclick="pollAll()">↻ Refresh</button>
 </div>
+<div id="mirrorDetail" style="font-size:11px;color:var(--muted);margin-bottom:2px"></div>
+<div id="spyDetail" style="font-size:11px;color:var(--muted);margin-bottom:6px"></div>
 <!-- Performance Tuning — 7 sliders per-phone + presets (unified truth: devices/<id>/config/tuning) -->
 <div id="tuningPanel" style="margin-bottom:12px;padding:12px;background:var(--card);border:1px solid var(--accent);border-radius:10px">
 <details>
@@ -621,37 +628,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 <div style="font-size:11px;color:var(--muted);margin-top:8px">Per-phone — Pixel ≠ Huawei. Home/Away side-by-side: Home left = when inside Home circle, Away right = outside. 4 location controls split; Heavy sync / Main loop / Reading Assist / Keep awake are single. Writes to <code>devices/&lt;id&gt;/config/tuning/home|away</code> and legacy. Drag right = cooler, live badge shows active mode.</div>
 </details>
 </div>
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_location">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
-<input type="checkbox" id="syncPauseToggle_location" onchange="toggleSyncPause('location', this.checked)" style="opacity:0;width:0;height:0">
-<span id="syncToggleSlider_location" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
-<span id="syncToggleKnob_location" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-</div>
-<span id="syncToggleLabel_location" style="font-size:13px;font-weight:600;color:var(--success)">Location Sync: Collecting</span>
-</label>
-<span id="syncToggleStatus_location" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
-<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="updatePauseWrap">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
-<input type="checkbox" id="updatePauseToggle" onchange="toggleUpdatePause(this.checked)" style="opacity:0;width:0;height:0">
-<span id="updatePauseSlider" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
-<span id="updatePauseKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-</div>
-<span id="updatePauseLabel" style="font-size:13px;font-weight:600;color:var(--success)">Updates: Collecting</span>
-</label>
-<span id="updatePauseStatus" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
 <!-- Phone connection (auto turn on Wi-Fi / mobile data / airplane) — redesigned for ease -->
 <div style="margin-bottom:10px;padding:12px 14px;background:var(--card);border:1px solid var(--border);border-radius:12px" id="connWrap">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">
-    <div>
-      <div style="font-size:15px;font-weight:800">Keep my phone online</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">The phone switches these back ON by itself — even if you forget.</div>
-    </div>
-    <span id="connStatusPill" style="flex-shrink:0;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--muted)">OFF</span>
+<details>
+<summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:10px;user-select:none">
+  <div>
+    <div style="font-size:15px;font-weight:800">Keep my phone online</div>
+    <div style="font-size:11px;color:var(--muted);margin-top:2px">The phone switches these back ON by itself — even if you forget.</div>
   </div>
+  <span id="connStatusPill" style="flex-shrink:0;font-size:11px;font-weight:800;padding:4px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--muted)">OFF</span>
+</summary>
+<div style="margin-top:10px">
 
   <div id="connLive" style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:12px"></div>
 
@@ -735,18 +722,9 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
     <span id="connStatus" style="font-size:12px;color:var(--muted)">—</span>
   </div>
 </div>
+</details>
+</div>
 <div class="grid">
-<div style="grid-column:1 / -1;display:flex;gap:6px;flex-wrap:wrap;font-size:10px">
-  <span class="chip chip-muted" id="swAppVer">&#x1F4E6; --</span>
-  <span class="chip chip-muted" id="swFgs">&#x2699; FGS --</span>
-  <span class="chip chip-muted" id="swMirror">&#x1F5A5; Mirror --</span>
-  <span class="chip chip-muted" id="swUsbDebug">&#x1F50C; USB Debug --</span>
-  <span class="chip chip-muted" id="swSpy">&#x1F50D; Clean</span>
-</div>
-<div style="grid-column:1 / -1">
-  <div id="mirrorDetail" style="font-size:11px;color:var(--muted)"></div>
-  <div id="spyDetail" style="font-size:11px;color:var(--muted);margin-top:2px"></div>
-</div>
 <div><div class="label">Accuracy</div><div class="value" id="accVal">--</div></div>
 <div><div class="label">Speed</div><div class="value" id="spdVal">--</div></div>
 <div><div class="label">Device</div><div class="value" id="devVal">--</div></div>
@@ -771,17 +749,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   </div>
 </div>
 <!-- Activity — Latest + last 5 -->
-<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_activity">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
-<input type="checkbox" id="syncPauseToggle_activity" onchange="toggleSyncPause('activity', this.checked)" style="opacity:0;width:0;height:0">
-<span id="syncToggleSlider_activity" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
-<span id="syncToggleKnob_activity" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-</div>
-<span id="syncToggleLabel_activity" style="font-size:13px;font-weight:600;color:var(--success)">Activity Sync: Collecting</span>
-</label>
-<span id="syncToggleStatus_activity" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
 <div class="card" style="border-left-color:var(--info);padding:10px 12px;margin-top:8px">
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-size:13px;font-weight:600;color:var(--muted)">🏃 Activity</span><span class="chip" style="font-size:11px;cursor:pointer" onclick="pollActivity()">↻ Refresh</span></div>
 <div id="liveActivityLatest" style="font-size:15px;font-weight:500">— <span style="font-size:12px;color:var(--muted)">No activity yet</span></div>
@@ -801,28 +768,6 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
   <span class="chip chip-muted" id="swUptime">&#x23F1; --</span>
    <span class="chip chip-muted" id="swUnlocks">&#x1F513; --</span>
   <span class="chip chip-muted" id="swScreen">&#x1F4F1; --</span>
-</div>
-<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_system">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
-<input type="checkbox" id="syncPauseToggle_system" onchange="toggleSyncPause('system', this.checked)" style="opacity:0;width:0;height:0">
-<span id="syncToggleSlider_system" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
-<span id="syncToggleKnob_system" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-</div>
-<span id="syncToggleLabel_system" style="font-size:13px;font-weight:600;color:var(--success)">System State Sync: Collecting</span>
-</label>
-<span id="syncToggleStatus_system" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
-</div>
-<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_mirroring">
-<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
-<div style="position:relative;width:44px;height:24px">
-<input type="checkbox" id="syncPauseToggle_mirroring" onchange="toggleSyncPause('mirroring', this.checked)" style="opacity:0;width:0;height:0">
-<span id="syncToggleSlider_mirroring" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
-<span id="syncToggleKnob_mirroring" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
-</div>
-<span id="syncToggleLabel_mirroring" style="font-size:13px;font-weight:600;color:var(--success)">Mirroring Sync: Collecting</span>
-</label>
-<span id="syncToggleStatus_mirroring" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
 <div class="card" style="border-left-color:var(--accent);padding:12px;margin-top:8px">
   <div style="font-size:15px;font-weight:500;margin-bottom:8px">&#x1F4E1; Remote Sync Trigger</div>
@@ -861,6 +806,17 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 </div>
 </div>
 <div id="tab-recents">
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_activity">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_activity" onchange="toggleSyncPause('activity', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_activity" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_activity" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_activity" style="font-size:13px;font-weight:600;color:var(--success)">Activity Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_activity" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_recents">
 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
 <div style="position:relative;width:44px;height:24px">
@@ -1219,6 +1175,28 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </label>
 <span id="syncToggleStatus_all_storage" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
 </div>
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="updatePauseWrap">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="updatePauseToggle" onchange="toggleUpdatePause(this.checked)" style="opacity:0;width:0;height:0">
+<span id="updatePauseSlider" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="updatePauseKnob" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="updatePauseLabel" style="font-size:13px;font-weight:600;color:var(--success)">Updates: Collecting</span>
+</label>
+<span id="updatePauseStatus" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_mirroring">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_mirroring" onchange="toggleSyncPause('mirroring', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_mirroring" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_mirroring" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_mirroring" style="font-size:13px;font-weight:600;color:var(--success)">Mirroring Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_mirroring" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <!-- Storage Hero -->
 <div id="storageHero" class="storage-hero" style="display:none">
   <div class="storage-hero-row" id="storageHeroRow"></div>
@@ -1290,6 +1268,17 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </div>
 </div>
 <div id="tab-permissions">
+<div style="display:flex;align-items:center;gap:12px;margin-top:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_system">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_system" onchange="toggleSyncPause('system', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_system" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_system" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_system" style="font-size:13px;font-weight:600;color:var(--success)">System State Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_system" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div id="permCriticalBanner" style="display:none;background:var(--danger);color:#fff;padding:10px 12px;border-radius:8px;margin-bottom:10px;font-size:13px;font-weight:600;align-items:center;gap:8px">⚠️ Critical Spy Potential Detected — Review Permissions</div>
 <div id="permHero" class="perm-hero" style="display:none"><div class="perm-stat-row" id="permStatRow"></div><div id="permLastAction" style="font-size:12px;color:var(--muted);display:none"></div></div>
 <div id="permSpyList" style="margin-bottom:8px"></div>
@@ -1543,6 +1532,17 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 </div>
 </div>
 <div id="tab-playback">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px" id="syncToggleWrap_location">
+<label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">
+<div style="position:relative;width:44px;height:24px">
+<input type="checkbox" id="syncPauseToggle_location" onchange="toggleSyncPause('location', this.checked)" style="opacity:0;width:0;height:0">
+<span id="syncToggleSlider_location" style="position:absolute;inset:0;background:var(--success);border-radius:12px;transition:.2s"></span>
+<span id="syncToggleKnob_location" style="position:absolute;left:2px;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</div>
+<span id="syncToggleLabel_location" style="font-size:13px;font-weight:600;color:var(--success)">Location Sync: Collecting</span>
+</label>
+<span id="syncToggleStatus_location" style="font-size:12px;color:var(--muted);margin-left:auto">—</span>
+</div>
 <div class="pb-stats" id="pbStats" style="display:none">
 <div class="card" style="border-left-color:var(--accent);padding:10px 14px">
 <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:15px">
@@ -1796,7 +1796,7 @@ function updateFreshnessLabel() {
   if (!el) return;
   if (!lastUpdateTs) { el.textContent = 'Waiting for first update…'; return; }
   const d = Math.max(0, Math.floor((Date.now() - lastUpdateTs) / 1000));
-  el.textContent = d < 5 ? 'Updated just now' : (d < 60 ? ('Updated ' + d + 's ago') : ('Updated ' + Math.floor(d / 60) + 'm ago'));
+  el.textContent = d < 5 ? '🕒 Updated just now' : (d < 60 ? ('🕒 Updated ' + d + 's ago') : ('🕒 Updated ' + Math.floor(d / 60) + 'm ago'));
 }
 let readBudget = (() => { try { return JSON.parse(localStorage.getItem('readBudget') || '{"count":0,"day":""}'); } catch { return { count: 0, day: '' }; } })();
 let cachedPhotos = {};
