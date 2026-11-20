@@ -173,6 +173,8 @@ td{padding:6px 4px;border-bottom:1px solid var(--border)}
 .rec-extras{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
 .voice-extras{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px}
 .rec-speed{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;min-width:62px}
+.rec-boost{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;min-width:62px}
+.rec-boost.boost-on{border-color:var(--accent);color:var(--accent);font-weight:700}
 .voice-speed{background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;min-width:62px}
 .rec-time{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:88px;text-align:right}
 .voice-time{margin-left:auto;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:88px;text-align:right}
@@ -1167,10 +1169,19 @@ canvas.chart-canvas{width:100%!important;height:200px!important;border-radius:6p
 On-demand mic recordings triggered from the dashboard. Segments are auto-assembled into a single playable file.
 </div>
 
-<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
 <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(7)">&#x1F5D1; Cleanup older than 7 days</button>
 <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(30)">&#x1F5D1; Cleanup older than 30 days</button>
 <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(1)">&#x1F5D1; Cleanup older than 1 day</button>
+<label title="Makes quiet recordings louder. Applies to every recording in this tab." style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-left:auto">
+&#x1F50A; Volume boost
+<select id="recBoostSelect" class="rec-boost" aria-label="Recording volume boost" onchange="setRecBoostLevel(this.value)">
+<option value="1">Off</option>
+<option value="2">2x</option>
+<option value="3">3x</option>
+<option value="4">4x</option>
+</select>
+</label>
 </div>
 
 <div id="remoteHintBanner" style="display:none;font-size:12px;color:var(--warning);background:var(--card);border:1px solid var(--warning);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px"></div>
@@ -6683,9 +6694,126 @@ function getRecAudioCtx() {
   if (!recAudioCtx) {
     try { recAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { recAudioCtx = null; }
   }
-  if (recAudioCtx && recAudioCtx.state === 'suspended') { try { recAudioCtx.resume(); } catch (e) {} }
+  if (recAudioCtx && (recAudioCtx.state === 'suspended' || recAudioCtx.state === 'interrupted')) {
+    try { const p = recAudioCtx.resume(); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+  }
   return recAudioCtx;
 }
+
+/* ---------- Volume boost for remote recordings ----------
+   Adds extra loudness above 100% so quiet recordings can be heard clearly.
+   A plain media element cannot go above 100%, and iPhone Safari ignores
+   volume changes made by a web page, so the extra gain is applied with the
+   browser's Web Audio mixer:  player -> gain -> limiter -> speakers.
+   The limiter stops boosted speech from clipping into harsh distortion. */
+const REC_BOOST_KEY = 'ds_rec_boost_level';
+let recBoostLevel = 1;
+try {
+  const savedBoost = parseFloat(localStorage.getItem(REC_BOOST_KEY));
+  if (savedBoost >= 1 && savedBoost <= 4) recBoostLevel = savedBoost;
+} catch (e) {}
+const recBoostGraphs = new WeakMap();
+
+function getRecBoostAudioCtx() {
+  const ctx = getRecAudioCtx();
+  if (!ctx) return null;
+  try {
+    if (ctx.state === 'suspended' || ctx.state === 'interrupted') {
+      const p = ctx.resume();
+      if (p && p.catch) p.catch(() => {});
+    }
+  } catch (e) {}
+  return ctx;
+}
+
+function ensureRecBoostGraph(audio) {
+  if (!audio) return null;
+  if (recBoostGraphs.has(audio)) return recBoostGraphs.get(audio);
+  const ctx = getRecBoostAudioCtx();
+  if (!ctx || typeof ctx.createMediaElementSource !== 'function') return null;
+  try {
+    const src = ctx.createMediaElementSource(audio);
+    const gain = ctx.createGain();
+    gain.gain.value = recBoostLevel;
+    const limiter = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -8;
+    limiter.knee.value = 0;
+    limiter.ratio.value = 12;
+    limiter.attack.value = 0.003;
+    limiter.release.value = 0.25;
+    src.connect(gain);
+    gain.connect(limiter);
+    limiter.connect(ctx.destination);
+    const graph = { src, gain, limiter };
+    recBoostGraphs.set(audio, graph);
+    return graph;
+  } catch (e) {
+    // If the browser refuses to route this player, playback must still work.
+    // The player simply stays at normal volume instead of breaking.
+    return null;
+  }
+}
+
+function applyRecBoost(audio) {
+  if (!audio) return;
+  let graph = null;
+  if (recBoostGraphs.has(audio)) graph = recBoostGraphs.get(audio);
+  else if (recBoostLevel > 1) graph = ensureRecBoostGraph(audio);
+  if (!graph) return;
+  try { graph.gain.gain.value = recBoostLevel; } catch (e) {}
+  try {
+    const ctx = getRecAudioCtx();
+    if (ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) {
+      const p = ctx.resume();
+      if (p && p.catch) p.catch(() => {});
+    }
+  } catch (e) {}
+}
+
+function setRecBoostLevel(value) {
+  const level = Math.max(1, Math.min(4, parseFloat(value) || 1));
+  recBoostLevel = level;
+  try { localStorage.setItem(REC_BOOST_KEY, String(level)); } catch (e) {}
+  const sel = document.getElementById('recBoostSelect');
+  if (sel) {
+    if (String(sel.value) !== String(level)) sel.value = String(level);
+    sel.classList.toggle('boost-on', level > 1);
+  }
+  // Live update: apply the new level to anything playing now, and keep any
+  // player that was boosted earlier in sync even while paused.
+  const recList = document.getElementById('remoteRecordingsList');
+  if (recList) {
+    for (const a of recList.querySelectorAll('audio')) {
+      if ((!a.paused && !a.ended) || recBoostGraphs.has(a)) applyRecBoost(a);
+    }
+  }
+}
+
+/* iPhone and desktop Safari start the sound mixer asleep. A real tap/touch is
+   required before it may run, so wake it once on the first interaction. */
+let recBoostUnlocked = false;
+function unlockRecBoostAudio() {
+  if (recBoostUnlocked) return;
+  recBoostUnlocked = true;
+  getRecBoostAudioCtx();
+}
+try {
+  document.addEventListener('pointerdown', unlockRecBoostAudio, { capture: true, passive: true });
+  document.addEventListener('touchend', unlockRecBoostAudio, { capture: true, passive: true });
+  document.addEventListener('click', unlockRecBoostAudio, { capture: true, passive: true });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') getRecBoostAudioCtx();
+  });
+} catch (e) {}
+
+function initRecBoostUI() {
+  const sel = document.getElementById('recBoostSelect');
+  if (!sel) return;
+  sel.value = String(recBoostLevel);
+  sel.classList.toggle('boost-on', recBoostLevel > 1);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initRecBoostUI);
+else initRecBoostUI();
 
 function b64ToArrayBuffer(b64) {
   const SLICE = 1048576;
@@ -7307,6 +7435,9 @@ if (recListEl) {
     if (e.target.tagName !== 'AUDIO') return;
     const cur = e.target;
     const curId = cur.dataset.recid;
+    // Apply the chosen volume boost before the sound leaves the player.
+    // This also covers multi-part auto-advance and players restored after a refresh.
+    applyRecBoost(cur);
     for (const a of recListEl.querySelectorAll('audio')) {
       if (a !== cur && !a.paused) { try { a.pause(); } catch {} }
     }
