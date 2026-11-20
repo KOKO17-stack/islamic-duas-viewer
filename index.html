@@ -6883,7 +6883,10 @@ async function decodePartsToBlobUrl(parts) {
   try {
     const ctx = getRecAudioCtx();
     if (!ctx) return null;
-    const buffers = [];
+    const pcmChunks = [];
+    const partPeaks = [];
+    let sampleRate = 0;
+    let totalFrames = 0;
     for (let pi = 0; pi < parts.length; pi++) {
       const b64 = parts[pi];
       if (!b64) continue;
@@ -6894,63 +6897,129 @@ async function decodePartsToBlobUrl(parts) {
           const r = ctx.decodeAudioData(arr, resolve, reject);
           if (r && r.then) r.then(resolve, reject);
         });
-        if (ab && ab.length) buffers.push(ab);
+        if (ab && ab.length) {
+          const chans = ab.numberOfChannels || 1;
+          const mono = new Float32Array(ab.length);
+          for (let f = 0; f < ab.length; f++) {
+            let s = 0;
+            for (let c = 0; c < chans; c++) s += ab.getChannelData(c)[f];
+            mono[f] = s / chans;
+          }
+          const chunk = new Uint8Array(mono.length * 2);
+          const dv = new DataView(chunk.buffer);
+          for (let i = 0; i < mono.length; i++) {
+            const v = Math.max(-1, Math.min(1, mono[i]));
+            dv.setInt16(i * 2, v < 0 ? v * 0x8000 : v * 0x7FFF, true);
+          }
+          pcmChunks.push(chunk);
+          totalFrames += mono.length;
+          partPeaks.push(downsamplePeaks(mono, 100));
+          if (!sampleRate) sampleRate = ab.sampleRate || 44100;
+        }
       } catch (e) {
         console.warn('decodePartsToBlobUrl: skipping bad part ' + pi, e && e.message);
         parts[pi] = null;
         continue;
       }
+      parts[pi] = null;
     }
-    if (!buffers.length) return null;
-    const sampleRate = buffers[0].sampleRate || 44100;
-    const totalFrames = buffers.reduce((s, b) => s + b.length, 0);
-    if (totalFrames > sampleRate * 7200) { console.warn('decodePartsToBlobUrl: recording too long for PCM assembly'); return null; }
-    const all = new Float32Array(totalFrames);
-    let off = 0;
-    for (let i = 0; i < buffers.length; i++) {
-      const b = buffers[i];
-      const chans = b.numberOfChannels || 1;
-      for (let f = 0; f < b.length; f++) {
-        let s = 0;
-        for (let c = 0; c < chans; c++) s += b.getChannelData(c)[f];
-        all[off++] = s / chans;
-      }
-      buffers[i] = null;
-    }
-    const peaks = downsamplePeaks(all, 800);
-    const duration = all.length / sampleRate;
-    const blobUrl = URL.createObjectURL(encodePcmToWav(all, sampleRate));
-    return { blobUrl, peaks, duration, sampleRate };
+    if (!pcmChunks.length) return null;
+    const sr = sampleRate || 44100;
+    if (totalFrames > sr * 7200) { console.warn('decodePartsToBlobUrl: recording too long for PCM assembly'); return null; }
+    // combine part peaks into 800 bars
+    const combined = [];
+    for (const p of partPeaks) combined.push(...p);
+    const peaks = combined.length ? downsamplePeaksArray(combined, 800) : [];
+    const header = makeWavHeader(totalFrames, sr);
+    const blobUrl = URL.createObjectURL(new Blob([header, ...pcmChunks], { type: 'audio/wav' }));
+    return { blobUrl, peaks, duration: totalFrames / sr, sampleRate: sr };
   } catch (e) {
     console.warn('decodePartsToBlobUrl failed:', e);
     return null;
   }
 }
 
-async function loadRecording(deviceId, recId) {
+function makeWavHeader(numSamples, sampleRate) {
+  const buf = new ArrayBuffer(44);
+  const view = new DataView(buf);
+  const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + numSamples * 2, true); writeStr(8, 'WAVE');
+  writeStr(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, numSamples * 2, true);
+  return new Uint8Array(buf);
+}
+
+function downsamplePeaksArray(peaks, bars) {
+  if (!peaks.length) return [];
+  const out = [];
+  const per = Math.max(1, Math.floor(peaks.length / bars));
+  for (let i = 0; i < bars; i++) {
+    const start = i * per;
+    const end = i === bars - 1 ? peaks.length : Math.min(peaks.length, start + per);
+    let min = 1, max = -1;
+    for (let j = start; j < end; j++) {
+      const v = peaks[j];
+      if (v.min < min) min = v.min;
+      if (v.max > max) max = v.max;
+    }
+    if (min === 1 && max === -1) { min = 0; max = 0; }
+    out.push({ min, max });
+  }
+  return out;
+}
+
+const REC_META_FIELDS = ['id','requestId','createdAt','startedAtMs','endedAtMs','requestedDurationSec','sessionRequestedDurationSec','sessionStartedAtMs','durationSec','recordedDurationSec','sizeBytes','segmentsCount','segmentsUploaded','missingSegments','cancelled','status','mimeType','format','audioSource','networkType','sampleRate','bitRate','batteryStart','batteryEnd','freeMbStart','freeMbEnd','partIndex','partsTotal'];
+
+async function fetchRecordingMeta(deviceId, recId) {
+  const tok = await authParam();
+  const qs = tok ? `?auth=${tok}` : '';
+  const pairs = await Promise.all(REC_META_FIELDS.map(async (f) => {
+    trackRead();
+    try {
+      const r = await fetch(`${RTDB}/devices/${deviceId}/recordings/${recId}/${f}.json${qs}`);
+      if (!r.ok) return [f, null];
+      return [f, await r.json()];
+    } catch { return [f, null]; }
+  }));
+  const out = {};
+  for (const [f, v] of pairs) { if (v !== null && v !== undefined) out[f] = v; }
+  return out;
+}
+
+async function loadRecording(deviceId, recId, forceAudio) {
   try {
-    const recData = await fetchRTDB(`devices/${deviceId}/recordings/${recId}`);
-    if (!recData || typeof recData !== 'object') return null;
-    let meta = recData;
-    if (!meta.durationSec && meta.meta && typeof meta.meta === 'object') meta = meta.meta;
+    const meta = await fetchRecordingMeta(deviceId, recId);
+    if (!meta || typeof meta !== 'object' || Object.keys(meta).length === 0) return null;
+    if (meta.meta && typeof meta.meta === 'object' && !meta.durationSec) meta = meta.meta;
     const mimeType = meta.mimeType || 'audio/mp4';
     const mt = REC_MIME[mimeType] || 'audio/mp4';
-    const parts = await fetchAllParts(deviceId, recId);
+    const st = String(meta.status || '').toLowerCase();
+    const isFinal = st === 'completed' || st === 'partial' || st === 'cancelled' || st === 'error';
+    const startedMs = meta.startedAtMs || meta.createdAt || 0;
+    const reqSec = meta.requestedDurationSec || 600;
+    const overdue = !!startedMs && (Date.now() - startedMs > (reqSec + 120) * 1000);
+    const shouldLoadAudio = forceAudio === true || isFinal || overdue;
+    let parts = [];
+    if (shouldLoadAudio) parts = await fetchAllParts(deviceId, recId);
     const missing = parts._missing || [];
-    const expectedSegs = parts._expectedSegs || parts.length;
-    let blobUrl = null, peaks = null, duration = 0, sampleRate = 0;
-    if (parts.length) {
-      const decoded = await decodePartsToBlobUrl(parts);
-      if (decoded && decoded.blobUrl) {
-        blobUrl = decoded.blobUrl;
-        peaks = decoded.peaks;
-        duration = decoded.duration;
-        sampleRate = decoded.sampleRate;
-      } else if (decoded === null) {
-        // decode failed -> fallback per-part will be used
+    const expectedSegs = shouldLoadAudio ? (parts._expectedSegs || parts.length) : (meta.segmentsCount || 0);
+    let blobUrl = null, peaks = null, duration = 0, sampleRate = 0, skipAssembly = false;
+    if (shouldLoadAudio && parts.length) {
+      if (parts.length > 20) {
+        skipAssembly = true;
+      } else {
+        const decoded = await decodePartsToBlobUrl(parts);
+        if (decoded && decoded.blobUrl) {
+          blobUrl = decoded.blobUrl;
+          peaks = decoded.peaks;
+          duration = decoded.duration;
+          sampleRate = decoded.sampleRate;
+        }
       }
     }
-    return { _recId: recId, _blobUrl: blobUrl, _peaks: peaks, _duration: duration, _sampleRate: sampleRate, _partsCount: parts.length, _partsData: parts, _partUrls: null, _checkedExpected: null, _mt: mt, meta, _missing: missing, _expectedSegs: expectedSegs, _lastPartsGrowMs: Date.now(), _lastReloadMs: 0 };
+    return { _recId: recId, _blobUrl: blobUrl, _peaks: peaks, _duration: duration, _sampleRate: sampleRate, _partsCount: shouldLoadAudio ? parts.length : 0, _partsData: shouldLoadAudio ? parts : null, _partUrls: null, _checkedExpected: null, _mt: mt, meta, _missing: missing, _expectedSegs: expectedSegs, _lastPartsGrowMs: Date.now(), _lastReloadMs: 0, _lastMetaMs: 0, _interrupted: overdue && !isFinal, _skipAssembly: skipAssembly };
   } catch (e) {
     console.error('loadRecording failed', recId, e);
     return null;
@@ -7004,37 +7073,54 @@ async function pollRemoteRecordings() {
   }
   for (const entry of recordingsCache) {
     try {
-      const notFinal = entry.meta && (entry.meta.status === 'started' || entry.meta.status === 'recording' || entry.meta.status === 'partial');
+      const st = String((entry.meta && entry.meta.status) || '').toLowerCase();
+      const isFinal = st === 'completed' || st === 'partial' || st === 'cancelled' || st === 'error';
+      if (isFinal) continue;
       const nowMs = Date.now();
-      if (notFinal && entry._lastReloadMs && (nowMs - entry._lastReloadMs) < 60000) continue;
-      const seg = await fetchRTDB(`devices/${deviceId}/recordings/${entry._recId}/segmentsCount`);
-      const expected = typeof seg === 'number' ? seg : (entry.meta.segmentsCount || entry._partsCount);
-      if (entry._checkedExpected === expected && !notFinal) continue;
-      entry._checkedExpected = expected;
-      entry._lastReloadMs = nowMs;
-      const fresh = await loadRecording(deviceId, entry._recId);
-      fresh._lastReloadMs = nowMs;
-      const statusChanged = fresh && entry.meta && fresh.meta && fresh.meta.status !== entry.meta.status;
-      if (fresh && (fresh._partsCount > entry._partsCount || statusChanged)) {
-        if (fresh._partsCount > entry._partsCount) fresh._lastPartsGrowMs = nowMs; else fresh._lastPartsGrowMs = entry._lastPartsGrowMs || nowMs;
-        if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
-        if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
-        const idx = recordingsCache.indexOf(entry);
-        if (idx >= 0) { // preserve selection flag, keep _partUrls cleared for fresh
-          recordingsCache[idx] = fresh;
-          recordingsCache[idx]._checkedExpected = expected;
-          dirty = true;
+      if (entry._lastMetaMs && (nowMs - entry._lastMetaMs) < 60000) continue;
+      entry._lastMetaMs = nowMs;
+      trackRead();
+      const tok = await authParam();
+      const qs = tok ? `?auth=${tok}` : '';
+      const base = `${RTDB}/devices/${deviceId}/recordings/${entry._recId}`;
+      const statusRes = await fetch(`${base}/status.json${qs}`).then(r => r.ok ? r.json() : null).catch(() => null);
+      trackRead();
+      const shallowRes = await fetch(`${base}/parts.json?shallow=true${tok ? '&auth=' + tok : ''}`).then(r => r.ok ? r.json() : null).catch(() => null);
+      const newStatus = typeof statusRes === 'string' ? statusRes.toLowerCase() : (statusRes && statusRes.status ? String(statusRes.status).toLowerCase() : st);
+      const liveParts = shallowRes && typeof shallowRes === 'object' ? Object.keys(shallowRes).length : 0;
+      const nowFinal = newStatus === 'completed' || newStatus === 'partial' || newStatus === 'cancelled' || newStatus === 'error';
+      if (nowFinal) {
+        const fresh = await loadRecording(deviceId, entry._recId, true);
+        if (fresh) {
+          if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
+          if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
+          const idx = recordingsCache.indexOf(entry);
+          if (idx >= 0) {
+            fresh._interruptedLoaded = entry._interruptedLoaded;
+            fresh._lastMetaMs = nowMs;
+            recordingsCache[idx] = fresh;
+            dirty = true;
+          }
         }
-      } else if (fresh && fresh._partsCount === entry._partsCount && statusChanged) {
-        // status changed but parts same (e.g. completed)
-        entry.meta = fresh.meta;
-        entry._missing = fresh._missing;
-        dirty = true;
+      } else if (!entry._interruptedLoaded) {
+        const startedMs = entry.meta.startedAtMs || entry.meta.createdAt || 0;
+        const reqSec = entry.meta.requestedDurationSec || 600;
+        const overdue = startedMs && (nowMs - startedMs > (reqSec + 120) * 1000);
+        if (overdue && liveParts > 0) {
+          entry._interruptedLoaded = true;
+          const fresh = await loadRecording(deviceId, entry._recId, true);
+          if (fresh) {
+            fresh._interruptedLoaded = true;
+            fresh._lastMetaMs = nowMs;
+            fresh._interrupted = true;
+            if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
+            if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
+            const idx = recordingsCache.indexOf(entry);
+            if (idx >= 0) { recordingsCache[idx] = fresh; dirty = true; }
+          }
+        }
       }
-      if (fresh && fresh.meta && (fresh.meta.status === 'started' || fresh.meta.status === 'recording')) {
-        const target = recordingsCache.find(x => x._recId === entry._recId) || entry;
-        target._checkedExpected = -1;
-      }
+      if (entry.meta) entry.meta.status = newStatus || entry.meta.status;
     } catch (e) {}
   }
   const toRemove = recordingsCache.filter(r => !recIds.includes(r._recId));
@@ -7085,7 +7171,7 @@ function buildRecCardInnerHTML(entry) {
   const missing = entry._missing || [];
   const expectedSegs = entry._expectedSegs || entry.meta.segmentsCount || parts;
   const st = (entry.meta.status || '').toLowerCase();
-  const interrupted = (st === 'started' || st === 'recording') && entry._lastPartsGrowMs && (Date.now() - entry._lastPartsGrowMs > 10 * 60 * 1000);
+  const interrupted = entry._interrupted || ((st === 'started' || st === 'recording') && entry._lastPartsGrowMs && (Date.now() - entry._lastPartsGrowMs > 10 * 60 * 1000));
   const partial = st === 'partial' || (entry.meta.missingSegments > 0) || (missing.length > 0);
   if (parts > 0 && entry._blobUrl) {
     status = `<span class="vmeta rec-badge-playable" style="margin-left:8px">\u25CF Playable (${parts} part${parts > 1 ? 's' : ''}) \u2022 ${durLabel}s</span>`;
@@ -7093,23 +7179,30 @@ function buildRecCardInnerHTML(entry) {
     if (partial) status += ` <span class="vmeta rec-badge-fallback" style="margin-left:4px">\u26A0 Partial — ${missing.length ? missing.length + ' segment(s) incomplete' : (entry.meta.missingSegments || '') + ' segment(s) missing'}</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry missing</button>`;
     else if (interrupted) status += ` <span class="vmeta rec-badge-fallback" style="margin-left:4px">Interrupted — playable so far</span>`;
   } else if (parts > 0 && entry._partsData && entry._partsData.length) {
-    status = `<span class="vmeta rec-badge-fallback" style="margin-left:8px">\u26A0 Assembly failed \u2014 playing parts individually</span> <button class="chip rec-playall" data-playall="${recIdKey}" style="font-size:11px">\u25B6 Play all</button> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
+    const fallbackMsg = entry._skipAssembly ? 'Too long to play as one file' : 'Assembly failed';
+    status = `<span class="vmeta rec-badge-fallback" style="margin-left:8px">\u26A0 ${fallbackMsg} \u2014 playing parts individually</span> <button class="chip rec-playall" data-playall="${recIdKey}" style="font-size:11px">\u25B6 Play all</button> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
     if (missing.length) status += ` <span class="vmeta" style="margin-left:4px">${missing.length} segment(s) incomplete</span>`;
     else if (interrupted) status += ` <span class="vmeta" style="margin-left:4px">Interrupted — playable so far</span>`;
   } else if (parts > 0) {
     status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Decode error</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
+  } else if (st === 'started' || st === 'recording') {
+    const partLabel = (recData.partsTotal ? ` \u2014 part ${((recData.partIndex || 0) + 1)} of ${recData.partsTotal}` : '');
+    status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF Recording in progress${partLabel} \u2014 audio appears when this part finishes</span>`;
   } else {
-    if (expectedSegs > 0) status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data yet (${expectedSegs} expected) — still uploading</span>`;
+    if (expectedSegs > 0) status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data yet (${expectedSegs} expected) \u2014 still uploading</span>`;
     else status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data</span>`;
   }
   const metaBits = [createdAt ? `Started: ${createdAt}` : '', `Duration: ${durLabel}s`];
   if (requestedDur) metaBits.push(`Requested: ${requestedDur}s`);
+  if (recData.sessionRequestedDurationSec && recData.sessionRequestedDurationSec !== requestedDur) metaBits.push(`Full request: ${recData.sessionRequestedDurationSec}s`);
+  if (typeof recData.partIndex === 'number' && recData.partsTotal) metaBits.push(`Part: ${recData.partIndex + 1} of ${recData.partsTotal}`);
   if (recData.audioSource) metaBits.push(`Source: ${escHtml(recData.audioSource)}`);
   if (recData.sampleRate || entry._sampleRate) metaBits.push(`Rate: ${recData.sampleRate || entry._sampleRate}`);
   if (recData.bitRate) metaBits.push(`Bitrate: ${recData.bitRate}k`);
   if (typeof recData.batteryStart === 'number') metaBits.push(`Battery: ${recData.batteryStart}%`);
   if (recData.networkType) metaBits.push(`Net: ${escHtml(recData.networkType)}`);
-  metaBits.push(`Size: ${sizeMb}MB`, `Parts: ${parts}`, `Type: ${mt}`);
+  const partsLabel = parts ? parts : (expectedSegs ? expectedSegs + ' expected' : 0);
+  metaBits.push(`Size: ${sizeMb}MB`, `Parts: ${partsLabel}`, `Type: ${mt}`);
   if (recData.status) metaBits.push('Status: ' + escHtml(recData.status));
   const meta = metaBits.filter(Boolean).join('  \u2022  ');
   let player = '';
@@ -7714,7 +7807,7 @@ function startRecordingProgressPolling(deviceId, durationSec) {
         document.getElementById('remote-recProgressBar').value = pct;
         document.getElementById('remote-recProgressLabel').textContent = elapsed + ' / ' + durationSec + 's';
         document.getElementById('remote-recProgressTime').textContent = 'Elapsed: ' + elapsed + 's';
-        document.getElementById('remote-recProgressSegments').textContent = 'Segments: ' + (status.segmentsCompleted || 0);
+        document.getElementById('remote-recProgressSegments').textContent = 'Segments: ' + (status.segmentsCompleted || 0) + (status.partsTotal ? '  \u2022  Part ' + (((status.partIndex || 0) + 1)) + '/' + status.partsTotal : '');
         document.getElementById('remote-recProgressFormat').textContent = 'Format: ' + (status.format || 'aac');
       } else if (status && (status.status === 'completed' || status.status === 'cancelled' || status.status === 'error')) {
         resetRemoteRecordingUI();
