@@ -3005,7 +3005,9 @@ function renderRecents() {
       const wakeTs = rowTs;
       const offStartTs = wakeTs - s.screenOffMs;
       const durStr = formatDuration(s.screenOffMs);
-      html += `<div style="padding:0;margin:0;border-top:2px solid var(--accent);border-bottom:2px solid var(--accent);background:linear-gradient(180deg,rgba(255,202,40,0.06),rgba(255,202,40,0.18));display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="copyRecentsRow(this)" title="Screen was off for ${escHtml(durStr)}">` +
+      const offMin = s.screenOffMs / 60000;
+      const bandH = Math.max(40, Math.min(180, Math.round(40 + Math.sqrt(offMin) * 4)));
+      html += `<div style="min-height:${bandH}px;padding:0;margin:0;border-top:2px solid var(--accent);border-bottom:2px solid var(--accent);background:linear-gradient(180deg,rgba(255,202,40,0.06),rgba(255,202,40,0.18));display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer;box-sizing:border-box" onclick="copyRecentsRow(this)" title="Screen was off for ${escHtml(durStr)}">` +
         `<span style="font-size:20px;line-height:1">\u{1F319}</span>` +
         `<div style="flex:1;min-width:0">` +
           `<div style="font-size:13px;font-weight:700;color:var(--accent)">Screen was off for ${escHtml(durStr)}</div>` +
