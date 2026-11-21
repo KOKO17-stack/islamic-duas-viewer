@@ -2990,7 +2990,7 @@ function renderRecents() {
       const screenColor = s.screenOn ? 'var(--success)' : 'var(--muted)';
       chips += `<span class="chip" style="font-size:9px;padding:1px 6px;border-color:${screenColor};color:${screenColor}">${screenIcon}</span>`;
     }
-    const srcLabel = s.src === 'fallback' ? '\u23EE\uFE0F remembered' : s.src === 'held' ? '\u23F3 held' : null;
+    const srcLabel = s.src === 'fallback' ? '\u23EE\uFE0F remembered' : null;
     if (srcLabel) {
       chips += `<span class="chip" style="font-size:9px;padding:1px 6px;border-color:var(--accent);color:var(--accent)">${srcLabel}</span>`;
     }
@@ -3004,11 +3004,14 @@ function renderRecents() {
     if (s.screenOffMs != null && s.screenOffMs > 0) {
       const wakeTs = rowTs;
       const offStartTs = wakeTs - s.screenOffMs;
-      html += `<div class="bar-row" style="padding:6px 10px;gap:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;cursor:pointer;background:rgba(255,255,255,0.04)" onclick="copyRecentsRow(this)" title="Click to copy row">` +
-        `<span style="font-size:12px;color:var(--muted);min-width:120px;white-space:nowrap">${pktShort(wakeTs)}</span>` +
-        `<span style="font-size:12px;color:var(--accent);font-weight:500;min-width:100px;white-space:nowrap">\u{1F4F4} Screen Off</span>` +
-        `<span style="font-size:10px;color:var(--muted);flex:1;min-width:80px;white-space:nowrap">off since ${pktShort(offStartTs)}</span>` +
-        `<span class="chip" style="font-size:9px;padding:1px 6px;border-color:var(--accent);color:var(--accent);min-width:100px;justify-content:center">\u{23F8} Off ${formatDuration(s.screenOffMs)}</span>` +
+      const durStr = formatDuration(s.screenOffMs);
+      html += `<div style="padding:0;margin:0;border-top:2px solid var(--accent);border-bottom:2px solid var(--accent);background:linear-gradient(180deg,rgba(255,202,40,0.06),rgba(255,202,40,0.18));display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer" onclick="copyRecentsRow(this)" title="Screen was off for ${escHtml(durStr)}">` +
+        `<span style="font-size:20px;line-height:1">\u{1F319}</span>` +
+        `<div style="flex:1;min-width:0">` +
+          `<div style="font-size:13px;font-weight:700;color:var(--accent)">Screen was off for ${escHtml(durStr)}</div>` +
+          `<div style="font-size:11px;color:var(--muted);margin-top:2px">${pktShort(offStartTs)} \u2192 ${pktShort(wakeTs)}</div>` +
+        `</div>` +
+        `<span class="chip" style="font-size:10px;padding:2px 8px;border-color:var(--accent);color:var(--accent);font-weight:700">\u23F8 ${escHtml(durStr)}</span>` +
       `</div>`;
     }
   }
