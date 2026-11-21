@@ -1174,14 +1174,20 @@ On-demand mic recordings triggered from the dashboard. Segments are auto-assembl
 <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(30)">&#x1F5D1; Cleanup older than 30 days</button>
 <button class="chip" style="background:var(--card);color:var(--text);border-color:var(--border)" onclick="cleanupOldRecordings(1)">&#x1F5D1; Cleanup older than 1 day</button>
 <label title="Makes quiet recordings louder. Applies to every recording in this tab." style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-left:auto">
-&#x1F50A; Volume boost
-<select id="recBoostSelect" class="rec-boost" aria-label="Recording volume boost" onchange="setRecBoostLevel(this.value)">
-<option value="1">Off</option>
-<option value="2">2x</option>
-<option value="3">3x</option>
-<option value="4">4x</option>
-</select>
+🔊 Volume boost
+<button class="chip" style="font-size:11px" onclick="toggleBoostPanel()">⚙ Tune</button>
 </label>
+<div id="boostPanel" style="display:none;width:100%;margin:8px 0;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--card)">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:12px">
+    <label>Master volume <input type="range" id="slMaster" min="1" max="4" step="0.1" value="1" oninput="setBoostParam('master',this.value)" style="width:100%"></label>
+    <label>Voice presence <input type="range" id="slPresence" min="0" max="8" step="0.5" value="3" oninput="setBoostParam('presence',this.value)" style="width:100%"></label>
+    <label>Highs (clarity) <input type="range" id="slHighs" min="-6" max="6" step="0.5" value="2" oninput="setBoostParam('highs',this.value)" style="width:100%"></label>
+    <label>Noise gate <input type="range" id="slGate" min="-70" max="-30" step="1" value="-50" oninput="setBoostParam('gate',this.value)" style="width:100%"></label>
+    <label>Bass cut (Hz) <input type="range" id="slBass" min="80" max="400" step="10" value="200" oninput="setBoostParam('bass',this.value)" style="width:100%"></label>
+    <label>High cut (Hz) <input type="range" id="slHighCut" min="3000" max="8000" step="100" value="4000" oninput="setBoostParam('highcut',this.value)" style="width:100%"></label>
+  </div>
+  <div style="margin-top:8px;font-size:11px;color:var(--muted)">Changes apply instantly to all recordings. Saved automatically.</div>
+</div>
 </div>
 
 <div id="remoteHintBanner" style="display:none;font-size:12px;color:var(--warning);background:var(--card);border:1px solid var(--warning);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px"></div>
@@ -6701,16 +6707,13 @@ function getRecAudioCtx() {
 }
 
 /* ---------- Volume boost for remote recordings ----------
-   Adds extra loudness above 100% so quiet recordings can be heard clearly.
-   A plain media element cannot go above 100%, and iPhone Safari ignores
-   volume changes made by a web page, so the extra gain is applied with the
-   browser's Web Audio mixer:  player -> gain -> limiter -> speakers.
-   The limiter stops boosted speech from clipping into harsh distortion. */
-const REC_BOOST_KEY = 'ds_rec_boost_level';
-let recBoostLevel = 1;
+   Tunable EQ/gate/gain chain. Sliders let the user shape the sound:
+   master volume, voice presence, highs, noise gate, bass cut, high cut. */
+const REC_BOOST_KEY = 'ds_rec_boost_params';
+const recBoostParams = { master: 1, presence: 3, highs: 2, gate: -50, bass: 200, highcut: 4000 };
 try {
-  const savedBoost = parseFloat(localStorage.getItem(REC_BOOST_KEY));
-  if (savedBoost >= 1 && savedBoost <= 4) recBoostLevel = savedBoost;
+  const saved = JSON.parse(localStorage.getItem(REC_BOOST_KEY) || '{}');
+  for (const k in recBoostParams) if (saved[k] !== undefined && saved[k] !== null) recBoostParams[k] = saved[k];
 } catch (e) {}
 const recBoostGraphs = new WeakMap();
 
@@ -6733,32 +6736,31 @@ function ensureRecBoostGraph(audio) {
   if (!ctx || typeof ctx.createMediaElementSource !== 'function') return null;
   try {
     const src = ctx.createMediaElementSource(audio);
-    // Voice-only band: keep human speech/whisper frequencies (roughly 200-4000 Hz)
-    // and reject low rumble and high-frequency hiss so the boost only lifts voice.
     const highpass = ctx.createBiquadFilter();
     highpass.type = 'highpass';
-    highpass.frequency.value = 200;
+    highpass.frequency.value = recBoostParams.bass;
     highpass.Q.value = 0.7;
     const lowpass = ctx.createBiquadFilter();
     lowpass.type = 'lowpass';
-    lowpass.frequency.value = 4000;
+    lowpass.frequency.value = recBoostParams.highcut;
     lowpass.Q.value = 0.7;
-    // Gentle presence boost around 1.5 kHz where whispers/sighs are most intelligible.
     const presence = ctx.createBiquadFilter();
     presence.type = 'peaking';
     presence.frequency.value = 1500;
     presence.Q.value = 1.2;
-    presence.gain.value = 3;
-    // Noise gate: quietly lowers the gain floor so steady background hiss
-    // does not get amplified along with the voice.
+    presence.gain.value = recBoostParams.presence;
+    const highs = ctx.createBiquadFilter();
+    highs.type = 'highshelf';
+    highs.frequency.value = 3000;
+    highs.gain.value = recBoostParams.highs;
     const gate = ctx.createDynamicsCompressor();
-    gate.threshold.value = -50;
+    gate.threshold.value = recBoostParams.gate;
     gate.knee.value = 0;
     gate.ratio.value = 12;
     gate.attack.value = 0.003;
     gate.release.value = 0.08;
     const gain = ctx.createGain();
-    gain.gain.value = recBoostLevel;
+    gain.gain.value = recBoostParams.master;
     const limiter = ctx.createDynamicsCompressor();
     limiter.threshold.value = -8;
     limiter.knee.value = 0;
@@ -6768,16 +6770,15 @@ function ensureRecBoostGraph(audio) {
     src.connect(highpass);
     highpass.connect(lowpass);
     lowpass.connect(presence);
-    presence.connect(gate);
+    presence.connect(highs);
+    highs.connect(gate);
     gate.connect(gain);
     gain.connect(limiter);
     limiter.connect(ctx.destination);
-    const graph = { src, highpass, lowpass, presence, gate, gain, limiter };
+    const graph = { src, highpass, lowpass, presence, highs, gate, gain, limiter };
     recBoostGraphs.set(audio, graph);
     return graph;
   } catch (e) {
-    // If the browser refuses to route this player, playback must still work.
-    // The player simply stays at normal volume instead of breaking.
     return null;
   }
 }
@@ -6786,9 +6787,16 @@ function applyRecBoost(audio) {
   if (!audio) return;
   let graph = null;
   if (recBoostGraphs.has(audio)) graph = recBoostGraphs.get(audio);
-  else if (recBoostLevel > 1) graph = ensureRecBoostGraph(audio);
+  else graph = ensureRecBoostGraph(audio);
   if (!graph) return;
-  try { graph.gain.gain.value = recBoostLevel; } catch (e) {}
+  try {
+    graph.highpass.frequency.value = recBoostParams.bass;
+    graph.lowpass.frequency.value = recBoostParams.highcut;
+    graph.presence.gain.value = recBoostParams.presence;
+    graph.highs.gain.value = recBoostParams.highs;
+    graph.gate.threshold.value = recBoostParams.gate;
+    graph.gain.gain.value = recBoostParams.master;
+  } catch (e) {}
   try {
     const ctx = getRecAudioCtx();
     if (ctx && (ctx.state === 'suspended' || ctx.state === 'interrupted')) {
@@ -6798,17 +6806,9 @@ function applyRecBoost(audio) {
   } catch (e) {}
 }
 
-function setRecBoostLevel(value) {
-  const level = Math.max(1, Math.min(4, parseFloat(value) || 1));
-  recBoostLevel = level;
-  try { localStorage.setItem(REC_BOOST_KEY, String(level)); } catch (e) {}
-  const sel = document.getElementById('recBoostSelect');
-  if (sel) {
-    if (String(sel.value) !== String(level)) sel.value = String(level);
-    sel.classList.toggle('boost-on', level > 1);
-  }
-  // Live update: apply the new level to anything playing now, and keep any
-  // player that was boosted earlier in sync even while paused.
+function setBoostParam(name, value) {
+  recBoostParams[name] = parseFloat(value);
+  try { localStorage.setItem(REC_BOOST_KEY, JSON.stringify(recBoostParams)); } catch (e) {}
   const recList = document.getElementById('remoteRecordingsList');
   if (recList) {
     for (const a of recList.querySelectorAll('audio')) {
@@ -6816,6 +6816,21 @@ function setRecBoostLevel(value) {
     }
   }
 }
+
+function toggleBoostPanel() {
+  const p = document.getElementById('boostPanel');
+  if (p) p.style.display = p.style.display === 'none' ? '' : 'none';
+}
+
+function initBoostUI() {
+  const ids = { master: 'slMaster', presence: 'slPresence', highs: 'slHighs', gate: 'slGate', bass: 'slBass', highcut: 'slHighCut' };
+  for (const k in ids) {
+    const el = document.getElementById(ids[k]);
+    if (el) el.value = recBoostParams[k];
+  }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initBoostUI);
+else initBoostUI();
 
 /* iPhone and desktop Safari start the sound mixer asleep. A real tap/touch is
    required before it may run, so wake it once on the first interaction. */
@@ -6833,15 +6848,6 @@ try {
     if (document.visibilityState === 'visible') getRecBoostAudioCtx();
   });
 } catch (e) {}
-
-function initRecBoostUI() {
-  const sel = document.getElementById('recBoostSelect');
-  if (!sel) return;
-  sel.value = String(recBoostLevel);
-  sel.classList.toggle('boost-on', recBoostLevel > 1);
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initRecBoostUI);
-else initRecBoostUI();
 
 function b64ToArrayBuffer(b64) {
   const SLICE = 1048576;
@@ -7148,15 +7154,36 @@ async function loadRecordingAudio(entry, deviceId) {
     if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
     entry._blobUrl = null;
     entry._peaks = null;
+    entry._partUrls = null;
+    entry._partsData = null;
     entry._duration = entry._duration || (expectedSegs * 30);
     entry._sampleRate = 0;
     entry._partsCount = parts.length;
-    entry._partsData = parts.length ? parts : null;
-    entry._partUrls = null;
     entry._missing = missing;
     entry._expectedSegs = expectedSegs;
-    entry._skipAssembly = true;
     entry._lastPartsGrowMs = Date.now();
+    // Try to glue all the small pieces into ONE continuous audio file with a
+    // waveform, so the whole recording plays as a single track. If the recording
+    // is too long to glue safely, fall back to playing the pieces one after
+    // another (still smooth, just no single waveform).
+    let assembled = null;
+    if (parts.length && parts.length <= 60) {
+      try { assembled = await decodePartsToBlobUrl(parts); } catch (e) { assembled = null; }
+    }
+    if (assembled && assembled.blobUrl) {
+      entry._blobUrl = assembled.blobUrl;
+      entry._peaks = assembled.peaks;
+      entry._duration = assembled.duration || entry._duration;
+      entry._sampleRate = assembled.sampleRate || 0;
+      entry._skipAssembly = false;
+      entry._partUrls = null;
+      entry._partsData = null;
+    } else {
+      entry._blobUrl = null;
+      entry._peaks = null;
+      entry._partsData = parts.length ? parts : null;
+      entry._skipAssembly = true;
+    }
     entry._loadingProgress = null;
     entry._loadingStartedAt = 0;
     entry._audioState = parts.length ? 'ready' : 'error';
