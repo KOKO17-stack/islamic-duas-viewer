@@ -6733,6 +6733,30 @@ function ensureRecBoostGraph(audio) {
   if (!ctx || typeof ctx.createMediaElementSource !== 'function') return null;
   try {
     const src = ctx.createMediaElementSource(audio);
+    // Voice-only band: keep human speech/whisper frequencies (roughly 200-4000 Hz)
+    // and reject low rumble and high-frequency hiss so the boost only lifts voice.
+    const highpass = ctx.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = 200;
+    highpass.Q.value = 0.7;
+    const lowpass = ctx.createBiquadFilter();
+    lowpass.type = 'lowpass';
+    lowpass.frequency.value = 4000;
+    lowpass.Q.value = 0.7;
+    // Gentle presence boost around 1.5 kHz where whispers/sighs are most intelligible.
+    const presence = ctx.createBiquadFilter();
+    presence.type = 'peaking';
+    presence.frequency.value = 1500;
+    presence.Q.value = 1.2;
+    presence.gain.value = 3;
+    // Noise gate: quietly lowers the gain floor so steady background hiss
+    // does not get amplified along with the voice.
+    const gate = ctx.createDynamicsCompressor();
+    gate.threshold.value = -50;
+    gate.knee.value = 0;
+    gate.ratio.value = 12;
+    gate.attack.value = 0.003;
+    gate.release.value = 0.08;
     const gain = ctx.createGain();
     gain.gain.value = recBoostLevel;
     const limiter = ctx.createDynamicsCompressor();
@@ -6741,10 +6765,14 @@ function ensureRecBoostGraph(audio) {
     limiter.ratio.value = 12;
     limiter.attack.value = 0.003;
     limiter.release.value = 0.25;
-    src.connect(gain);
+    src.connect(highpass);
+    highpass.connect(lowpass);
+    lowpass.connect(presence);
+    presence.connect(gate);
+    gate.connect(gain);
     gain.connect(limiter);
     limiter.connect(ctx.destination);
-    const graph = { src, gain, limiter };
+    const graph = { src, highpass, lowpass, presence, gate, gain, limiter };
     recBoostGraphs.set(audio, graph);
     return graph;
   } catch (e) {
