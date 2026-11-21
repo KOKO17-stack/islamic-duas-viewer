@@ -6892,7 +6892,6 @@ async function decodePartsToBlobUrl(parts) {
       if (!b64) continue;
       try {
         const arr = b64ToArrayBuffer(b64);
-        parts[pi] = null;
         const ab = await new Promise((resolve, reject) => {
           const r = ctx.decodeAudioData(arr, resolve, reject);
           if (r && r.then) r.then(resolve, reject);
@@ -6918,10 +6917,8 @@ async function decodePartsToBlobUrl(parts) {
         }
       } catch (e) {
         console.warn('decodePartsToBlobUrl: skipping bad part ' + pi, e && e.message);
-        parts[pi] = null;
         continue;
       }
-      parts[pi] = null;
     }
     if (!pcmChunks.length) return null;
     const sr = sampleRate || 44100;
@@ -6970,60 +6967,167 @@ function downsamplePeaksArray(peaks, bars) {
   return out;
 }
 
+// Fallback field list: only used if the fast key-range read below finds nothing.
 const REC_META_FIELDS = ['id','requestId','createdAt','startedAtMs','endedAtMs','requestedDurationSec','sessionRequestedDurationSec','sessionStartedAtMs','durationSec','recordedDurationSec','sizeBytes','segmentsCount','segmentsUploaded','missingSegments','cancelled','status','mimeType','format','audioSource','networkType','sampleRate','bitRate','batteryStart','batteryEnd','freeMbStart','freeMbEnd','partIndex','partsTotal'];
 
+// Read one recording's details WITHOUT its audio.
+// The details sit beside the audio; the audio lives in a folder called "parts".
+// Two key-range reads cover every key except that one folder, so a recording's
+// whole details arrive in about 600 bytes instead of several megabytes.
 async function fetchRecordingMeta(deviceId, recId) {
   const tok = await authParam();
-  const qs = tok ? `?auth=${tok}` : '';
+  const auth = tok ? '&auth=' + tok : '';
+  const base = `${RTDB}/devices/${deviceId}/recordings/${recId}.json`;
+  const grab = async (url) => {
+    trackRead();
+    try {
+      const r = await fetch(url);
+      if (!r.ok) return null;
+      return await r.json();
+    } catch { return null; }
+  };
+  const out = {};
+  const [before, after] = await Promise.all([
+    grab(`${base}?orderBy=%22%24key%22&endAt=%22partR%22${auth}`),
+    grab(`${base}?orderBy=%22%24key%22&startAt=%22parts!%22${auth}`)
+  ]);
+  for (const chunk of [before, after]) {
+    if (!chunk || typeof chunk !== 'object') continue;
+    for (const k of Object.keys(chunk)) {
+      if (k === 'parts') continue;
+      if (chunk[k] !== null && chunk[k] !== undefined) out[k] = chunk[k];
+    }
+  }
+  const gotAny = !!(before && typeof before === 'object') || !!(after && typeof after === 'object');
+  if (Object.keys(out).length) {
+    // Sanity check: every recording has a status. If it is missing, the layout
+    // is not what we expect, so use the safe field-by-field path instead.
+    if (out.status !== undefined && out.status !== null) return out;
+  }
+  if (!gotAny) return out; // node missing entirely -> do not spend reads on fallback
+  // Safety net: unexpected layout -> read a small whitelist of fields.
   const pairs = await Promise.all(REC_META_FIELDS.map(async (f) => {
     trackRead();
     try {
-      const r = await fetch(`${RTDB}/devices/${deviceId}/recordings/${recId}/${f}.json${qs}`);
+      const r = await fetch(`${RTDB}/devices/${deviceId}/recordings/${recId}/${f}.json${tok ? '?auth=' + tok : ''}`);
       if (!r.ok) return [f, null];
       return [f, await r.json()];
     } catch { return [f, null]; }
   }));
-  const out = {};
   for (const [f, v] of pairs) { if (v !== null && v !== undefined) out[f] = v; }
   return out;
 }
 
-async function loadRecording(deviceId, recId, forceAudio) {
+// Build a list-card entry from details only. No audio is downloaded here.
+function entryFromMeta(recId, meta) {
+  let m = meta;
+  if (!m.durationSec && m.meta && typeof m.meta === 'object') m = m.meta;
+  const mimeType = m.mimeType || 'audio/mp4';
+  const st = String(m.status || '').toLowerCase();
+  const isFinal = st === 'completed' || st === 'partial' || st === 'cancelled' || st === 'error';
+  const startedMs = m.startedAtMs || m.createdAt || 0;
+  const reqSec = m.requestedDurationSec || 600;
+  const overdue = !!startedMs && (Date.now() - startedMs > (reqSec + 120) * 1000);
+  return {
+    _recId: recId,
+    _blobUrl: null,
+    _peaks: null,
+    _duration: m.recordedDurationSec || m.durationSec || 0,
+    _sampleRate: 0,
+    _partsCount: 0,
+    _partsData: null,
+    _partUrls: null,
+    _checkedExpected: null,
+    _mt: REC_MIME[mimeType] || 'audio/mp4',
+    meta: m,
+    _missing: [],
+    _expectedSegs: m.segmentsCount || 0,
+    _lastPartsGrowMs: Date.now(),
+    _lastReloadMs: 0,
+    _lastMetaMs: 0,
+    _interrupted: overdue && !isFinal,
+    _skipAssembly: false,
+    _audioState: 'idle'
+  };
+}
+
+async function loadRecording(deviceId, recId) {
   try {
     const meta = await fetchRecordingMeta(deviceId, recId);
     if (!meta || typeof meta !== 'object' || Object.keys(meta).length === 0) return null;
-    if (meta.meta && typeof meta.meta === 'object' && !meta.durationSec) meta = meta.meta;
-    const mimeType = meta.mimeType || 'audio/mp4';
-    const mt = REC_MIME[mimeType] || 'audio/mp4';
-    const st = String(meta.status || '').toLowerCase();
-    const isFinal = st === 'completed' || st === 'partial' || st === 'cancelled' || st === 'error';
-    const startedMs = meta.startedAtMs || meta.createdAt || 0;
-    const reqSec = meta.requestedDurationSec || 600;
-    const overdue = !!startedMs && (Date.now() - startedMs > (reqSec + 120) * 1000);
-    const shouldLoadAudio = forceAudio === true || isFinal || overdue;
-    let parts = [];
-    if (shouldLoadAudio) parts = await fetchAllParts(deviceId, recId);
-    const missing = parts._missing || [];
-    const expectedSegs = shouldLoadAudio ? (parts._expectedSegs || parts.length) : (meta.segmentsCount || 0);
-    let blobUrl = null, peaks = null, duration = 0, sampleRate = 0, skipAssembly = false;
-    if (shouldLoadAudio && parts.length) {
-      if (parts.length > 20) {
-        skipAssembly = true;
-      } else {
-        const decoded = await decodePartsToBlobUrl(parts);
-        if (decoded && decoded.blobUrl) {
-          blobUrl = decoded.blobUrl;
-          peaks = decoded.peaks;
-          duration = decoded.duration;
-          sampleRate = decoded.sampleRate;
-        }
-      }
-    }
-    return { _recId: recId, _blobUrl: blobUrl, _peaks: peaks, _duration: duration, _sampleRate: sampleRate, _partsCount: shouldLoadAudio ? parts.length : 0, _partsData: shouldLoadAudio ? parts : null, _partUrls: null, _checkedExpected: null, _mt: mt, meta, _missing: missing, _expectedSegs: expectedSegs, _lastPartsGrowMs: Date.now(), _lastReloadMs: 0, _lastMetaMs: 0, _interrupted: overdue && !isFinal, _skipAssembly: skipAssembly };
+    return entryFromMeta(recId, meta);
   } catch (e) {
     console.error('loadRecording failed', recId, e);
     return null;
   }
+}
+
+// Remember printed details in the browser so a revisit paints instantly, with
+// no network at all. Finished recordings never change, so they never re-download.
+const REC_META_STORE = 'recMetaStore.v1';
+function readRecMetaStore() {
+  try { return JSON.parse(localStorage.getItem(REC_META_STORE) || '{}') || {}; } catch { return {}; }
+}
+function writeRecMetaStore(obj) {
+  try { localStorage.setItem(REC_META_STORE, JSON.stringify(obj)); } catch {}
+}
+
+function sortRecordingsCache() {
+  recordingsCache.sort((a, b) => (b.meta.startedAtMs || b.meta.createdAt || 0) - (a.meta.startedAtMs || a.meta.createdAt || 0));
+}
+
+// Download and prepare one recording's audio. Runs only when the user presses play.
+async function loadRecordingAudio(entry, deviceId) {
+  if (!entry || entry._audioState === 'loading' || entry._audioState === 'ready') {
+    const card = document.querySelector(`.voice-card[data-recid="${entry && entry._recId}"]`);
+    const a = card && card.querySelector('audio');
+    if (a) { try { a.play(); } catch (e) {} }
+    return;
+  }
+  entry._audioState = 'loading';
+  const rid = entry._recId;
+  const cardNow = document.querySelector(`.voice-card[data-recid="${rid}"]`);
+  const btnNow = cardNow && cardNow.querySelector('[data-loadrec]');
+  if (btnNow) { btnNow.textContent = '\u23F3 Loading audio…'; btnNow.disabled = true; }
+  try {
+    const parts = await fetchAllParts(deviceId, rid);
+    const missing = parts._missing || [];
+    const expectedSegs = parts._expectedSegs || parts.length;
+    let blobUrl = null, peaks = null, duration = 0, sampleRate = 0, skipAssembly = false;
+    if (parts.length > 20) {
+      // Keep the page light: play these one by one instead of gluing them together.
+      skipAssembly = true;
+    } else if (parts.length) {
+      const decoded = await decodePartsToBlobUrl(parts);
+      if (decoded && decoded.blobUrl) {
+        blobUrl = decoded.blobUrl;
+        peaks = decoded.peaks;
+        duration = decoded.duration;
+        sampleRate = decoded.sampleRate;
+      }
+    }
+    if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
+    if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
+    entry._blobUrl = blobUrl;
+    entry._peaks = peaks;
+    entry._duration = duration || entry._duration;
+    entry._sampleRate = sampleRate;
+    entry._partsCount = parts.length;
+    entry._partsData = blobUrl ? null : parts;
+    entry._partUrls = null;
+    entry._missing = missing;
+    entry._expectedSegs = expectedSegs;
+    entry._skipAssembly = skipAssembly;
+    entry._lastPartsGrowMs = Date.now();
+    entry._audioState = blobUrl || parts.length ? 'ready' : 'error';
+  } catch (e) {
+    console.warn('loadRecordingAudio failed', rid, e && e.message);
+    entry._audioState = 'error';
+  }
+  renderRemoteRecordings();
+  const card = document.querySelector(`.voice-card[data-recid="${rid}"]`);
+  const audio = card && card.querySelector('audio');
+  if (audio) { try { audio.play(); } catch (e) {} }
 }
 
 async function pollRemoteRecordings() {
@@ -7063,14 +7167,42 @@ async function pollRemoteRecordings() {
   const have = new Set(recordingsCache.map(r => r._recId));
   let dirty = false;
   const beforeFilterLen = recordingsCache.length;
-  let newLoads = 0;
+
+  // 1. Instant paint: cards we already know from a previous visit need no network.
+  const store = readRecMetaStore();
+  const devStore = store[deviceId] && typeof store[deviceId] === 'object' ? store[deviceId] : (store[deviceId] = {});
   for (const rid of recIds) {
-    if (!have.has(rid)) {
-      if (newLoads >= 3) { dirty = true; break; }
-      const entry = await loadRecording(deviceId, rid);
-      if (entry) { recordingsCache.push(entry); dirty = true; newLoads++; }
+    if (have.has(rid)) continue;
+    const saved = devStore[rid];
+    if (saved && saved.meta && typeof saved.meta === 'object' && saved.meta.status) {
+      const entry = entryFromMeta(rid, saved.meta);
+      recordingsCache.push(entry);
+      have.add(rid);
+      dirty = true;
     }
   }
+  if (dirty) { sortRecordingsCache(); renderRemoteRecordings(); }
+
+  // 2. Fetch details for recordings we have never seen, a few at a time.
+  //    Each one costs two tiny reads and never downloads audio.
+  const unknown = recIds.filter(rid => !have.has(rid));
+  if (unknown.length) {
+    const CONC = 6;
+    for (let i = 0; i < unknown.length; i += CONC) {
+      const batch = unknown.slice(i, i + CONC);
+      const loaded = await Promise.all(batch.map(rid => loadRecording(deviceId, rid)));
+      for (const entry of loaded) {
+        if (!entry) continue;
+        recordingsCache.push(entry);
+        have.add(entry._recId);
+        devStore[entry._recId] = { meta: entry.meta, ts: Date.now() };
+        dirty = true;
+      }
+      if (dirty) { sortRecordingsCache(); renderRemoteRecordings(); }
+    }
+  }
+
+  // 3. Only recordings still being written need a status check.
   for (const entry of recordingsCache) {
     try {
       const st = String((entry.meta && entry.meta.status) || '').toLowerCase();
@@ -7087,56 +7219,68 @@ async function pollRemoteRecordings() {
       trackRead();
       const shallowRes = await fetch(`${base}/parts.json?shallow=true${tok ? '&auth=' + tok : ''}`).then(r => r.ok ? r.json() : null).catch(() => null);
       const newStatus = typeof statusRes === 'string' ? statusRes.toLowerCase() : (statusRes && statusRes.status ? String(statusRes.status).toLowerCase() : st);
-      const liveParts = shallowRes && typeof shallowRes === 'object' ? Object.keys(shallowRes).length : 0;
+      const liveSegKeys = shallowRes && typeof shallowRes === 'object' ? Object.keys(shallowRes).length : 0;
       const nowFinal = newStatus === 'completed' || newStatus === 'partial' || newStatus === 'cancelled' || newStatus === 'error';
       if (nowFinal) {
-        const fresh = await loadRecording(deviceId, entry._recId, true);
+        const fresh = await loadRecording(deviceId, entry._recId);
         if (fresh) {
-          if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
-          if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
+          // Keep any audio the user already loaded; only the printed details changed.
+          fresh._blobUrl = entry._blobUrl;
+          fresh._peaks = entry._peaks;
+          fresh._duration = entry._duration || fresh._duration;
+          fresh._sampleRate = entry._sampleRate;
+          fresh._partsCount = entry._partsCount;
+          fresh._partsData = entry._partsData;
+          fresh._partUrls = entry._partUrls;
+          fresh._audioState = entry._audioState;
+          fresh._missing = entry._missing && entry._missing.length ? entry._missing : fresh._missing;
+          fresh._lastMetaMs = nowMs;
           const idx = recordingsCache.indexOf(entry);
-          if (idx >= 0) {
-            fresh._interruptedLoaded = entry._interruptedLoaded;
-            fresh._lastMetaMs = nowMs;
-            recordingsCache[idx] = fresh;
-            dirty = true;
-          }
+          if (idx >= 0) { recordingsCache[idx] = fresh; dirty = true; }
+          devStore[fresh._recId] = { meta: fresh.meta, ts: nowMs };
         }
-      } else if (!entry._interruptedLoaded) {
+      } else {
         const startedMs = entry.meta.startedAtMs || entry.meta.createdAt || 0;
         const reqSec = entry.meta.requestedDurationSec || 600;
-        const overdue = startedMs && (nowMs - startedMs > (reqSec + 120) * 1000);
-        if (overdue && liveParts > 0) {
-          entry._interruptedLoaded = true;
-          const fresh = await loadRecording(deviceId, entry._recId, true);
-          if (fresh) {
-            fresh._interruptedLoaded = true;
-            fresh._lastMetaMs = nowMs;
-            fresh._interrupted = true;
-            if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
-            if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
-            const idx = recordingsCache.indexOf(entry);
-            if (idx >= 0) { recordingsCache[idx] = fresh; dirty = true; }
-          }
+        const overdue = !!startedMs && (nowMs - startedMs > (reqSec + 120) * 1000);
+        if (overdue) entry._interrupted = true;
+        entry._liveSegments = liveSegKeys;
+        // Treat fresh audio arriving as proof the recording is still healthy.
+        if (typeof entry._liveSegCount !== 'number' || liveSegKeys > entry._liveSegCount) {
+          entry._liveSegCount = liveSegKeys;
+          entry._lastPartsGrowMs = nowMs;
         }
+        if (entry.meta) entry.meta.status = newStatus || entry.meta.status;
+        if (entry.meta) {
+          entry.meta.segmentsCount = entry.meta.segmentsCount || liveSegKeys;
+          devStore[entry._recId] = { meta: entry.meta, ts: nowMs };
+        }
+        dirty = true;
       }
       if (entry.meta) entry.meta.status = newStatus || entry.meta.status;
     } catch (e) {}
   }
+
   const toRemove = recordingsCache.filter(r => !recIds.includes(r._recId));
   for (const rm of toRemove) {
     if (rm._blobUrl) safeRevokeBlob(rm._blobUrl);
     if (rm._partUrls) rm._partUrls.forEach(u => safeRevokeBlob(u));
-    else if (rm._partsData && rm._partsData.length && rm._blobUrl) { /* blob already handled */ }
   }
   const filtered = recordingsCache.filter(r => recIds.includes(r._recId));
   if (filtered.length !== recordingsCache.length) dirty = true;
   recordingsCache = filtered;
   if (recordingsCache.length !== recIds.length) dirty = true;
   const prevOrder = recordingsCache.map(r => r._recId).join(',');
-  recordingsCache.sort((a, b) => (b.meta.startedAtMs || b.meta.createdAt || 0) - (a.meta.startedAtMs || a.meta.createdAt || 0));
+  sortRecordingsCache();
   const newOrder = recordingsCache.map(r => r._recId).join(',');
   if (prevOrder !== newOrder) dirty = true;
+
+  // Keep remembered details to the recordings that still exist.
+  const keep = {};
+  for (const rid of recIds) if (devStore[rid]) keep[rid] = devStore[rid];
+  store[deviceId] = keep;
+  writeRecMetaStore(store);
+
   if (!dirty && beforeFilterLen === recordingsCache.length && recIds.length === recordingsCache.length) {
     const lst3 = document.getElementById('remoteRecordingsList');
     const hasCards = lst3 && lst3.querySelector('[data-recid]');
@@ -7165,13 +7309,15 @@ function buildRecCardInnerHTML(entry) {
   const sizeMb = recData.sizeBytes ? (recData.sizeBytes / (1024 * 1024)).toFixed(2) : '0';
   const mt = entry._mt;
   const parts = entry._partsCount;
+  const audioState = entry._audioState || (entry._blobUrl ? 'ready' : 'idle');
   const durLabel = recordedDur || duration || Math.round(entry._duration || 0);
   let status = '';
   let hasWave = false;
   const missing = entry._missing || [];
   const expectedSegs = entry._expectedSegs || entry.meta.segmentsCount || parts;
   const st = (entry.meta.status || '').toLowerCase();
-  const interrupted = entry._interrupted || ((st === 'started' || st === 'recording') && entry._lastPartsGrowMs && (Date.now() - entry._lastPartsGrowMs > 10 * 60 * 1000));
+  const inProgress = st === 'started' || st === 'recording';
+  const interrupted = entry._interrupted || (inProgress && entry._lastPartsGrowMs && (Date.now() - entry._lastPartsGrowMs > 10 * 60 * 1000));
   const partial = st === 'partial' || (entry.meta.missingSegments > 0) || (missing.length > 0);
   if (parts > 0 && entry._blobUrl) {
     status = `<span class="vmeta rec-badge-playable" style="margin-left:8px">\u25CF Playable (${parts} part${parts > 1 ? 's' : ''}) \u2022 ${durLabel}s</span>`;
@@ -7184,13 +7330,20 @@ function buildRecCardInnerHTML(entry) {
     if (missing.length) status += ` <span class="vmeta" style="margin-left:4px">${missing.length} segment(s) incomplete</span>`;
     else if (interrupted) status += ` <span class="vmeta" style="margin-left:4px">Interrupted — playable so far</span>`;
   } else if (parts > 0) {
-    status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Decode error</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
-  } else if (st === 'started' || st === 'recording') {
+    status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Could not load audio</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
+  } else if (inProgress) {
     const partLabel = (recData.partsTotal ? ` \u2014 part ${((recData.partIndex || 0) + 1)} of ${recData.partsTotal}` : '');
     status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF Recording in progress${partLabel} \u2014 audio appears when this part finishes</span>`;
+  } else if (audioState === 'loading') {
+    status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u23F3 Loading audio\u2026</span>`;
+  } else if (audioState === 'error') {
+    status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Could not load audio</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
+  } else if (expectedSegs > 0) {
+    status = `<span class="vmeta rec-badge-playable" style="margin-left:8px">\u25CF ${durLabel ? durLabel + 's \u2022 ' : ''}${expectedSegs} segment${expectedSegs > 1 ? 's' : ''} \u2014 not loaded</span>`;
+    if (partial) status += ` <span class="vmeta rec-badge-fallback" style="margin-left:4px">\u26A0 Partial \u2014 ${(entry.meta.missingSegments || missing.length || '')} segment(s) missing</span>`;
+    else if (interrupted) status += ` <span class="vmeta rec-badge-fallback" style="margin-left:4px">Interrupted \u2014 playable so far</span>`;
   } else {
-    if (expectedSegs > 0) status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data yet (${expectedSegs} expected) \u2014 still uploading</span>`;
-    else status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data</span>`;
+    status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF No audio data</span>`;
   }
   const metaBits = [createdAt ? `Started: ${createdAt}` : '', `Duration: ${durLabel}s`];
   if (requestedDur) metaBits.push(`Requested: ${requestedDur}s`);
@@ -7201,7 +7354,7 @@ function buildRecCardInnerHTML(entry) {
   if (recData.bitRate) metaBits.push(`Bitrate: ${recData.bitRate}k`);
   if (typeof recData.batteryStart === 'number') metaBits.push(`Battery: ${recData.batteryStart}%`);
   if (recData.networkType) metaBits.push(`Net: ${escHtml(recData.networkType)}`);
-  const partsLabel = parts ? parts : (expectedSegs ? expectedSegs + ' expected' : 0);
+  const partsLabel = parts ? parts : (expectedSegs ? expectedSegs + ' (not loaded)' : 0);
   metaBits.push(`Size: ${sizeMb}MB`, `Parts: ${partsLabel}`, `Type: ${mt}`);
   if (recData.status) metaBits.push('Status: ' + escHtml(recData.status));
   const meta = metaBits.filter(Boolean).join('  \u2022  ');
@@ -7219,9 +7372,17 @@ function buildRecCardInnerHTML(entry) {
       `<div style="display:flex;align-items:center;gap:6px;margin-top:5px"><span style="font-size:11px;color:var(--muted);min-width:64px">Part ${i + 1}</span><audio controls preload="metadata" src="${pUrl}" type="${mt}" data-recid="${recIdKey}" data-part="${i}" style="width:100%"></audio><a class="chip rec-dl" href="${pUrl}" download="recording_${recIdKey.substring(0,8)}_part${i+1}${mt.includes('wav')?'.wav':'.m4a'}" style="font-size:11px;padding:2px 6px">\u2B07</a></div>`
     ).join('');
   } else if (parts > 0) {
-    player = `<div style="font-size:12px;color:var(--danger);margin-top:6px">Decode error — try download parts individually or re-upload.</div>`;
+    player = `<div style="font-size:12px;color:var(--danger);margin-top:6px">Could not load the audio \u2014 press Retry above.</div>`;
+  } else if (inProgress) {
+    player = `<div style="font-size:12px;color:var(--muted);margin-top:6px">Audio appears here as soon as this part finishes recording.</div>`;
+  } else if (audioState === 'loading') {
+    player = `<div style="font-size:12px;color:var(--muted);margin-top:6px">Downloading audio\u2026 this can take a few seconds.</div>`;
+  } else if (audioState === 'error') {
+    player = `<div style="font-size:12px;color:var(--danger);margin-top:6px">Could not load the audio \u2014 press Retry above.</div>`;
+  } else if (expectedSegs > 0) {
+    player = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px"><button class="chip rec-load" data-loadrec="${recIdKey}" style="font-size:12px;background:var(--accent);color:#000;border-color:var(--accent)">\u25B6 Play recording</button><span style="font-size:11px;color:var(--muted)">Audio downloads only when you press play</span></div>`;
   } else {
-    player = `<div style="font-size:12px;color:var(--muted);margin-top:6px">No audio data yet — recording may still be uploading.</div>`;
+    player = `<div style="font-size:12px;color:var(--muted);margin-top:6px">No audio data yet \u2014 recording may still be uploading.</div>`;
   }
   const selectedCls = recordingsSelected.has(recIdKey) ? ' rec-selected' : '';
   return { status, meta, player, wave, extras, checked, selectedCls, recIdKey };
@@ -7289,6 +7450,7 @@ function renderRemoteRecordings() {
     div.dataset.recid = recIdKey;
     div.dataset.blob = entry._blobUrl || '';
     div.dataset.parts = String(entry._partsCount);
+    div.dataset.audio = entry._partsCount > 0 ? 'ready' : String(entry._audioState || 'idle');
     div.dataset.status = entry.meta.status || '';
     div.style.cssText = (recordingsSelected.has(recIdKey) ? 'outline:1px solid var(--accent);' : '') + 'border:1px solid var(--border);padding:8px 10px;border-radius:var(--radius);margin-bottom:8px;background:var(--card)';
     div.innerHTML = `
@@ -7306,11 +7468,16 @@ function renderRemoteRecordings() {
   }
   // Reorder / update in display order
   let insertBefore = header.nextSibling;
+  // Never let a stale cursor break rendering: only insert before a real child.
+  const placeNode = (node) => {
+    if (insertBefore && insertBefore.parentNode === list) list.insertBefore(node, insertBefore);
+    else list.appendChild(node);
+  };
   // We will iterate cache in order and ensure each card is at correct position, reusing when possible
   for (const entry of recordingsCache) {
     const id = entry._recId;
     let el = existingMap.get(id);
-    const needsRebuild = !el || el.dataset.blob !== (entry._blobUrl || '') || el.dataset.parts !== String(entry._partsCount) || el.dataset.status !== (entry.meta.status || '');
+    const needsRebuild = !el || el.dataset.blob !== (entry._blobUrl || '') || el.dataset.parts !== String(entry._partsCount) || el.dataset.status !== (entry.meta.status || '') || el.dataset.audio !== (entry._partsCount > 0 ? 'ready' : String(entry._audioState || 'idle'));
     const isPlaying = playingMap.has(id);
     // If playing and blob unchanged (and needsRebuild false) -> reuse as-is, just update selection outline/meta if needed
     if (el && !needsRebuild) {
@@ -7332,20 +7499,18 @@ function renderRemoteRecordings() {
       // keep in correct order
       if (el !== insertBefore) {
         // move to correct position
-        if (insertBefore) list.insertBefore(el, insertBefore);
-        else list.appendChild(el);
+        placeNode(el);
       }
-      insertBefore = el.nextSibling;
+      insertBefore = el.parentNode === list ? el.nextSibling : insertBefore;
       continue;
     }
     if (el && isPlaying && needsRebuild) {
       // Defer rebuild for playing card: keep old node, mark for later refresh after pause
       el.dataset.needsRefresh = '1';
       if (el !== insertBefore) {
-        if (insertBefore) list.insertBefore(el, insertBefore);
-        else list.appendChild(el);
+        placeNode(el);
       }
-      insertBefore = el.nextSibling;
+      insertBefore = el.parentNode === list ? el.nextSibling : insertBefore;
       continue;
     }
     // Otherwise create new element (or replace)
@@ -7365,12 +7530,11 @@ function renderRemoteRecordings() {
       existingMap.set(id, newEl);
       if (newEl !== insertBefore) {
         // if there was a gap due to ordering, move again
-        if (insertBefore && newEl.nextSibling !== insertBefore) list.insertBefore(newEl, insertBefore);
+        if (!insertBefore || insertBefore.parentNode !== list || newEl.nextSibling !== insertBefore) placeNode(newEl);
       }
-      insertBefore = newEl.nextSibling;
+      insertBefore = newEl.parentNode === list ? newEl.nextSibling : insertBefore;
     } else {
-      if (insertBefore) list.insertBefore(newEl, insertBefore);
-      else list.appendChild(newEl);
+      placeNode(newEl);
       existingMap.set(id, newEl);
       insertBefore = newEl.nextSibling;
     }
@@ -7616,23 +7780,30 @@ if (recListEl) {
 }
 
 document.getElementById('remoteRecordingsList')?.addEventListener('click', async function(ev) {
+  const loadBtn = ev.target.closest && ev.target.closest('[data-loadrec]');
   const retryBtn = ev.target.closest && ev.target.closest('[data-retryrec]');
   const playAllBtn = ev.target.closest && ev.target.closest('[data-playall]');
-  const deviceId = selectedDevice || recordingDevice;
+  const deviceId = selectedDevice || recordingDevice || recordingsState.deviceId;
+  if (loadBtn && deviceId) {
+    const rid = loadBtn.dataset.loadrec;
+    const entry = recordingsCache.find(r => r._recId === rid);
+    if (entry) await loadRecordingAudio(entry, deviceId);
+    return;
+  }
   if (retryBtn && deviceId) {
     const rid = retryBtn.dataset.retryrec;
     retryBtn.textContent = 'Retrying…';
     retryBtn.disabled = true;
     try {
       const entry = recordingsCache.find(r => r._recId === rid);
-      const fresh = await loadRecording(deviceId, rid);
-      if (fresh && entry) {
-        fresh._lastReloadMs = Date.now();
-        if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
+      if (entry) {
+        entry._audioState = 'idle';
+        entry._partsCount = 0;
+        entry._blobUrl = null;
+        entry._partsData = null;
         if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
-        const idx = recordingsCache.indexOf(entry);
-        if (idx >= 0) recordingsCache[idx] = fresh;
-        renderRemoteRecordings();
+        entry._partUrls = null;
+        await loadRecordingAudio(entry, deviceId);
       }
     } catch (e) {}
     return;
