@@ -7078,58 +7078,75 @@ function sortRecordingsCache() {
 
 // Download and prepare one recording's audio. Runs only when the user presses play.
 async function loadRecordingAudio(entry, deviceId) {
-  if (!entry || entry._audioState === 'loading' || entry._audioState === 'ready') {
-    const card = document.querySelector(`.voice-card[data-recid="${entry && entry._recId}"]`);
+  if (!entry) return;
+  const rid = entry._recId;
+  if (entry._audioState === 'loading') {
+    // If a previous attempt is stuck, let the user retry instead of ignoring the tap.
+    if (entry._loadingStartedAt && (Date.now() - entry._loadingStartedAt) > 120000) {
+      entry._audioState = 'idle';
+      entry._loadingProgress = null;
+    } else {
+      return; // already in progress
+    }
+  }
+  if (entry._audioState === 'ready') {
+    const card = document.querySelector(`.voice-card[data-recid="${rid}"]`);
     const a = card && card.querySelector('audio');
     if (a) { try { a.play(); } catch (e) {} }
     return;
   }
   entry._audioState = 'loading';
-  const rid = entry._recId;
-  const cardNow = document.querySelector(`.voice-card[data-recid="${rid}"]`);
-  const btnNow = cardNow && cardNow.querySelector('[data-loadrec]');
-  if (btnNow) { btnNow.textContent = '\u23F3 Loading audio…'; btnNow.disabled = true; }
+  entry._loadingStartedAt = Date.now();
+  entry._loadingProgress = 'starting…';
+  entry._loadError = null;
+  try { renderRemoteRecordings(); } catch (e) { console.warn('render failed (loading)', e && e.message); }
+  let progressTimer = null;
+  let segDone = 0;
+  const totalSegs = entry.meta.segmentsCount || 0;
+  const updateProgress = (done, total) => {
+    if (total && done === total) segDone++;
+    entry._loadingProgress = totalSegs ? (segDone + ' of ' + totalSegs + ' segments') : (segDone + ' segments');
+    // Throttle re-render to avoid thrashing the DOM.
+    if (!progressTimer) {
+      progressTimer = setTimeout(() => { progressTimer = null; try { renderRemoteRecordings(); } catch (e) {} }, 400);
+    }
+  };
   try {
-    const parts = await fetchAllParts(deviceId, rid);
+    const parts = await fetchAllParts(deviceId, rid, (done, total) => updateProgress(done, total));
+    if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
     const missing = parts._missing || [];
     const expectedSegs = parts._expectedSegs || parts.length;
-    let blobUrl = null, peaks = null, duration = 0, sampleRate = 0, skipAssembly = false;
-    if (parts.length > 20) {
-      // Keep the page light: play these one by one instead of gluing them together.
-      skipAssembly = true;
-    } else if (parts.length) {
-      const decoded = await decodePartsToBlobUrl(parts);
-      if (decoded && decoded.blobUrl) {
-        blobUrl = decoded.blobUrl;
-        peaks = decoded.peaks;
-        duration = decoded.duration;
-        sampleRate = decoded.sampleRate;
-      }
-    }
     if (entry._blobUrl) safeRevokeBlob(entry._blobUrl);
     if (entry._partUrls) entry._partUrls.forEach(u => safeRevokeBlob(u));
-    entry._blobUrl = blobUrl;
-    entry._peaks = peaks;
-    entry._duration = duration || entry._duration;
-    entry._sampleRate = sampleRate;
+    entry._blobUrl = null;
+    entry._peaks = null;
+    entry._duration = entry._duration || (expectedSegs * 30);
+    entry._sampleRate = 0;
     entry._partsCount = parts.length;
-    entry._partsData = blobUrl ? null : parts;
+    entry._partsData = parts.length ? parts : null;
     entry._partUrls = null;
     entry._missing = missing;
     entry._expectedSegs = expectedSegs;
-    entry._skipAssembly = skipAssembly;
+    entry._skipAssembly = true;
     entry._lastPartsGrowMs = Date.now();
-    entry._audioState = blobUrl || parts.length ? 'ready' : 'error';
+    entry._loadingProgress = null;
+    entry._loadingStartedAt = 0;
+    entry._audioState = parts.length ? 'ready' : 'error';
+    if (!parts.length) entry._loadError = 'No audio data found. Try reloading the page.';
+    try { renderRemoteRecordings(); } catch (e) { console.warn('render failed (ready)', e && e.message); }
+    const card = document.querySelector(`.voice-card[data-recid="${rid}"]`);
+    const audio = card && card.querySelector('audio');
+    if (audio) { try { audio.play(); } catch (e) { /* autoplay may be blocked; user can press play */ } }
   } catch (e) {
+    if (progressTimer) { clearTimeout(progressTimer); progressTimer = null; }
     console.warn('loadRecordingAudio failed', rid, e && e.message);
     entry._audioState = 'error';
+    entry._loadingProgress = null;
+    entry._loadingStartedAt = 0;
+    entry._loadError = (e && e.message) ? e.message : 'Could not load audio.';
+    try { renderRemoteRecordings(); } catch (err) { console.warn('render failed (error)', err && err.message); }
   }
-  renderRemoteRecordings();
-  const card = document.querySelector(`.voice-card[data-recid="${rid}"]`);
-  const audio = card && card.querySelector('audio');
-  if (audio) { try { audio.play(); } catch (e) {} }
 }
-
 async function pollRemoteRecordings() {
   const deviceId = selectedDevice || recordingDevice;
   if (!deviceId) return;
@@ -7325,19 +7342,25 @@ function buildRecCardInnerHTML(entry) {
     if (partial) status += ` <span class="vmeta rec-badge-fallback" style="margin-left:4px">\u26A0 Partial — ${missing.length ? missing.length + ' segment(s) incomplete' : (entry.meta.missingSegments || '') + ' segment(s) missing'}</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry missing</button>`;
     else if (interrupted) status += ` <span class="vmeta rec-badge-fallback" style="margin-left:4px">Interrupted — playable so far</span>`;
   } else if (parts > 0 && entry._partsData && entry._partsData.length) {
-    const fallbackMsg = entry._skipAssembly ? 'Too long to play as one file' : 'Assembly failed';
-    status = `<span class="vmeta rec-badge-fallback" style="margin-left:8px">\u26A0 ${fallbackMsg} \u2014 playing parts individually</span> <button class="chip rec-playall" data-playall="${recIdKey}" style="font-size:11px">\u25B6 Play all</button> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
+    if (entry._audioState === 'ready' && !entry._blobUrl) {
+      status = `<span class="vmeta rec-badge-playable" style="margin-left:8px">\u25CF Playable (${parts} segment${parts > 1 ? 's' : ''}) \u2022 ${durLabel}s \u2014 plays in sequence</span> <button class="chip rec-playall" data-playall="${recIdKey}" style="font-size:11px;background:var(--accent);color:#000;border-color:var(--accent)">\u25B6 Play all</button>`;
+    } else {
+      const fallbackMsg = entry._skipAssembly ? 'Too long to play as one file' : 'Assembly failed';
+      status = `<span class="vmeta rec-badge-fallback" style="margin-left:8px">\u26A0 ${fallbackMsg} \u2014 playing parts individually</span> <button class="chip rec-playall" data-playall="${recIdKey}" style="font-size:11px">\u25B6 Play all</button> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
+    }
     if (missing.length) status += ` <span class="vmeta" style="margin-left:4px">${missing.length} segment(s) incomplete</span>`;
-    else if (interrupted) status += ` <span class="vmeta" style="margin-left:4px">Interrupted — playable so far</span>`;
+    else if (interrupted) status += ` <span class="vmeta" style="margin-left:4px">Interrupted \u2014 playable so far</span>`;
   } else if (parts > 0) {
     status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Could not load audio</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
   } else if (inProgress) {
     const partLabel = (recData.partsTotal ? ` \u2014 part ${((recData.partIndex || 0) + 1)} of ${recData.partsTotal}` : '');
     status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u25CF Recording in progress${partLabel} \u2014 audio appears when this part finishes</span>`;
   } else if (audioState === 'loading') {
-    status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u23F3 Loading audio\u2026</span>`;
+    const prog = entry._loadingProgress ? ' \u2014 ' + entry._loadingProgress : '';
+    status = `<span class="vmeta rec-badge-nodata" style="margin-left:8px">\u23F3 Loading audio\u2026${prog}</span>`;
   } else if (audioState === 'error') {
     status = `<span class="vmeta" style="color:var(--danger);margin-left:8px">\u26A0 Could not load audio</span> <button class="chip rec-retry" data-retryrec="${recIdKey}" style="font-size:11px">Retry</button>`;
+    if (entry._loadError) status += ` <span class="vmeta" style="margin-left:4px;font-size:11px">${escHtml(entry._loadError)}</span>`;
   } else if (expectedSegs > 0) {
     status = `<span class="vmeta rec-badge-playable" style="margin-left:8px">\u25CF ${durLabel ? durLabel + 's \u2022 ' : ''}${expectedSegs} segment${expectedSegs > 1 ? 's' : ''} \u2014 not loaded</span>`;
     if (partial) status += ` <span class="vmeta rec-badge-fallback" style="margin-left:4px">\u26A0 Partial \u2014 ${(entry.meta.missingSegments || missing.length || '')} segment(s) missing</span>`;
@@ -7368,6 +7391,7 @@ function buildRecCardInnerHTML(entry) {
     player = `<audio controls preload="metadata" src="${entry._blobUrl}" type="audio/wav" data-recid="${recIdKey}" style="width:100%"></audio>`;
   } else if (parts > 0 && entry._partsData && entry._partsData.length) {
     if (!entry._partUrls) entry._partUrls = entry._partsData.map(b64 => base64ToBlobUrl(b64, mt));
+    if (entry._partUrls && entry._partsData) entry._partsData = null;
     player = entry._partUrls.map((pUrl, i) =>
       `<div style="display:flex;align-items:center;gap:6px;margin-top:5px"><span style="font-size:11px;color:var(--muted);min-width:64px">Part ${i + 1}</span><audio controls preload="metadata" src="${pUrl}" type="${mt}" data-recid="${recIdKey}" data-part="${i}" style="width:100%"></audio><a class="chip rec-dl" href="${pUrl}" download="recording_${recIdKey.substring(0,8)}_part${i+1}${mt.includes('wav')?'.wav':'.m4a'}" style="font-size:11px;padding:2px 6px">\u2B07</a></div>`
     ).join('');
@@ -7376,7 +7400,8 @@ function buildRecCardInnerHTML(entry) {
   } else if (inProgress) {
     player = `<div style="font-size:12px;color:var(--muted);margin-top:6px">Audio appears here as soon as this part finishes recording.</div>`;
   } else if (audioState === 'loading') {
-    player = `<div style="font-size:12px;color:var(--muted);margin-top:6px">Downloading audio\u2026 this can take a few seconds.</div>`;
+    const prog = entry._loadingProgress ? ' (' + entry._loadingProgress + ')' : '';
+    player = `<div style="font-size:12px;color:var(--muted);margin-top:6px">Downloading audio\u2026${prog} this can take a moment for long recordings.</div>`;
   } else if (audioState === 'error') {
     player = `<div style="font-size:12px;color:var(--danger);margin-top:6px">Could not load the audio \u2014 press Retry above.</div>`;
   } else if (expectedSegs > 0) {
@@ -7389,6 +7414,7 @@ function buildRecCardInnerHTML(entry) {
 }
 
 function renderRemoteRecordings() {
+  try {
   const list = document.getElementById('remoteRecordingsList');
   if (!list) return;
   const countBadge = document.getElementById('recCountBadge');
@@ -7563,6 +7589,7 @@ function renderRemoteRecordings() {
       if (canvas && audio) drawRecWaveform(canvas, entry._peaks, audio, entry._duration);
     }
   });
+  } catch (e) { console.warn('renderRemoteRecordings failed:', e && e.message); }
 }
 
 function updateRecordingsSelectionUI() {
