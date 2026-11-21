@@ -6918,7 +6918,9 @@ async function decodePartsToBlobUrl(parts) {
     const ctx = getRecAudioCtx();
     if (!ctx) return null;
     const pcmChunks = [];
-    const partPeaks = [];
+    // Keep the full decoded audio (mono) so we can compute one accurate
+    // peak list across the whole recording instead of per-chunk peaks.
+    const allMono = [];
     let sampleRate = 0;
     let totalFrames = 0;
     for (let pi = 0; pi < parts.length; pi++) {
@@ -6946,7 +6948,8 @@ async function decodePartsToBlobUrl(parts) {
           }
           pcmChunks.push(chunk);
           totalFrames += mono.length;
-          partPeaks.push(downsamplePeaks(mono, 100));
+          // Accumulate mono samples for accurate global peak computation.
+          allMono.push(mono);
           if (!sampleRate) sampleRate = ab.sampleRate || 44100;
         }
       } catch (e) {
@@ -6957,10 +6960,15 @@ async function decodePartsToBlobUrl(parts) {
     if (!pcmChunks.length) return null;
     const sr = sampleRate || 44100;
     if (totalFrames > sr * 7200) { console.warn('decodePartsToBlobUrl: recording too long for PCM assembly'); return null; }
-    // combine part peaks into 800 bars
-    const combined = [];
-    for (const p of partPeaks) combined.push(...p);
-    const peaks = combined.length ? downsamplePeaksArray(combined, 800) : [];
+    // Compute peaks directly from the full decoded audio at a high resolution
+    // (about 4 bars per second, capped at 4000) so timing stays accurate and
+    // quiet detail is not averaged away by per-chunk downsampling.
+    const targetBars = Math.min(4000, Math.max(800, Math.round((totalFrames / sr) * 4)));
+    // Build one contiguous mono array.
+    const monoAll = new Float32Array(totalFrames);
+    let off = 0;
+    for (const m of allMono) { monoAll.set(m, off); off += m.length; }
+    const peaks = downsamplePeaks(monoAll, targetBars);
     const header = makeWavHeader(totalFrames, sr);
     const blobUrl = URL.createObjectURL(new Blob([header, ...pcmChunks], { type: 'audio/wav' }));
     return { blobUrl, peaks, duration: totalFrames / sr, sampleRate: sr };
@@ -7692,14 +7700,32 @@ function drawRecWaveform(canvas, peaks, audio, duration) {
   // background grid
   ctx.fillStyle = '#0d1117';
   ctx.fillRect(0,0,w,h);
-  // draw peaks
-  const barCount = peaks.length;
+  // If we have more peaks than pixels, aggregate neighbouring peaks so we
+  // draw exactly one bar per pixel (sharper, no wasted data).
+  let drawPeaks = peaks;
+  if (peaks.length > w && w > 0) {
+    const per = peaks.length / w;
+    drawPeaks = [];
+    for (let i = 0; i < w; i++) {
+      const start = Math.floor(i * per);
+      const end = Math.min(peaks.length, Math.floor((i + 1) * per));
+      let min = 1, max = -1;
+      for (let j = start; j < end; j++) {
+        const p = peaks[j];
+        if (p.min < min) min = p.min;
+        if (p.max > max) max = p.max;
+      }
+      if (min === 1 && max === -1) { min = 0; max = 0; }
+      drawPeaks.push({ min, max });
+    }
+  }
+  const barCount = drawPeaks.length;
   const gap = w / barCount * 0.3;
   const barW = w / barCount - gap;
   const mid = h / 2;
   const ampScale = (h * 0.42);
   for (let i=0;i<barCount;i++) {
-    const p = peaks[i];
+    const p = drawPeaks[i];
     const x = i * (w / barCount) + gap/2;
     const y1 = mid - Math.max(0, p.max) * ampScale;
     const y2 = mid - Math.min(0, p.min) * ampScale;
