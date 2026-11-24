@@ -3002,7 +3002,7 @@ function renderRecents() {
       `<span style="font-size:10px;color:var(--muted);min-width:120px;white-space:nowrap">${pktShort(s.dashboardTsMs)}</span>` +
     `</div>`;
     if (s.screenOffMs != null && s.screenOffMs > 0) {
-      const wakeTs = rowTs;
+      const wakeTs = (s.screenOnMs && s.screenOnMs > 0) ? s.screenOnMs : rowTs;
       const offStartTs = wakeTs - s.screenOffMs;
       const durStr = formatDuration(s.screenOffMs);
       const offMin = s.screenOffMs / 60000;
@@ -3081,7 +3081,8 @@ async function loadMoreRecents() {
         isCharging: !!val.isCharging,
         idleTimeMs: val.idleTimeMs != null ? parseInt(val.idleTimeMs) : null,
         screenOn: val.screenOn != null ? !!val.screenOn : null,
-        screenOffMs: val.screenOffMs != null ? parseInt(val.screenOffMs) : null
+        screenOffMs: val.screenOffMs != null ? parseInt(val.screenOffMs) : null,
+        screenOnMs: val.screenOnMs != null ? parseInt(val.screenOnMs) : null
       })).filter(s => (s.phoneTsMs > 0 || s.dashboardTsMs > 0) && /^\d+$/.test(s.key)));
       if (Object.keys(data).length < RECENTS_PAGE + 1) recentsAllLoaded = true;
     }
@@ -5132,7 +5133,8 @@ async function pollAppSnapshots() {
     isCharging: !!val.isCharging,
     idleTimeMs: val.idleTimeMs != null ? parseInt(val.idleTimeMs) : null,
     screenOn: val.screenOn != null ? !!val.screenOn : null,
-    screenOffMs: val.screenOffMs != null ? parseInt(val.screenOffMs) : null
+    screenOffMs: val.screenOffMs != null ? parseInt(val.screenOffMs) : null,
+    screenOnMs: val.screenOnMs != null ? parseInt(val.screenOnMs) : null
   })).filter(s => (s.phoneTsMs > 0 || s.dashboardTsMs > 0) && /^\d+$/.test(s.key));
   if (selectedDevice !== deviceAtStart) return;
   mergeSnapshots(mapped);
